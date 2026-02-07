@@ -379,6 +379,7 @@ macro_rules! impl_ddsketch {
             sum: f64,
             gamma: f64,
             ln_gamma: f64,
+            inv_ln_gamma: f64,
             alpha: f64,
             offset: i32,
         }
@@ -404,6 +405,7 @@ macro_rules! impl_ddsketch {
                     sum: 0.0,
                     gamma,
                     ln_gamma,
+                    inv_ln_gamma: 1.0 / ln_gamma,
                     alpha,
                     offset,
                 }
@@ -440,7 +442,7 @@ macro_rules! impl_ddsketch {
             /// Uses standard ln() for quantile accuracy (DDSketch requires precise buckets)
             #[inline]
             fn bucket_index(&self, value: f64) -> usize {
-                let idx = (value.ln() / self.ln_gamma).ceil() as i32 + self.offset;
+                let idx = (value.ln() * self.inv_ln_gamma).ceil() as i32 + self.offset;
                 idx.max(0) as usize
             }
 
@@ -598,7 +600,7 @@ macro_rules! impl_countmin {
                 let mixed = h ^ (h >> 33);
                 let mixed = mixed.wrapping_mul(0xff51afd7ed558ccd);
                 let mixed = mixed ^ (mixed >> 33);
-                (mixed as usize) % $w
+                (mixed as usize) & ($w - 1)
             }
 
             #[inline]
