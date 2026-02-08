@@ -86,6 +86,10 @@ pub mod anomaly;
 pub mod pipeline;
 pub mod privacy;
 pub mod sketch;
+#[cfg(feature = "queue")]
+pub mod queue_bridge;
+#[cfg(feature = "pyo3")]
+pub mod python;
 
 /// Prelude for convenient imports
 pub mod prelude {
@@ -112,6 +116,11 @@ pub mod prelude {
 
 // Re-export main types at crate root
 pub use prelude::*;
+
+#[cfg(feature = "queue")]
+pub use queue_bridge::{
+    encode_metric_payload, parse_metric_event, QueueConsumerPipeline, METRIC_PAYLOAD_SIZE,
+};
 
 // ============================================================================
 // Integration Tests

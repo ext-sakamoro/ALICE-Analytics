@@ -350,6 +350,15 @@ let total_unique = node1_hll.cardinality(); // ≈ 1000
 | StreamingMedian push | O(N) | O(W) | Binary search + memmove |
 | StreamingMedian median | O(1) | - | Direct array access |
 
+## Test Suite
+
+42 tests covering sketches, privacy, anomaly detection, pipeline integration, and queue bridge:
+
+```bash
+cargo test                  # Run 37 core tests
+cargo test --features queue # Run all 42 tests (including queue bridge)
+```
+
 ## Building
 
 ```bash
@@ -359,12 +368,66 @@ cargo build --release
 # no_std build (for embedded/WASM)
 cargo build --release --no-default-features
 
-# Run tests
-cargo test
-
 # With SIMD optimizations (AVX2 zero counting)
 cargo build --release --features simd
+
+# With queue bridge
+cargo build --release --features queue
 ```
+
+## Data Pipeline (ALICE-Queue Bridge)
+
+Enable with `--features queue` to bridge ALICE-Queue message transport with ALICE-Analytics streaming aggregation.
+
+```toml
+[dependencies]
+alice-analytics = { path = "../ALICE-Analytics", features = ["queue"] }
+```
+
+### Architecture
+
+```
+Sensor/App ──► ALICE-Queue (SPSC + WAL)
+                     ↓  dequeue
+              QueueConsumerPipeline
+                     ↓  parse + submit
+              MetricPipeline (HLL++, DDSketch, streaming)
+                     ↓  flush
+              ALICE-DB (Model-Based LSM-Tree)
+```
+
+### Usage
+
+```rust
+use alice_analytics::{QueueConsumerPipeline, encode_metric_payload, MetricEvent, FnvHasher};
+use alice_queue::Message;
+
+// Create combined consumer pipeline
+let mut consumer = QueueConsumerPipeline::<128, 512, 1024>::new(0.05);
+
+// Producer side: encode metrics into queue messages
+let hash = FnvHasher::hash_bytes(b"http.requests");
+let payload = encode_metric_payload(&MetricEvent::counter(hash, 1.0));
+let msg = Message::new([0u8; 32], 1, payload.to_vec());
+consumer.queue.enqueue(msg).unwrap();
+
+// Consumer side: drain queue → pipeline
+let processed = consumer.drain();
+
+// Access aggregated data
+if let Some(slot) = consumer.pipeline.get_slot(hash) {
+    println!("Requests: {}", slot.counter);
+}
+```
+
+### Payload Format
+
+| Offset | Size | Field | Description |
+|--------|------|-------|-------------|
+| 0 | 1 | type | 0=Counter, 1=Gauge, 2=Histogram, 3=Unique |
+| 1 | 8 | name_hash | Metric name hash (LE) |
+| 9 | 8 | value | Metric value as f64 (LE) |
+| | **17** | **Total** | **Compact per-event payload** |
 
 ## Cargo Features
 
@@ -372,6 +435,7 @@ cargo build --release --features simd
 |---------|---------|-------------|
 | `std` | Yes | Standard library support |
 | `simd` | No | AVX2-accelerated HyperLogLog zero counting |
+| `queue` | No | ALICE-Queue bridge (Message → MetricEvent streaming) |
 
 ## Mathematical Background
 

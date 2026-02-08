@@ -97,7 +97,8 @@ impl<T: Copy + Default, const N: usize> RingBuffer<T, N> {
 
     /// Clear the buffer
     pub fn clear(&mut self) {
-        while self.pop().is_some() {}
+        self.write_pos = 0;
+        self.read_pos = 0;
         self.dropped = 0;
     }
 }

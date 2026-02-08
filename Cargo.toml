@@ -12,14 +12,20 @@ categories = ["algorithms", "data-structures", "science"]
 [lib]
 name = "alice_analytics"
 path = "src/lib.rs"
+crate-type = ["rlib", "cdylib"]
 
 [features]
 default = ["std"]
 std = []
 simd = []  # SIMD-accelerated hash and register updates
+queue = ["alice-queue"]  # ALICE-Queue bridge (Message → MetricEvent streaming)
+pyo3 = ["dep:pyo3", "dep:numpy", "std"]  # Python bindings
 
 [dependencies]
-# No external dependencies - pure Rust implementation
+# ALICE-Queue bridge (optional)
+alice-queue = { path = "../ALICE-Queue", optional = true }
+pyo3 = { version = "0.27", features = ["extension-module"], optional = true }
+numpy = { version = "0.27", optional = true }
 
 [profile.release]
 opt-level = 3
