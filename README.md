@@ -436,6 +436,38 @@ if let Some(slot) = consumer.pipeline.get_slot(hash) {
 | `std` | Yes | Standard library support |
 | `simd` | No | AVX2-accelerated HyperLogLog zero counting |
 | `queue` | No | ALICE-Queue bridge (Message → MetricEvent streaming) |
+| `db` | No | ALICE-DB bridge (HLL/DDSketch/Anomaly → time-series persistence) |
+
+## DB Bridge (ALICE-DB Persistence)
+
+Enable with `--features db` to persist streaming analytics metrics into [ALICE-DB](../ALICE-DB) time-series storage. Each metric type (cardinality, quantile, anomaly) is stored in a separate ALICE-DB instance for efficient time-range queries.
+
+```toml
+[dependencies]
+alice-analytics = { path = "../ALICE-Analytics", features = ["db"] }
+```
+
+```rust
+use alice_analytics::db_bridge::AnalyticsSink;
+
+// Open DB-backed sink (creates 3 ALICE-DB instances)
+let sink = AnalyticsSink::open("/tmp/analytics")?;
+
+// Record HyperLogLog cardinality estimates
+sink.record_cardinality(timestamp_ms, estimate)?;
+
+// Record DDSketch quantile values
+sink.record_quantile(timestamp_ms, p99_value)?;
+
+// Record anomaly scores
+sink.record_anomaly(timestamp_ms, score)?;
+
+// Batch insert for high-throughput
+sink.record_cardinality_batch(&[(ts1, est1), (ts2, est2)])?;
+
+// Time-range query
+let history = sink.query_cardinality(start_ms, end_ms)?;
+```
 
 ## Mathematical Background
 
