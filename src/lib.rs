@@ -88,6 +88,8 @@ pub mod privacy;
 pub mod sketch;
 #[cfg(feature = "queue")]
 pub mod queue_bridge;
+#[cfg(feature = "db")]
+pub mod db_bridge;
 #[cfg(feature = "pyo3")]
 pub mod python;
 

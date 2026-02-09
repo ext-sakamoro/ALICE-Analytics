@@ -19,11 +19,13 @@ default = ["std"]
 std = []
 simd = []  # SIMD-accelerated hash and register updates
 queue = ["alice-queue"]  # ALICE-Queue bridge (Message → MetricEvent streaming)
+db = ["dep:alice-db", "std"]  # ALICE-DB bridge (persist analytics to time-series)
 pyo3 = ["dep:pyo3", "dep:numpy", "std"]  # Python bindings
 
 [dependencies]
 # ALICE-Queue bridge (optional)
 alice-queue = { path = "../ALICE-Queue", optional = true }
+alice-db = { path = "../ALICE-DB", optional = true, default-features = false }
 pyo3 = { version = "0.27", features = ["extension-module"], optional = true }
 numpy = { version = "0.27", optional = true }
 
