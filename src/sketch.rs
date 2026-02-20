@@ -82,7 +82,7 @@ const POW2_NEG_LUT: [f64; 65] = [
 
 /// Fast approximate log2 using IEEE 754 bit extraction
 /// Returns floor(log2(x)) for positive x, useful for bucket indexing
-#[inline]
+#[inline(always)]
 fn fast_log2_approx(x: f64) -> f64 {
     // IEEE 754 double: sign(1) | exponent(11) | mantissa(52)
     // For positive x: log2(x) ≈ exponent - 1023 + mantissa_fraction
@@ -91,9 +91,10 @@ fn fast_log2_approx(x: f64) -> f64 {
     let mantissa = bits & 0xFFFFFFFFFFFFF;
 
     // exponent - 1023 gives the integer part of log2
-    // mantissa / 2^52 gives a value in [0, 1) for linear interpolation
+    // mantissa * (1/2^52) gives a value in [0, 1) for linear interpolation
+    const RCP_POW2_52: f64 = 1.0 / 4503599627370496.0; // 1/2^52, precomputed
     let int_part = exponent - 1023;
-    let frac_part = mantissa as f64 / 4503599627370496.0; // 2^52
+    let frac_part = mantissa as f64 * RCP_POW2_52;
 
     int_part as f64 + frac_part
 }
@@ -261,10 +262,12 @@ macro_rules! impl_hyperloglog {
                 }
 
                 let m = Self::M as f64;
-                let raw_estimate = Self::ALPHA * m * m / sum;
+                let inv_sum = 1.0 / sum;
+                let raw_estimate = Self::ALPHA * m * m * inv_sum;
 
                 if raw_estimate <= 2.5 * m && zeros > 0 {
-                    m * (m / zeros as f64).ln()
+                    let inv_zeros = 1.0 / zeros as f64;
+                    m * (m * inv_zeros).ln()
                 } else {
                     raw_estimate
                 }
@@ -448,13 +451,14 @@ macro_rules! impl_ddsketch {
 
             /// Fast bucket index using IEEE 754 bit extraction (for non-critical paths)
             /// ~10x faster than ln() but has ~1-2% error
-            #[inline]
+            #[inline(always)]
             #[allow(dead_code)]
             fn bucket_index_fast(&self, value: f64) -> usize {
                 const LN2: f64 = 0.6931471805599453;
                 let log2_gamma = self.ln_gamma / LN2;
+                let inv_log2_gamma = 1.0 / log2_gamma;
                 let log2_value = fast_log2_approx(value);
-                let idx = (log2_value / log2_gamma).ceil() as i32 + self.offset;
+                let idx = (log2_value * inv_log2_gamma).ceil() as i32 + self.offset;
                 idx.max(0) as usize
             }
 
@@ -504,9 +508,9 @@ macro_rules! impl_ddsketch {
                 self.sum
             }
 
-            #[inline]
+            #[inline(always)]
             pub fn mean(&self) -> f64 {
-                if self.count == 0 { 0.0 } else { self.sum / self.count as f64 }
+                if self.count == 0 { 0.0 } else { self.sum * (1.0 / self.count as f64) }
             }
 
             #[inline]
@@ -657,9 +661,9 @@ macro_rules! impl_countmin {
                 self.total = 0;
             }
 
-            #[inline]
+            #[inline(always)]
             pub fn error_bound(&self) -> f64 {
-                core::f64::consts::E / ($w as f64)
+                core::f64::consts::E * (1.0 / ($w as f64))
             }
 
             #[inline]

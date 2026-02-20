@@ -128,7 +128,7 @@ impl StreamingMedian {
     }
 
     /// Get the current median estimate - O(1)
-    #[inline]
+    #[inline(always)]
     pub fn median(&mut self) -> f64 {
         if self.count == 0 {
             return 0.0;
@@ -136,7 +136,7 @@ impl StreamingMedian {
 
         let mid = self.count / 2;
         if self.count % 2 == 0 {
-            (self.sorted[mid - 1] + self.sorted[mid]) / 2.0
+            (self.sorted[mid - 1] + self.sorted[mid]) * 0.5
         } else {
             self.sorted[mid]
         }
@@ -318,7 +318,8 @@ impl MadDetector {
             };
         }
 
-        (value - self.cached_median).abs() / (self.cached_mad * Self::MAD_SCALE)
+        let inv_mad_scale = 1.0 / (self.cached_mad * Self::MAD_SCALE);
+        (value - self.cached_median).abs() * inv_mad_scale
     }
 
     /// Get the current median
@@ -468,7 +469,8 @@ impl EwmaDetector {
             };
         }
 
-        (value - self.ewma).abs() / std_dev
+        let inv_std = 1.0 / std_dev;
+        (value - self.ewma).abs() * inv_std
     }
 
     /// Get current EWMA
@@ -556,14 +558,15 @@ impl ZScoreDetector {
     /// Observe a new value (updates running statistics)
     pub fn observe(&mut self, value: f64) {
         self.count += 1;
+        let inv_count = 1.0 / self.count as f64;
         let delta = value - self.mean;
-        self.mean += delta / self.count as f64;
+        self.mean += delta * inv_count;
         let delta2 = value - self.mean;
         self.m2 += delta * delta2;
     }
 
     /// Get the variance
-    #[inline]
+    #[inline(always)]
     pub fn variance(&self) -> f64 {
         if self.count < 2 {
             0.0
@@ -589,7 +592,8 @@ impl ZScoreDetector {
             return (value - self.mean).abs() > 1e-10;
         }
 
-        let z_score = (value - self.mean).abs() / std_dev;
+        let inv_std = 1.0 / std_dev;
+        let z_score = (value - self.mean).abs() * inv_std;
         z_score > self.threshold_k
     }
 
@@ -603,7 +607,8 @@ impl ZScoreDetector {
                 0.0
             };
         }
-        (value - self.mean) / std_dev
+        let inv_std = 1.0 / std_dev;
+        (value - self.mean) * inv_std
     }
 
     /// Get current mean

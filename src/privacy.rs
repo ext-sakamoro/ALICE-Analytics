@@ -54,9 +54,11 @@ impl XorShift64 {
     }
 
     /// Generate uniform f64 in [0, 1)
-    #[inline]
+    #[inline(always)]
     pub fn next_f64(&mut self) -> f64 {
-        (self.next_u64() >> 11) as f64 / (1u64 << 53) as f64
+        // Multiply by 1/2^53 instead of dividing
+        const RCP_POW2_53: f64 = 1.0 / (1u64 << 53) as f64;
+        (self.next_u64() >> 11) as f64 * RCP_POW2_53
     }
 
     /// Generate uniform f64 in [low, high)
@@ -220,7 +222,8 @@ impl RandomizedResponse {
         if n == 0 {
             return 0.0;
         }
-        let observed_rate = k as f64 / n as f64;
+        let inv_n = 1.0 / n as f64;
+        let observed_rate = k as f64 * inv_n;
         // Debiasing: true_rate = (observed_rate - 0.5*(1-p)) / (p - 0.5*(1-p))
         // Simplifies to: true_rate = (observed_rate - 0.5 + 0.5*p) / (p - 0.5 + 0.5*p)
         //              = (2*observed_rate - 1 + p) / (2p - 1 + p)
@@ -229,7 +232,8 @@ impl RandomizedResponse {
         // P(report=1) = p*true_rate + (1-p)*0.5
         // observed_rate = p*true_rate + 0.5 - 0.5*p
         // true_rate = (observed_rate - 0.5 + 0.5*p) / p
-        let true_rate = (observed_rate - 0.5 + 0.5 * p_true) / p_true;
+        let inv_p_true = 1.0 / p_true;
+        let true_rate = (observed_rate - 0.5 + 0.5 * p_true) * inv_p_true;
         true_rate.clamp(0.0, 1.0)
     }
 }
@@ -450,7 +454,8 @@ impl PrivateAggregator {
         if self.count == 0 {
             0.0
         } else {
-            self.noisy_sum / self.count as f64
+            let inv_count = 1.0 / self.count as f64;
+            self.noisy_sum * inv_count
         }
     }
 
@@ -466,7 +471,8 @@ impl PrivateAggregator {
         if self.count == 0 {
             f64::INFINITY
         } else {
-            self.noise_scale * core::f64::consts::SQRT_2 / (self.count as f64).sqrt()
+            let inv_sqrt_n = 1.0 / (self.count as f64).sqrt();
+            self.noise_scale * core::f64::consts::SQRT_2 * inv_sqrt_n
         }
     }
 
