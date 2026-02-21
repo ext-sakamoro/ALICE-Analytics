@@ -42,10 +42,9 @@ impl PyHyperLogLog {
         self.inner.insert_hash(FnvHasher::hash_bytes(value.as_bytes()));
     }
 
-    /// Batch insert u64 hashes from NumPy array (GIL released).
-    fn insert_batch<'py>(&mut self, _py: Python<'py>, hashes: PyReadonlyArray1<'py, u64>) -> PyResult<()> {
+    /// Batch insert u64 hashes from NumPy array.
+    fn insert_batch(&mut self, hashes: PyReadonlyArray1<'_, u64>) -> PyResult<()> {
         let slice = hashes.as_slice().map_err(|e| PyValueError::new_err(e.to_string()))?;
-        // Cannot release GIL: &mut self
         for &h in slice {
             self.inner.insert_hash(h);
         }

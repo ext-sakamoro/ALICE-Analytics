@@ -454,8 +454,7 @@ macro_rules! impl_ddsketch {
             #[inline(always)]
             #[allow(dead_code)]
             fn bucket_index_fast(&self, value: f64) -> usize {
-                const LN2: f64 = 0.6931471805599453;
-                let log2_gamma = self.ln_gamma / LN2;
+                let log2_gamma = self.ln_gamma / std::f64::consts::LN_2;
                 let inv_log2_gamma = 1.0 / log2_gamma;
                 let log2_value = fast_log2_approx(value);
                 let idx = (log2_value * inv_log2_gamma).ceil() as i32 + self.offset;
