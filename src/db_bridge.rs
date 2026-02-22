@@ -36,8 +36,8 @@ impl AnalyticsSink {
             .map_err(|e| format!("cardinality db: {}", e))?;
         let quantile_db = AliceDB::open(format!("{}/quantile", dir))
             .map_err(|e| format!("quantile db: {}", e))?;
-        let anomaly_db = AliceDB::open(format!("{}/anomaly", dir))
-            .map_err(|e| format!("anomaly db: {}", e))?;
+        let anomaly_db =
+            AliceDB::open(format!("{}/anomaly", dir)).map_err(|e| format!("anomaly db: {}", e))?;
         Ok(Self {
             cardinality_db,
             quantile_db,
@@ -47,7 +47,9 @@ impl AnalyticsSink {
 
     /// Record a cardinality estimate (e.g., from HyperLogLog).
     pub fn record_cardinality(&self, timestamp_ms: u64, estimate: f64) {
-        let _ = self.cardinality_db.put(timestamp_ms as i64, estimate as f32);
+        let _ = self
+            .cardinality_db
+            .put(timestamp_ms as i64, estimate as f32);
     }
 
     /// Record a quantile estimate (e.g., P50/P99 from DDSketch).

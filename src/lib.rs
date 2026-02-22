@@ -83,15 +83,15 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 pub mod anomaly;
-pub mod pipeline;
-pub mod privacy;
-pub mod sketch;
-#[cfg(feature = "queue")]
-pub mod queue_bridge;
 #[cfg(feature = "db")]
 pub mod db_bridge;
+pub mod pipeline;
+pub mod privacy;
 #[cfg(feature = "pyo3")]
 pub mod python;
+#[cfg(feature = "queue")]
+pub mod queue_bridge;
+pub mod sketch;
 
 /// Prelude for convenient imports
 pub mod prelude {
@@ -107,12 +107,10 @@ pub mod prelude {
         LaplaceNoise, PrivacyBudget, PrivateAggregator, RandomizedResponse, Rappor, XorShift64,
     };
     pub use crate::sketch::{
-        CountMinSketch, CountMinSketch1024x5, CountMinSketch2048x7, CountMinSketch4096x5,
-        DDSketch, DDSketch128, DDSketch256, DDSketch512, DDSketch1024, DDSketch2048,
-        FnvHasher,
-        HeavyHitters, HeavyHitters5, HeavyHitters10, HeavyHitters20, HeavyHitterEntry,
-        HyperLogLog, HyperLogLog10, HyperLogLog12, HyperLogLog14, HyperLogLog16,
-        Mergeable,
+        CountMinSketch, CountMinSketch1024x5, CountMinSketch2048x7, CountMinSketch4096x5, DDSketch,
+        DDSketch1024, DDSketch128, DDSketch2048, DDSketch256, DDSketch512, FnvHasher,
+        HeavyHitterEntry, HeavyHitters, HeavyHitters10, HeavyHitters20, HeavyHitters5, HyperLogLog,
+        HyperLogLog10, HyperLogLog12, HyperLogLog14, HyperLogLog16, Mergeable,
     };
 }
 
@@ -143,7 +141,11 @@ mod tests {
 
         let estimate = hll.cardinality();
         // HyperLogLog16 has ~0.4% standard error, allow ±25% for robustness
-        assert!(estimate > 75000.0 && estimate < 125000.0, "estimate = {}", estimate);
+        assert!(
+            estimate > 75000.0 && estimate < 125000.0,
+            "estimate = {}",
+            estimate
+        );
     }
 
     #[test]
@@ -262,7 +264,11 @@ mod tests {
         // Check cardinality (HyperLogLog10 in MetricSlot)
         let user_slot = pipeline.get_slot(user_hash).unwrap();
         let cardinality = user_slot.hll.cardinality();
-        assert!(cardinality > 30.0 && cardinality < 70.0, "cardinality = {}", cardinality);
+        assert!(
+            cardinality > 30.0 && cardinality < 70.0,
+            "cardinality = {}",
+            cardinality
+        );
     }
 
     #[test]
@@ -284,7 +290,11 @@ mod tests {
 
         let estimate = node1.cardinality();
         // Should be close to 1000 (allow ±20% for statistical variance)
-        assert!(estimate > 800.0 && estimate < 1200.0, "estimate = {}", estimate);
+        assert!(
+            estimate > 800.0 && estimate < 1200.0,
+            "estimate = {}",
+            estimate
+        );
     }
 
     #[test]

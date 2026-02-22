@@ -125,7 +125,9 @@ impl FnvHasher {
 
     #[inline]
     pub const fn new() -> Self {
-        Self { state: Self::FNV_OFFSET }
+        Self {
+            state: Self::FNV_OFFSET,
+        }
     }
 
     /// Avalanche bit mixer (from MurmurHash3 finalizer)
@@ -335,10 +337,10 @@ macro_rules! impl_hyperloglog {
 }
 
 // Generate common HyperLogLog sizes
-impl_hyperloglog!(HyperLogLog10, 10, 1024);      // 1KB, ~3.2% error
-impl_hyperloglog!(HyperLogLog12, 12, 4096);      // 4KB, ~1.6% error
-impl_hyperloglog!(HyperLogLog14, 14, 16384);     // 16KB, ~0.8% error
-impl_hyperloglog!(HyperLogLog16, 16, 65536);     // 64KB, ~0.4% error
+impl_hyperloglog!(HyperLogLog10, 10, 1024); // 1KB, ~3.2% error
+impl_hyperloglog!(HyperLogLog12, 12, 4096); // 4KB, ~1.6% error
+impl_hyperloglog!(HyperLogLog14, 14, 16384); // 16KB, ~0.8% error
+impl_hyperloglog!(HyperLogLog16, 16, 65536); // 64KB, ~0.4% error
 
 /// Type alias for the most common HyperLogLog size (16KB, ~0.8% error)
 pub type HyperLogLog = HyperLogLog14;
@@ -367,7 +369,6 @@ pub type HyperLogLog = HyperLogLog14;
 /// let p99 = sketch.quantile(0.99);
 /// // p99 ≈ 500.0 (within 1% relative error)
 /// ```
-
 /// Macro to generate DDSketch implementations for specific bin counts
 macro_rules! impl_ddsketch {
     ($name:ident, $bins:expr) => {
@@ -509,7 +510,11 @@ macro_rules! impl_ddsketch {
 
             #[inline(always)]
             pub fn mean(&self) -> f64 {
-                if self.count == 0 { 0.0 } else { self.sum * (1.0 / self.count as f64) }
+                if self.count == 0 {
+                    0.0
+                } else {
+                    self.sum * (1.0 / self.count as f64)
+                }
             }
 
             #[inline]
@@ -540,10 +545,18 @@ macro_rules! impl_ddsketch {
 
         impl Mergeable for $name {
             fn merge(&mut self, other: &Self) {
-                for (dst, &src) in self.positive_bins.iter_mut().zip(other.positive_bins.iter()) {
+                for (dst, &src) in self
+                    .positive_bins
+                    .iter_mut()
+                    .zip(other.positive_bins.iter())
+                {
                     *dst += src;
                 }
-                for (dst, &src) in self.negative_bins.iter_mut().zip(other.negative_bins.iter()) {
+                for (dst, &src) in self
+                    .negative_bins
+                    .iter_mut()
+                    .zip(other.negative_bins.iter())
+                {
                     *dst += src;
                 }
                 self.zero_count += other.zero_count;
@@ -562,9 +575,9 @@ macro_rules! impl_ddsketch {
 }
 
 // Generate common DDSketch sizes
-impl_ddsketch!(DDSketch128, 128);   // Small, use alpha >= 0.1
-impl_ddsketch!(DDSketch256, 256);   // Medium, use alpha >= 0.05
-impl_ddsketch!(DDSketch512, 512);   // Good balance
+impl_ddsketch!(DDSketch128, 128); // Small, use alpha >= 0.1
+impl_ddsketch!(DDSketch256, 256); // Medium, use alpha >= 0.05
+impl_ddsketch!(DDSketch512, 512); // Good balance
 impl_ddsketch!(DDSketch1024, 1024); // High accuracy, alpha >= 0.02
 impl_ddsketch!(DDSketch2048, 2048); // Very high accuracy, alpha >= 0.01
 
@@ -667,7 +680,7 @@ macro_rules! impl_countmin {
 
             #[inline]
             pub fn confidence(&self) -> f64 {
-                1.0 - (-1.0 * $d as f64).exp()
+                1.0 - (-($d as f64)).exp()
             }
         }
 
@@ -751,11 +764,17 @@ macro_rules! impl_heavy_hitters {
                     self.top_k[idx].count = estimated;
                     self.sort_top_k();
                 } else if self.count < $k {
-                    self.top_k[self.count] = HeavyHitterEntry { hash, count: estimated };
+                    self.top_k[self.count] = HeavyHitterEntry {
+                        hash,
+                        count: estimated,
+                    };
                     self.count += 1;
                     self.sort_top_k();
                 } else if estimated > self.top_k[0].count {
-                    self.top_k[0] = HeavyHitterEntry { hash, count: estimated };
+                    self.top_k[0] = HeavyHitterEntry {
+                        hash,
+                        count: estimated,
+                    };
                     self.sort_top_k();
                 }
             }
@@ -834,7 +853,11 @@ mod tests {
 
         let estimate = hll.cardinality();
         // Relaxed tolerance due to statistical nature
-        assert!(estimate > 800.0 && estimate < 1200.0, "estimate = {}", estimate);
+        assert!(
+            estimate > 800.0 && estimate < 1200.0,
+            "estimate = {}",
+            estimate
+        );
     }
 
     #[test]
@@ -851,7 +874,11 @@ mod tests {
 
         hll1.merge(&hll2);
         let estimate = hll1.cardinality();
-        assert!(estimate > 800.0 && estimate < 1200.0, "estimate = {}", estimate);
+        assert!(
+            estimate > 800.0 && estimate < 1200.0,
+            "estimate = {}",
+            estimate
+        );
     }
 
     #[test]
@@ -865,7 +892,11 @@ mod tests {
 
         let estimate = hll.cardinality();
         // With 100K values in 64K registers, expect reasonable accuracy (±25%)
-        assert!(estimate > 75000.0 && estimate < 125000.0, "estimate = {}", estimate);
+        assert!(
+            estimate > 75000.0 && estimate < 125000.0,
+            "estimate = {}",
+            estimate
+        );
     }
 
     #[test]

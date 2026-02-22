@@ -3,15 +3,13 @@
 //! Streaming analytics with probabilistic data structures.
 //! Jupyter notebook integration with NumPy batch APIs.
 
-use pyo3::prelude::*;
-use pyo3::exceptions::PyValueError;
 use numpy::{IntoPyArray, PyArray1, PyReadonlyArray1};
+use pyo3::exceptions::PyValueError;
+use pyo3::prelude::*;
 
 use crate::anomaly::{EwmaDetector, MadDetector, ZScoreDetector};
 use crate::privacy::{LaplaceNoise, RandomizedResponse};
-use crate::sketch::{
-    CountMinSketch2048x7, DDSketch256, FnvHasher, HyperLogLog14, Mergeable,
-};
+use crate::sketch::{CountMinSketch2048x7, DDSketch256, FnvHasher, HyperLogLog14, Mergeable};
 
 // ============================================================================
 // HyperLogLog (Cardinality Estimation)
@@ -39,12 +37,15 @@ impl PyHyperLogLog {
 
     /// Insert a string value (hashed internally).
     fn insert_str(&mut self, value: &str) {
-        self.inner.insert_hash(FnvHasher::hash_bytes(value.as_bytes()));
+        self.inner
+            .insert_hash(FnvHasher::hash_bytes(value.as_bytes()));
     }
 
     /// Batch insert u64 hashes from NumPy array.
     fn insert_batch(&mut self, hashes: PyReadonlyArray1<'_, u64>) -> PyResult<()> {
-        let slice = hashes.as_slice().map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let slice = hashes
+            .as_slice()
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
         for &h in slice {
             self.inner.insert_hash(h);
         }
@@ -96,7 +97,9 @@ impl PyDDSketch {
 
     /// Batch insert values from NumPy array.
     fn insert_batch(&mut self, values: PyReadonlyArray1<'_, f64>) -> PyResult<()> {
-        let slice = values.as_slice().map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let slice = values
+            .as_slice()
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
         for &v in slice {
             self.inner.insert(v);
         }
@@ -166,12 +169,15 @@ impl PyCountMinSketch {
     }
 
     fn insert_str(&mut self, value: &str) {
-        self.inner.insert_hash(FnvHasher::hash_bytes(value.as_bytes()), 1);
+        self.inner
+            .insert_hash(FnvHasher::hash_bytes(value.as_bytes()), 1);
     }
 
     /// Batch insert u64 hashes.
     fn insert_batch(&mut self, hashes: PyReadonlyArray1<'_, u64>) -> PyResult<()> {
-        let slice = hashes.as_slice().map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let slice = hashes
+            .as_slice()
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
         for &h in slice {
             self.inner.insert_hash(h, 1);
         }
@@ -183,7 +189,8 @@ impl PyCountMinSketch {
     }
 
     fn estimate_str(&self, value: &str) -> u64 {
-        self.inner.estimate_hash(FnvHasher::hash_bytes(value.as_bytes()))
+        self.inner
+            .estimate_hash(FnvHasher::hash_bytes(value.as_bytes()))
     }
 
     fn total(&self) -> u64 {
@@ -229,7 +236,9 @@ impl PyMadDetector {
 
     /// Batch observe values (sequential, stateful).
     fn observe_batch(&mut self, values: PyReadonlyArray1<'_, f64>) -> PyResult<()> {
-        let slice = values.as_slice().map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let slice = values
+            .as_slice()
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
         for &v in slice {
             self.inner.observe(v);
         }
@@ -250,7 +259,9 @@ impl PyMadDetector {
         py: Python<'py>,
         values: PyReadonlyArray1<'py, f64>,
     ) -> PyResult<Bound<'py, PyArray1<bool>>> {
-        let slice = values.as_slice().map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let slice = values
+            .as_slice()
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
         let result: Vec<bool> = slice.iter().map(|&v| self.inner.is_anomaly(v)).collect();
         Ok(result.into_pyarray(py))
     }
@@ -261,7 +272,9 @@ impl PyMadDetector {
         py: Python<'py>,
         values: PyReadonlyArray1<'py, f64>,
     ) -> PyResult<Bound<'py, PyArray1<f64>>> {
-        let slice = values.as_slice().map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let slice = values
+            .as_slice()
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
         let result: Vec<f64> = slice.iter().map(|&v| self.inner.anomaly_score(v)).collect();
         Ok(result.into_pyarray(py))
     }
@@ -306,7 +319,9 @@ impl PyEwmaDetector {
     }
 
     fn observe_batch(&mut self, values: PyReadonlyArray1<'_, f64>) -> PyResult<()> {
-        let slice = values.as_slice().map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let slice = values
+            .as_slice()
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
         for &v in slice {
             self.inner.observe(v);
         }
@@ -327,10 +342,15 @@ impl PyEwmaDetector {
         py: Python<'py>,
         values: PyReadonlyArray1<'py, f64>,
     ) -> PyResult<Bound<'py, PyArray1<bool>>> {
-        let slice = values.as_slice().map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let slice = values
+            .as_slice()
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
         let detector = &self.inner;
         let result = py.detach(|| {
-            slice.iter().map(|&v| detector.is_anomaly(v)).collect::<Vec<bool>>()
+            slice
+                .iter()
+                .map(|&v| detector.is_anomaly(v))
+                .collect::<Vec<bool>>()
         });
         Ok(result.into_pyarray(py))
     }
@@ -341,10 +361,15 @@ impl PyEwmaDetector {
         py: Python<'py>,
         values: PyReadonlyArray1<'py, f64>,
     ) -> PyResult<Bound<'py, PyArray1<f64>>> {
-        let slice = values.as_slice().map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let slice = values
+            .as_slice()
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
         let detector = &self.inner;
         let result = py.detach(|| {
-            slice.iter().map(|&v| detector.anomaly_score(v)).collect::<Vec<f64>>()
+            slice
+                .iter()
+                .map(|&v| detector.anomaly_score(v))
+                .collect::<Vec<f64>>()
         });
         Ok(result.into_pyarray(py))
     }
@@ -389,7 +414,9 @@ impl PyZScoreDetector {
     }
 
     fn observe_batch(&mut self, values: PyReadonlyArray1<'_, f64>) -> PyResult<()> {
-        let slice = values.as_slice().map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let slice = values
+            .as_slice()
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
         for &v in slice {
             self.inner.observe(v);
         }
@@ -410,10 +437,15 @@ impl PyZScoreDetector {
         py: Python<'py>,
         values: PyReadonlyArray1<'py, f64>,
     ) -> PyResult<Bound<'py, PyArray1<bool>>> {
-        let slice = values.as_slice().map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let slice = values
+            .as_slice()
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
         let detector = &self.inner;
         let result = py.detach(|| {
-            slice.iter().map(|&v| detector.is_anomaly(v)).collect::<Vec<bool>>()
+            slice
+                .iter()
+                .map(|&v| detector.is_anomaly(v))
+                .collect::<Vec<bool>>()
         });
         Ok(result.into_pyarray(py))
     }
@@ -423,10 +455,15 @@ impl PyZScoreDetector {
         py: Python<'py>,
         values: PyReadonlyArray1<'py, f64>,
     ) -> PyResult<Bound<'py, PyArray1<f64>>> {
-        let slice = values.as_slice().map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let slice = values
+            .as_slice()
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
         let detector = &self.inner;
         let result = py.detach(|| {
-            slice.iter().map(|&v| detector.z_score(v)).collect::<Vec<f64>>()
+            slice
+                .iter()
+                .map(|&v| detector.z_score(v))
+                .collect::<Vec<f64>>()
         });
         Ok(result.into_pyarray(py))
     }
@@ -473,7 +510,9 @@ impl PyLaplaceNoise {
         py: Python<'py>,
         values: PyReadonlyArray1<'py, f64>,
     ) -> PyResult<Bound<'py, PyArray1<f64>>> {
-        let slice = values.as_slice().map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let slice = values
+            .as_slice()
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
         let result: Vec<f64> = slice.iter().map(|&v| self.inner.privatize(v)).collect();
         Ok(result.into_pyarray(py))
     }
@@ -539,9 +578,14 @@ fn fnv_hash_batch<'py>(
     py: Python<'py>,
     values: PyReadonlyArray1<'py, u64>,
 ) -> PyResult<Bound<'py, PyArray1<u64>>> {
-    let slice = values.as_slice().map_err(|e| PyValueError::new_err(e.to_string()))?;
+    let slice = values
+        .as_slice()
+        .map_err(|e| PyValueError::new_err(e.to_string()))?;
     let result = py.detach(|| {
-        slice.iter().map(|&v| FnvHasher::hash_u64(v)).collect::<Vec<u64>>()
+        slice
+            .iter()
+            .map(|&v| FnvHasher::hash_u64(v))
+            .collect::<Vec<u64>>()
     });
     Ok(result.into_pyarray(py))
 }

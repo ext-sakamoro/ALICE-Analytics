@@ -79,12 +79,18 @@ pub fn parse_metric_event(msg: &Message) -> Option<MetricEvent> {
     };
 
     let name_hash = u64::from_le_bytes([
-        payload[1], payload[2], payload[3], payload[4],
-        payload[5], payload[6], payload[7], payload[8],
+        payload[1], payload[2], payload[3], payload[4], payload[5], payload[6], payload[7],
+        payload[8],
     ]);
     let value = f64::from_le_bytes([
-        payload[9], payload[10], payload[11], payload[12],
-        payload[13], payload[14], payload[15], payload[16],
+        payload[9],
+        payload[10],
+        payload[11],
+        payload[12],
+        payload[13],
+        payload[14],
+        payload[15],
+        payload[16],
     ]);
 
     Some(MetricEvent {
@@ -275,21 +281,30 @@ mod tests {
         // 5 counters
         for _ in 0..5 {
             let payload = encode_metric_payload(&MetricEvent::counter(counter_hash, 1.0));
-            consumer.queue.enqueue(Message::new(test_sender(), seq, payload.to_vec())).unwrap();
+            consumer
+                .queue
+                .enqueue(Message::new(test_sender(), seq, payload.to_vec()))
+                .unwrap();
             seq += 1;
         }
 
         // 3 gauge updates
         for v in [50.0, 60.0, 70.0] {
             let payload = encode_metric_payload(&MetricEvent::gauge(gauge_hash, v));
-            consumer.queue.enqueue(Message::new(test_sender(), seq, payload.to_vec())).unwrap();
+            consumer
+                .queue
+                .enqueue(Message::new(test_sender(), seq, payload.to_vec()))
+                .unwrap();
             seq += 1;
         }
 
         // 4 histogram observations
         for v in [10.0, 20.0, 30.0, 100.0] {
             let payload = encode_metric_payload(&MetricEvent::histogram(hist_hash, v));
-            consumer.queue.enqueue(Message::new(test_sender(), seq, payload.to_vec())).unwrap();
+            consumer
+                .queue
+                .enqueue(Message::new(test_sender(), seq, payload.to_vec()))
+                .unwrap();
             seq += 1;
         }
 
@@ -318,7 +333,10 @@ mod tests {
         // Enqueue 20 events
         for i in 0..20u64 {
             let payload = encode_metric_payload(&MetricEvent::counter(hash, 1.0));
-            consumer.queue.enqueue(Message::new(test_sender(), i + 1, payload.to_vec())).unwrap();
+            consumer
+                .queue
+                .enqueue(Message::new(test_sender(), i + 1, payload.to_vec()))
+                .unwrap();
         }
 
         // Drain only 5
