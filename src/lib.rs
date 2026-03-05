@@ -97,6 +97,8 @@
 pub mod anomaly;
 #[cfg(feature = "db")]
 pub mod db_bridge;
+#[cfg(feature = "std")]
+pub mod export;
 pub mod pipeline;
 pub mod privacy;
 #[cfg(feature = "pyo3")]
@@ -104,6 +106,8 @@ pub mod python;
 #[cfg(feature = "queue")]
 pub mod queue_bridge;
 pub mod sketch;
+pub mod stats;
+pub mod window;
 
 /// Prelude for convenient imports
 pub mod prelude {
@@ -123,6 +127,12 @@ pub mod prelude {
         DDSketch1024, DDSketch128, DDSketch2048, DDSketch256, DDSketch512, FnvHasher,
         HeavyHitterEntry, HeavyHitters, HeavyHitters10, HeavyHitters20, HeavyHitters5, HyperLogLog,
         HyperLogLog10, HyperLogLog12, HyperLogLog14, HyperLogLog16, Mergeable,
+    };
+    pub use crate::stats::{
+        percentile_rank, iqr, quantile_sorted, CovarianceMatrix, IqrResult, StreamingStats,
+    };
+    pub use crate::window::{
+        HierarchicalRollup, SlidingWindow, TumblingWindow, WindowResult,
     };
 }
 
