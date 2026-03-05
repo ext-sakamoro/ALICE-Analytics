@@ -9,8 +9,8 @@
 //!
 //! | Feature | Description | Memory |
 //! |---------|-------------|--------|
-//! | **HyperLogLog++** | Cardinality estimation | O(2^P) ≈ 16KB |
-//! | **DDSketch** | Relative-error quantiles | O(log N) |
+//! | **`HyperLogLog`++** | Cardinality estimation | O(2^P) ≈ 16KB |
+//! | **`DDSketch`** | Relative-error quantiles | O(log N) |
 //! | **Count-Min Sketch** | Frequency estimation | O(w × d) |
 //! | **Local Differential Privacy** | Privacy-preserving aggregation | O(1) |
 //! | **Streaming Anomaly Detection** | Real-time outlier detection | O(W) |
@@ -19,7 +19,7 @@
 //!
 //! - **Zero Allocation**: All structures have fixed upper bounds at compile time
 //! - **Mergeable**: All sketches can be merged across distributed nodes
-//! - **no_std Compatible**: Works on embedded systems and WebAssembly
+//! - **`no_std` Compatible**: Works on embedded systems and WebAssembly
 //! - **Mathematical Guarantees**: Error bounds are provable, not empirical
 //!
 //! ## Quick Start
@@ -80,6 +80,18 @@
 //! assert!(detector.is_anomaly(100.0)); // Anomaly!
 //! ```
 
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    clippy::cast_lossless,
+    clippy::similar_names,
+    clippy::many_single_char_names,
+    clippy::module_name_repetitions,
+    clippy::inline_always,
+    clippy::too_many_lines
+)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
 pub mod anomaly;

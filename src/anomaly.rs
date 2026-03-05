@@ -15,8 +15,8 @@ pub const DEFAULT_WINDOW: usize = 100;
 /// Maintains a sorted array that is incrementally updated with O(N) memmove
 /// operations instead of O(N log N) sorting on each access.
 ///
-/// - push(): O(N) - binary search + memmove
-/// - median(): O(1) - direct array access
+/// - `push()`: O(N) - binary search + memmove
+/// - `median()`: O(1) - direct array access
 #[derive(Clone, Debug)]
 pub struct StreamingMedian {
     /// Circular buffer of recent values (insertion order)
@@ -34,6 +34,7 @@ impl StreamingMedian {
     pub const WINDOW: usize = DEFAULT_WINDOW;
 
     /// Create a new streaming median estimator
+    #[must_use]
     pub fn new() -> Self {
         Self {
             buffer: [0.0; DEFAULT_WINDOW],
@@ -147,12 +148,14 @@ impl StreamingMedian {
 
     /// Get count of values
     #[inline]
+    #[must_use]
     pub fn count(&self) -> usize {
         self.count
     }
 
     /// Check if buffer is full
     #[inline]
+    #[must_use]
     pub fn is_full(&self) -> bool {
         self.count >= DEFAULT_WINDOW
     }
@@ -179,7 +182,7 @@ impl Default for StreamingMedian {
 /// MAD-based anomaly detector
 ///
 /// Uses Median Absolute Deviation for robust outlier detection.
-/// MAD = median(|X_i - median(X)|)
+/// MAD = `median(|X_i` - median(X)|)
 ///
 /// An observation is anomalous if:
 /// |x - median| > k * MAD * 1.4826
@@ -232,6 +235,7 @@ impl MadDetector {
     ///
     /// # Arguments
     /// * `threshold_k` - Number of MAD units for anomaly threshold (typically 3.0)
+    #[must_use]
     pub fn new(threshold_k: f64) -> Self {
         Self {
             values_median: StreamingMedian::new(),
@@ -339,6 +343,7 @@ impl MadDetector {
 
     /// Get the threshold multiplier
     #[inline]
+    #[must_use]
     pub fn threshold_k(&self) -> f64 {
         self.threshold_k
     }
@@ -351,6 +356,7 @@ impl MadDetector {
 
     /// Get count of observations
     #[inline]
+    #[must_use]
     pub fn count(&self) -> usize {
         self.count
     }
@@ -412,6 +418,7 @@ impl EwmaDetector {
     /// # Arguments
     /// * `alpha` - Smoothing factor (0.0-1.0, higher = more reactive)
     /// * `threshold_k` - Number of standard deviations for anomaly threshold
+    #[must_use]
     pub fn new(alpha: f64, threshold_k: f64) -> Self {
         Self {
             alpha: alpha.clamp(0.001, 1.0),
@@ -443,6 +450,7 @@ impl EwmaDetector {
     }
 
     /// Check if a value is an anomaly (without updating)
+    #[must_use]
     pub fn is_anomaly(&self, value: f64) -> bool {
         if !self.initialized || self.count < 3 {
             return false;
@@ -458,6 +466,7 @@ impl EwmaDetector {
     }
 
     /// Get anomaly score (number of standard deviations)
+    #[must_use]
     pub fn anomaly_score(&self, value: f64) -> f64 {
         if !self.initialized {
             return 0.0;
@@ -478,18 +487,21 @@ impl EwmaDetector {
 
     /// Get current EWMA
     #[inline]
+    #[must_use]
     pub fn ewma(&self) -> f64 {
         self.ewma
     }
 
     /// Get current standard deviation estimate
     #[inline]
+    #[must_use]
     pub fn std_dev(&self) -> f64 {
         self.ewma_var.sqrt()
     }
 
     /// Get smoothing factor
     #[inline]
+    #[must_use]
     pub fn alpha(&self) -> f64 {
         self.alpha
     }
@@ -502,6 +514,7 @@ impl EwmaDetector {
 
     /// Get threshold multiplier
     #[inline]
+    #[must_use]
     pub fn threshold_k(&self) -> f64 {
         self.threshold_k
     }
@@ -514,6 +527,7 @@ impl EwmaDetector {
 
     /// Get count of observations
     #[inline]
+    #[must_use]
     pub fn count(&self) -> u64 {
         self.count
     }
@@ -549,6 +563,7 @@ pub struct ZScoreDetector {
 
 impl ZScoreDetector {
     /// Create a new Z-score detector
+    #[must_use]
     pub fn new(threshold_k: f64) -> Self {
         Self {
             mean: 0.0,
@@ -570,6 +585,7 @@ impl ZScoreDetector {
 
     /// Get the variance
     #[inline(always)]
+    #[must_use]
     pub fn variance(&self) -> f64 {
         if self.count < 2 {
             0.0
@@ -580,11 +596,13 @@ impl ZScoreDetector {
 
     /// Get the standard deviation
     #[inline]
+    #[must_use]
     pub fn std_dev(&self) -> f64 {
         self.variance().sqrt()
     }
 
     /// Check if a value is an anomaly
+    #[must_use]
     pub fn is_anomaly(&self, value: f64) -> bool {
         if self.count < 3 {
             return false;
@@ -601,6 +619,7 @@ impl ZScoreDetector {
     }
 
     /// Get the Z-score for a value
+    #[must_use]
     pub fn z_score(&self, value: f64) -> f64 {
         let std_dev = self.std_dev();
         if std_dev < 1e-10 {
@@ -616,12 +635,14 @@ impl ZScoreDetector {
 
     /// Get current mean
     #[inline]
+    #[must_use]
     pub fn mean(&self) -> f64 {
         self.mean
     }
 
     /// Get count
     #[inline]
+    #[must_use]
     pub fn count(&self) -> u64 {
         self.count
     }
@@ -680,6 +701,7 @@ pub struct CompositeDetector {
 
 impl CompositeDetector {
     /// Create a new composite detector with default settings
+    #[must_use]
     pub fn new() -> Self {
         Self {
             mad: MadDetector::new(3.0),
@@ -690,6 +712,7 @@ impl CompositeDetector {
     }
 
     /// Create with custom thresholds
+    #[must_use]
     pub fn with_thresholds(mad_k: f64, ewma_alpha: f64, ewma_k: f64, zscore_k: f64) -> Self {
         Self {
             mad: MadDetector::new(mad_k),
@@ -732,6 +755,7 @@ impl CompositeDetector {
 
     /// Get count of observations
     #[inline]
+    #[must_use]
     pub fn count(&self) -> u64 {
         self.zscore.count()
     }
@@ -873,5 +897,271 @@ mod tests {
 
         // Different value is anomaly (MAD = 0)
         assert!(detector.is_anomaly(5.1));
+    }
+
+    #[test]
+    fn test_streaming_median_default() {
+        let sm = StreamingMedian::default();
+        assert_eq!(sm.count(), 0);
+        assert!(!sm.is_full());
+    }
+
+    #[test]
+    fn test_streaming_median_empty() {
+        let mut sm = StreamingMedian::new();
+        assert_eq!(sm.median(), 0.0);
+    }
+
+    #[test]
+    fn test_streaming_median_clear() {
+        let mut sm = StreamingMedian::new();
+        sm.push(1.0);
+        sm.push(2.0);
+        assert_eq!(sm.count(), 2);
+        sm.clear();
+        assert_eq!(sm.count(), 0);
+    }
+
+    #[test]
+    fn test_streaming_median_full() {
+        let mut sm = StreamingMedian::new();
+        for i in 0..DEFAULT_WINDOW {
+            sm.push(i as f64);
+        }
+        assert!(sm.is_full());
+        assert_eq!(sm.count(), DEFAULT_WINDOW);
+    }
+
+    #[test]
+    fn test_streaming_median_wrap() {
+        let mut sm = StreamingMedian::new();
+        // Fill and then wrap
+        for i in 0..(DEFAULT_WINDOW + 10) {
+            sm.push(i as f64);
+        }
+        assert_eq!(sm.count(), DEFAULT_WINDOW);
+        let median = sm.median();
+        assert!(median > 0.0);
+    }
+
+    #[test]
+    fn test_mad_detector_insufficient_data() {
+        let mut detector = MadDetector::new(3.0);
+        detector.observe(10.0);
+        detector.observe(20.0);
+        // Less than 3 observations: never anomaly
+        assert!(!detector.is_anomaly(1000.0));
+    }
+
+    #[test]
+    fn test_mad_detector_count() {
+        let mut detector = MadDetector::new(3.0);
+        assert_eq!(detector.count(), 0);
+        detector.observe(1.0);
+        assert_eq!(detector.count(), 1);
+    }
+
+    #[test]
+    fn test_mad_detector_threshold_k() {
+        let detector = MadDetector::new(5.0);
+        assert!((detector.threshold_k() - 5.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_mad_detector_set_threshold() {
+        let mut detector = MadDetector::new(3.0);
+        detector.set_threshold_k(5.0);
+        assert!((detector.threshold_k() - 5.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_mad_detector_clear() {
+        let mut detector = MadDetector::new(3.0);
+        for v in [10.0, 11.0, 9.0, 10.5] {
+            detector.observe(v);
+        }
+        detector.clear();
+        assert_eq!(detector.count(), 0);
+    }
+
+    #[test]
+    fn test_mad_detector_anomaly_score() {
+        let mut detector = MadDetector::new(3.0);
+        for v in [10.0, 10.5, 9.5, 10.2, 9.8] {
+            detector.observe(v);
+        }
+        let score_normal = detector.anomaly_score(10.0);
+        let score_extreme = detector.anomaly_score(100.0);
+        assert!(score_extreme > score_normal);
+    }
+
+    #[test]
+    fn test_mad_detector_median_and_mad() {
+        let mut detector = MadDetector::new(3.0);
+        for v in [1.0, 2.0, 3.0, 4.0, 5.0] {
+            detector.observe(v);
+        }
+        let median = detector.median();
+        assert!((median - 3.0).abs() < 0.01);
+        let mad = detector.mad();
+        assert!(mad > 0.0);
+    }
+
+    #[test]
+    fn test_ewma_detector_not_initialized() {
+        let detector = EwmaDetector::new(0.1, 3.0);
+        assert!(!detector.is_anomaly(100.0));
+        assert_eq!(detector.anomaly_score(100.0), 0.0);
+    }
+
+    #[test]
+    fn test_ewma_detector_count() {
+        let mut detector = EwmaDetector::new(0.1, 3.0);
+        assert_eq!(detector.count(), 0);
+        detector.observe(10.0);
+        assert_eq!(detector.count(), 1);
+    }
+
+    #[test]
+    fn test_ewma_detector_alpha() {
+        let detector = EwmaDetector::new(0.2, 3.0);
+        assert!((detector.alpha() - 0.2).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_ewma_detector_set_alpha() {
+        let mut detector = EwmaDetector::new(0.1, 3.0);
+        detector.set_alpha(0.5);
+        assert!((detector.alpha() - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_ewma_detector_set_threshold() {
+        let mut detector = EwmaDetector::new(0.1, 3.0);
+        detector.set_threshold_k(5.0);
+        assert!((detector.threshold_k() - 5.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_ewma_detector_std_dev() {
+        let mut detector = EwmaDetector::new(0.1, 3.0);
+        for v in [10.0, 20.0, 30.0, 40.0, 50.0] {
+            detector.observe(v);
+        }
+        assert!(detector.std_dev() > 0.0);
+    }
+
+    #[test]
+    fn test_ewma_detector_reset() {
+        let mut detector = EwmaDetector::new(0.1, 3.0);
+        detector.observe(10.0);
+        detector.observe(20.0);
+        detector.reset();
+        assert_eq!(detector.count(), 0);
+    }
+
+    #[test]
+    fn test_zscore_detector_insufficient_data() {
+        let mut detector = ZScoreDetector::new(3.0);
+        detector.observe(10.0);
+        assert!(!detector.is_anomaly(1000.0));
+    }
+
+    #[test]
+    fn test_zscore_detector_variance() {
+        let mut detector = ZScoreDetector::new(3.0);
+        for v in [10.0, 20.0, 30.0] {
+            detector.observe(v);
+        }
+        assert!(detector.variance() > 0.0);
+        assert!(detector.std_dev() > 0.0);
+    }
+
+    #[test]
+    fn test_zscore_detector_z_score() {
+        let mut detector = ZScoreDetector::new(3.0);
+        for v in [10.0, 10.0, 10.0, 10.0, 10.0] {
+            detector.observe(v);
+        }
+        // All same values, z_score for 10.0 should be 0
+        let z = detector.z_score(10.0);
+        assert!(z.abs() < f64::EPSILON || z == 0.0);
+    }
+
+    #[test]
+    fn test_zscore_detector_count() {
+        let mut detector = ZScoreDetector::new(3.0);
+        detector.observe(1.0);
+        detector.observe(2.0);
+        assert_eq!(detector.count(), 2);
+    }
+
+    #[test]
+    fn test_zscore_detector_reset() {
+        let mut detector = ZScoreDetector::new(3.0);
+        detector.observe(1.0);
+        detector.observe(2.0);
+        detector.reset();
+        assert_eq!(detector.count(), 0);
+        assert_eq!(detector.mean(), 0.0);
+    }
+
+    #[test]
+    fn test_composite_detector_default() {
+        let detector = CompositeDetector::default();
+        assert_eq!(detector.count(), 0);
+    }
+
+    #[test]
+    fn test_composite_detector_with_thresholds() {
+        let detector = CompositeDetector::with_thresholds(2.0, 0.2, 2.5, 2.0);
+        assert!((detector.mad.threshold_k() - 2.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_composite_detector_consensus() {
+        let mut detector = CompositeDetector::new();
+        detector.require_consensus = true;
+        for v in [10.0, 10.5, 9.5, 10.2, 9.8, 10.1, 9.9] {
+            detector.observe(v);
+        }
+        // With consensus, borderline values less likely flagged
+        assert!(!detector.is_anomaly(10.0));
+    }
+
+    #[test]
+    fn test_composite_detector_reset() {
+        let mut detector = CompositeDetector::new();
+        detector.observe(10.0);
+        detector.observe(20.0);
+        detector.reset();
+        assert_eq!(detector.count(), 0);
+    }
+
+    #[test]
+    fn test_anomaly_event_clone() {
+        let event = AnomalyEvent {
+            value: 100.0,
+            score: 5.0,
+            expected: 10.0,
+            timestamp: 12345,
+            metric_id: 1,
+        };
+        let cloned = event.clone();
+        assert_eq!(cloned.value, 100.0);
+        assert_eq!(cloned.metric_id, 1);
+    }
+
+    #[test]
+    fn test_anomaly_event_debug() {
+        let event = AnomalyEvent {
+            value: 100.0,
+            score: 5.0,
+            expected: 10.0,
+            timestamp: 0,
+            metric_id: 0,
+        };
+        let s = format!("{:?}", event);
+        assert!(s.contains("value"));
     }
 }

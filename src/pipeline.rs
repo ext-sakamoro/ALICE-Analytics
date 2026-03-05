@@ -26,6 +26,7 @@ pub struct RingBuffer<T: Copy + Default, const N: usize> {
 
 impl<T: Copy + Default, const N: usize> RingBuffer<T, N> {
     /// Create a new empty ring buffer
+    #[must_use]
     pub fn new() -> Self {
         Self {
             buffer: [T::default(); N],
@@ -143,6 +144,7 @@ pub struct MetricEvent {
 impl MetricEvent {
     /// Create a counter increment event
     #[inline]
+    #[must_use]
     pub const fn counter(name_hash: u64, delta: f64) -> Self {
         Self {
             name_hash,
@@ -154,6 +156,7 @@ impl MetricEvent {
 
     /// Create a gauge event
     #[inline]
+    #[must_use]
     pub const fn gauge(name_hash: u64, value: f64) -> Self {
         Self {
             name_hash,
@@ -165,6 +168,7 @@ impl MetricEvent {
 
     /// Create a histogram observation
     #[inline]
+    #[must_use]
     pub const fn histogram(name_hash: u64, value: f64) -> Self {
         Self {
             name_hash,
@@ -176,6 +180,7 @@ impl MetricEvent {
 
     /// Create a unique item event
     #[inline]
+    #[must_use]
     pub const fn unique(name_hash: u64, item_hash: u64) -> Self {
         Self {
             name_hash,
@@ -187,6 +192,7 @@ impl MetricEvent {
 
     /// Set timestamp
     #[inline]
+    #[must_use]
     pub const fn with_timestamp(mut self, ts: u64) -> Self {
         self.timestamp = ts;
         self
@@ -206,9 +212,9 @@ pub struct MetricSlot {
     pub counter: f64,
     /// Gauge value (for Gauge type)
     pub gauge: f64,
-    /// HyperLogLog for unique counting (P=10, 1KB)
+    /// `HyperLogLog` for unique counting (P=10, 1KB)
     pub hll: HyperLogLog10,
-    /// DDSketch for histogram/quantiles (256 bins, use alpha >= 0.05)
+    /// `DDSketch` for histogram/quantiles (256 bins, use alpha >= 0.05)
     pub ddsketch: DDSketch256,
     /// Event count
     pub event_count: u64,
@@ -220,6 +226,7 @@ impl MetricSlot {
     /// Create a new metric slot
     ///
     /// Note: With 256 bins, use alpha >= 0.05 for best results
+    #[must_use]
     pub fn new(name_hash: u64, alpha: f64) -> Self {
         Self {
             name_hash,
@@ -316,7 +323,7 @@ pub struct MetricPipeline<const SLOTS: usize, const QUEUE_SIZE: usize> {
     slots: [Option<MetricSlot>; SLOTS],
     /// Event queue (ring buffer)
     queue: RingBuffer<MetricEvent, QUEUE_SIZE>,
-    /// DDSketch alpha parameter
+    /// `DDSketch` alpha parameter
     alpha: f64,
     /// Total events processed
     total_events: u64,
@@ -326,7 +333,8 @@ impl<const SLOTS: usize, const QUEUE_SIZE: usize> MetricPipeline<SLOTS, QUEUE_SI
     /// Create a new metric pipeline
     ///
     /// # Arguments
-    /// * `alpha` - Relative error for DDSketch (e.g., 0.01 for 1%)
+    /// * `alpha` - Relative error for `DDSketch` (e.g., 0.01 for 1%)
+    #[must_use]
     pub fn new(alpha: f64) -> Self {
         // Use array initialization with Default
         const NONE_SLOT: Option<MetricSlot> = None;
@@ -377,6 +385,7 @@ impl<const SLOTS: usize, const QUEUE_SIZE: usize> MetricPipeline<SLOTS, QUEUE_SI
     }
 
     /// Get a metric slot by name hash
+    #[must_use]
     pub fn get_slot(&self, name_hash: u64) -> Option<&MetricSlot> {
         let slot_idx = (name_hash as usize) % SLOTS;
         self.slots[slot_idx]
@@ -399,18 +408,21 @@ impl<const SLOTS: usize, const QUEUE_SIZE: usize> MetricPipeline<SLOTS, QUEUE_SI
 
     /// Get total events processed
     #[inline]
+    #[must_use]
     pub fn total_events(&self) -> u64 {
         self.total_events
     }
 
     /// Get count of dropped events
     #[inline]
+    #[must_use]
     pub fn dropped_events(&self) -> u64 {
         self.queue.dropped()
     }
 
     /// Get queue length
     #[inline]
+    #[must_use]
     pub fn queue_len(&self) -> usize {
         self.queue.len()
     }
@@ -444,6 +456,7 @@ pub struct MetricEntry {
 
 impl MetricEntry {
     /// Create a new metric entry
+    #[must_use]
     pub fn new(name: &str, metric_type: MetricType) -> Self {
         use crate::sketch::FnvHasher;
 
@@ -460,6 +473,7 @@ impl MetricEntry {
     }
 
     /// Get name as string slice
+    #[must_use]
     pub fn name_str(&self) -> &str {
         core::str::from_utf8(&self.name[..self.name_len]).unwrap_or("")
     }
@@ -476,6 +490,7 @@ pub struct MetricRegistry<const N: usize> {
 
 impl<const N: usize> MetricRegistry<N> {
     /// Create a new empty registry
+    #[must_use]
     pub fn new() -> Self {
         const NONE_ENTRY: Option<MetricEntry> = None;
         Self {
@@ -496,7 +511,7 @@ impl<const N: usize> MetricRegistry<N> {
         let hash = entry.hash;
 
         // Find empty slot
-        for slot in self.entries.iter_mut() {
+        for slot in &mut self.entries {
             if slot.is_none() {
                 *slot = Some(entry);
                 self.count += 1;
@@ -508,6 +523,7 @@ impl<const N: usize> MetricRegistry<N> {
     }
 
     /// Look up a metric by name
+    #[must_use]
     pub fn lookup(&self, name: &str) -> Option<&MetricEntry> {
         use crate::sketch::FnvHasher;
         let hash = FnvHasher::hash_bytes(name.as_bytes());
@@ -515,6 +531,7 @@ impl<const N: usize> MetricRegistry<N> {
     }
 
     /// Look up a metric by hash
+    #[must_use]
     pub fn lookup_by_hash(&self, hash: u64) -> Option<&MetricEntry> {
         self.entries
             .iter()
@@ -529,6 +546,7 @@ impl<const N: usize> MetricRegistry<N> {
 
     /// Get count of registered metrics
     #[inline]
+    #[must_use]
     pub fn count(&self) -> usize {
         self.count
     }
@@ -721,5 +739,180 @@ mod tests {
         assert_eq!(snapshot.counter, 100.0);
         assert_eq!(snapshot.event_count, 11);
         assert!((snapshot.mean - 55.0).abs() < 1.0);
+    }
+
+    #[test]
+    fn test_ring_buffer_len() {
+        let mut rb = RingBuffer::<u32, 8>::new();
+        assert_eq!(rb.len(), 0);
+        rb.push(1);
+        rb.push(2);
+        assert_eq!(rb.len(), 2);
+        rb.pop();
+        assert_eq!(rb.len(), 1);
+    }
+
+    #[test]
+    fn test_ring_buffer_dropped() {
+        let mut rb = RingBuffer::<u32, 3>::new();
+        rb.push(1);
+        rb.push(2);
+        assert!(!rb.push(3)); // Full (cap=2)
+        assert_eq!(rb.dropped(), 1);
+    }
+
+    #[test]
+    fn test_ring_buffer_clear() {
+        let mut rb = RingBuffer::<u32, 8>::new();
+        rb.push(1);
+        rb.push(2);
+        rb.clear();
+        assert!(rb.is_empty());
+        assert_eq!(rb.dropped(), 0);
+    }
+
+    #[test]
+    fn test_ring_buffer_default() {
+        let rb = RingBuffer::<u32, 8>::default();
+        assert!(rb.is_empty());
+    }
+
+    #[test]
+    fn test_metric_event_with_timestamp() {
+        let ev = MetricEvent::counter(42, 1.0).with_timestamp(12345);
+        assert_eq!(ev.timestamp, 12345);
+    }
+
+    #[test]
+    fn test_metric_event_gauge() {
+        let ev = MetricEvent::gauge(1, 99.0);
+        assert_eq!(ev.metric_type, MetricType::Gauge);
+        assert_eq!(ev.value, 99.0);
+    }
+
+    #[test]
+    fn test_metric_event_unique() {
+        let ev = MetricEvent::unique(1, 42);
+        assert_eq!(ev.metric_type, MetricType::Unique);
+    }
+
+    #[test]
+    fn test_metric_slot_reset() {
+        let mut slot = MetricSlot::new(1, 0.05);
+        slot.process(&MetricEvent::counter(1, 10.0));
+        slot.reset();
+        assert_eq!(slot.counter, 0.0);
+        assert_eq!(slot.event_count, 0);
+    }
+
+    #[test]
+    fn test_metric_slot_merge() {
+        let mut s1 = MetricSlot::new(1, 0.05);
+        let mut s2 = MetricSlot::new(1, 0.05);
+        s1.process(&MetricEvent::counter(1, 10.0));
+        s2.process(&MetricEvent::counter(1, 20.0));
+        s1.merge(&s2);
+        assert_eq!(s1.counter, 30.0);
+    }
+
+    #[test]
+    fn test_pipeline_total_events() {
+        let mut pipeline = MetricPipeline::<16, 64>::new(0.05);
+        pipeline.submit(MetricEvent::counter(1, 1.0));
+        pipeline.submit(MetricEvent::counter(1, 1.0));
+        pipeline.flush();
+        assert_eq!(pipeline.total_events(), 2);
+    }
+
+    #[test]
+    fn test_pipeline_dropped_events() {
+        let mut pipeline = MetricPipeline::<16, 3>::new(0.05);
+        pipeline.submit(MetricEvent::counter(1, 1.0));
+        pipeline.submit(MetricEvent::counter(1, 1.0));
+        // Cap is 2 (N-1), third should be dropped
+        pipeline.submit(MetricEvent::counter(1, 1.0));
+        assert_eq!(pipeline.dropped_events(), 1);
+    }
+
+    #[test]
+    fn test_pipeline_queue_len() {
+        let mut pipeline = MetricPipeline::<16, 64>::new(0.05);
+        pipeline.submit(MetricEvent::counter(1, 1.0));
+        assert_eq!(pipeline.queue_len(), 1);
+        pipeline.flush();
+        assert_eq!(pipeline.queue_len(), 0);
+    }
+
+    #[test]
+    fn test_pipeline_get_slot_mut() {
+        let mut pipeline = MetricPipeline::<64, 128>::new(0.05);
+        let h = hash("test_metric");
+        pipeline.submit(MetricEvent::counter(h, 5.0));
+        pipeline.flush();
+        let slot = pipeline.get_slot_mut(h).unwrap();
+        assert_eq!(slot.counter, 5.0);
+    }
+
+    #[test]
+    fn test_pipeline_iter_slots() {
+        let mut pipeline = MetricPipeline::<64, 128>::new(0.05);
+        pipeline.submit(MetricEvent::counter(hash("a"), 1.0));
+        pipeline.submit(MetricEvent::counter(hash("b"), 2.0));
+        pipeline.flush();
+        let count = pipeline.iter_slots().count();
+        assert!(count >= 1);
+    }
+
+    #[test]
+    fn test_pipeline_reset() {
+        let mut pipeline = MetricPipeline::<16, 64>::new(0.05);
+        pipeline.submit(MetricEvent::counter(1, 1.0));
+        pipeline.flush();
+        pipeline.reset();
+        assert_eq!(pipeline.total_events(), 0);
+    }
+
+    #[test]
+    fn test_metric_registry_full() {
+        let mut registry = MetricRegistry::<2>::new();
+        registry.register("a", MetricType::Counter);
+        registry.register("b", MetricType::Counter);
+        assert!(registry.register("c", MetricType::Counter).is_none());
+    }
+
+    #[test]
+    fn test_metric_registry_default() {
+        let registry = MetricRegistry::<8>::default();
+        assert_eq!(registry.count(), 0);
+    }
+
+    #[test]
+    fn test_metric_registry_lookup_by_hash() {
+        let mut registry = MetricRegistry::<16>::new();
+        let h = registry.register("test", MetricType::Histogram).unwrap();
+        let entry = registry.lookup_by_hash(h).unwrap();
+        assert_eq!(entry.metric_type, MetricType::Histogram);
+    }
+
+    #[test]
+    fn test_metric_registry_iter() {
+        let mut registry = MetricRegistry::<16>::new();
+        registry.register("a", MetricType::Counter);
+        registry.register("b", MetricType::Gauge);
+        assert_eq!(registry.iter().count(), 2);
+    }
+
+    #[test]
+    fn test_metric_entry_name_str() {
+        let entry = MetricEntry::new("http.requests", MetricType::Counter);
+        assert_eq!(entry.name_str(), "http.requests");
+    }
+
+    #[test]
+    fn test_metric_snapshot_debug() {
+        let slot = MetricSlot::new(1, 0.05);
+        let snapshot = MetricSnapshot::from(&slot);
+        let s = format!("{:?}", snapshot);
+        assert!(s.contains("name_hash"));
     }
 }

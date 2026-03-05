@@ -18,28 +18,34 @@ pub struct XorShift64 {
 impl XorShift64 {
     /// Create a new PRNG with given seed
     #[inline]
+    #[must_use]
     pub const fn new(seed: u64) -> Self {
         // Ensure non-zero state
         Self {
-            state: if seed == 0 { 0x853c49e6748fea9b } else { seed },
+            state: if seed == 0 {
+                0x853c_49e6_748f_ea9b
+            } else {
+                seed
+            },
         }
     }
 
     /// Create from system entropy (uses address as seed if no std)
     #[cfg(feature = "std")]
+    #[must_use]
     pub fn from_entropy() -> Self {
         use std::time::{SystemTime, UNIX_EPOCH};
         let seed = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_nanos() as u64)
-            .unwrap_or(0x853c49e6748fea9b);
+            .unwrap_or(0x853c_49e6_748f_ea9b);
         Self::new(seed)
     }
 
     #[cfg(not(feature = "std"))]
     pub fn from_entropy() -> Self {
         // Use a fixed seed in no_std environments
-        Self::new(0x853c49e6748fea9b)
+        Self::new(0x853c_49e6_748f_ea9b)
     }
 
     /// Generate next u64
@@ -104,6 +110,7 @@ impl LaplaceNoise {
     /// # Arguments
     /// * `sensitivity` - Maximum change in output for one input change (Δf)
     /// * `epsilon` - Privacy parameter ε (smaller = more privacy)
+    #[must_use]
     pub fn new(sensitivity: f64, epsilon: f64) -> Self {
         let scale = sensitivity / epsilon;
         Self {
@@ -113,6 +120,7 @@ impl LaplaceNoise {
     }
 
     /// Create with explicit seed
+    #[must_use]
     pub fn with_seed(sensitivity: f64, epsilon: f64, seed: u64) -> Self {
         let scale = sensitivity / epsilon;
         Self {
@@ -144,6 +152,7 @@ impl LaplaceNoise {
 
     /// Get the scale parameter
     #[inline]
+    #[must_use]
     pub fn scale(&self) -> f64 {
         self.scale
     }
@@ -172,6 +181,7 @@ impl RandomizedResponse {
     /// Create from privacy parameter epsilon
     ///
     /// Higher epsilon = more accuracy, less privacy
+    #[must_use]
     pub fn new(epsilon: f64) -> Self {
         // p = e^ε / (1 + e^ε)
         let exp_eps = epsilon.exp();
@@ -183,6 +193,7 @@ impl RandomizedResponse {
     }
 
     /// Create with explicit probability and seed
+    #[must_use]
     pub fn with_probability(p_true: f64, seed: u64) -> Self {
         Self {
             p_true: p_true.clamp(0.5, 1.0),
@@ -205,15 +216,12 @@ impl RandomizedResponse {
     /// Privatize a bit (0 or 1)
     #[inline]
     pub fn privatize_bit(&mut self, bit: u8) -> u8 {
-        if self.privatize(bit != 0) {
-            1
-        } else {
-            0
-        }
+        u8::from(self.privatize(bit != 0))
     }
 
     /// Get the probability of truthful response
     #[inline]
+    #[must_use]
     pub fn p_true(&self) -> f64 {
         self.p_true
     }
@@ -222,6 +230,7 @@ impl RandomizedResponse {
     ///
     /// Given N total responses with K positive responses,
     /// estimate the true proportion of positive values.
+    #[must_use]
     pub fn estimate_proportion(p_true: f64, n: u64, k: u64) -> f64 {
         if n == 0 {
             return 0.0;
@@ -274,6 +283,7 @@ impl Rappor {
     /// * `f` - Probability of flipping a bit in permanent response (0.0 to 0.5)
     /// * `p` - Probability of setting a 1 bit to 1 in instantaneous response
     /// * `q` - Probability of setting a 0 bit to 1 in instantaneous response
+    #[must_use]
     pub fn new(f: f64, p: f64, q: f64) -> Self {
         Self {
             f: f.clamp(0.0, 0.5),
@@ -286,11 +296,13 @@ impl Rappor {
     /// Create with typical parameters for ε-differential privacy
     ///
     /// Uses f=0.5, p=0.75, q=0.25 for approximately ε=2 privacy
+    #[must_use]
     pub fn default_params() -> Self {
         Self::new(0.5, 0.75, 0.25)
     }
 
     /// Encode a value into a Bloom filter (simple hash-based)
+    #[allow(clippy::unused_self)]
     fn encode_bloom(&self, value: u64) -> [u8; RAPPOR_BITS] {
         use crate::sketch::FnvHasher;
 
@@ -310,7 +322,7 @@ impl Rappor {
         for i in 0..RAPPOR_BITS {
             if self.rng.next_bool(self.f) {
                 // Flip with probability f
-                result[i] = if self.rng.next_bool(0.5) { 1 } else { 0 };
+                result[i] = u8::from(self.rng.next_bool(0.5));
             } else {
                 // Keep original
                 result[i] = bloom[i];
@@ -324,9 +336,9 @@ impl Rappor {
         let mut result = [0u8; RAPPOR_BITS];
         for i in 0..RAPPOR_BITS {
             if permanent[i] == 1 {
-                result[i] = if self.rng.next_bool(self.p) { 1 } else { 0 };
+                result[i] = u8::from(self.rng.next_bool(self.p));
             } else {
-                result[i] = if self.rng.next_bool(self.q) { 1 } else { 0 };
+                result[i] = u8::from(self.rng.next_bool(self.q));
             }
         }
         result
@@ -342,6 +354,7 @@ impl Rappor {
     }
 
     /// Get privacy parameters
+    #[must_use]
     pub fn params(&self) -> (f64, f64, f64) {
         (self.f, self.p, self.q)
     }
@@ -367,6 +380,7 @@ pub struct PrivacyBudget {
 
 impl PrivacyBudget {
     /// Create a new privacy budget tracker
+    #[must_use]
     pub fn new(max_epsilon: f64) -> Self {
         Self {
             total_epsilon: 0.0,
@@ -390,24 +404,28 @@ impl PrivacyBudget {
 
     /// Get remaining budget
     #[inline]
+    #[must_use]
     pub fn remaining(&self) -> f64 {
         (self.max_epsilon - self.total_epsilon).max(0.0)
     }
 
     /// Get total spent
     #[inline]
+    #[must_use]
     pub fn spent(&self) -> f64 {
         self.total_epsilon
     }
 
     /// Get query count
     #[inline]
+    #[must_use]
     pub fn query_count(&self) -> u64 {
         self.query_count
     }
 
     /// Check if budget is exhausted
     #[inline]
+    #[must_use]
     pub fn is_exhausted(&self) -> bool {
         self.total_epsilon >= self.max_epsilon
     }
@@ -436,6 +454,7 @@ pub struct PrivateAggregator {
 
 impl PrivateAggregator {
     /// Create a new aggregator
+    #[must_use]
     pub fn new(noise_scale: f64) -> Self {
         Self {
             noisy_sum: 0.0,
@@ -454,6 +473,7 @@ impl PrivateAggregator {
     /// Estimate the true mean
     ///
     /// As count increases, noise averages out to zero.
+    #[must_use]
     pub fn estimate_mean(&self) -> f64 {
         if self.count == 0 {
             0.0
@@ -464,6 +484,7 @@ impl PrivateAggregator {
     }
 
     /// Estimate the true sum
+    #[must_use]
     pub fn estimate_sum(&self) -> f64 {
         self.noisy_sum
     }
@@ -471,6 +492,7 @@ impl PrivateAggregator {
     /// Get the standard error of the mean estimate
     ///
     /// SE = scale * sqrt(2) / sqrt(n)
+    #[must_use]
     pub fn standard_error(&self) -> f64 {
         if self.count == 0 {
             f64::INFINITY
@@ -482,6 +504,7 @@ impl PrivateAggregator {
 
     /// Get the count
     #[inline]
+    #[must_use]
     pub fn count(&self) -> u64 {
         self.count
     }
@@ -622,5 +645,152 @@ mod tests {
         // but with same structure (64 bits)
         assert_eq!(encoded1.len(), 64);
         assert_eq!(encoded2.len(), 64);
+    }
+
+    #[test]
+    fn test_xorshift_deterministic() {
+        let mut rng1 = XorShift64::new(42);
+        let mut rng2 = XorShift64::new(42);
+        assert_eq!(rng1.next_u64(), rng2.next_u64());
+        assert_eq!(rng1.next_u64(), rng2.next_u64());
+    }
+
+    #[test]
+    fn test_xorshift_zero_seed() {
+        let mut rng = XorShift64::new(0);
+        // Should use fallback seed, not produce zeros
+        assert_ne!(rng.next_u64(), 0);
+    }
+
+    #[test]
+    fn test_xorshift_f64_range() {
+        let mut rng = XorShift64::new(42);
+        for _ in 0..100 {
+            let v = rng.next_f64();
+            assert!((0.0..1.0).contains(&v), "v = {}", v);
+        }
+    }
+
+    #[test]
+    fn test_xorshift_f64_range_custom() {
+        let mut rng = XorShift64::new(42);
+        for _ in 0..100 {
+            let v = rng.next_f64_range(10.0, 20.0);
+            assert!(v >= 10.0 && v < 20.0, "v = {}", v);
+        }
+    }
+
+    #[test]
+    fn test_xorshift_bool() {
+        let mut rng = XorShift64::new(42);
+        let mut trues = 0;
+        let n = 10000;
+        for _ in 0..n {
+            if rng.next_bool(0.5) {
+                trues += 1;
+            }
+        }
+        // Should be roughly 50%
+        assert!(trues > 4000 && trues < 6000, "trues = {}", trues);
+    }
+
+    #[test]
+    fn test_xorshift_default() {
+        let mut rng = XorShift64::default();
+        let v = rng.next_u64();
+        assert_ne!(v, 0);
+    }
+
+    #[test]
+    fn test_laplace_scale() {
+        let noise = LaplaceNoise::with_seed(2.0, 0.5, 42);
+        // scale = sensitivity / epsilon = 2.0 / 0.5 = 4.0
+        assert!((noise.scale() - 4.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_laplace_privatize_int() {
+        let mut noise = LaplaceNoise::with_seed(1.0, 1.0, 42);
+        let result = noise.privatize_int(100);
+        // Should be close to 100 but not exactly
+        assert!((result - 100).abs() < 20, "result = {}", result);
+    }
+
+    #[test]
+    fn test_rr_privatize_bit() {
+        let mut rr = RandomizedResponse::with_probability(0.9, 42);
+        let bit = rr.privatize_bit(1);
+        assert!(bit == 0 || bit == 1);
+    }
+
+    #[test]
+    fn test_rr_p_true() {
+        let rr = RandomizedResponse::with_probability(0.8, 42);
+        assert!((rr.p_true() - 0.8).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_rr_estimate_zero_n() {
+        let result = RandomizedResponse::estimate_proportion(0.8, 0, 0);
+        assert_eq!(result, 0.0);
+    }
+
+    #[test]
+    fn test_privacy_budget_exhausted() {
+        let mut budget = PrivacyBudget::new(1.0);
+        budget.try_spend(0.5);
+        budget.try_spend(0.5);
+        assert!(budget.is_exhausted());
+    }
+
+    #[test]
+    fn test_privacy_budget_remaining() {
+        let mut budget = PrivacyBudget::new(1.0);
+        budget.try_spend(0.3);
+        assert!((budget.remaining() - 0.7).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_privacy_budget_reset() {
+        let mut budget = PrivacyBudget::new(1.0);
+        budget.try_spend(0.5);
+        budget.reset();
+        assert_eq!(budget.query_count(), 0);
+        assert!((budget.remaining() - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_private_aggregator_empty() {
+        let agg = PrivateAggregator::new(1.0);
+        assert_eq!(agg.estimate_mean(), 0.0);
+        assert_eq!(agg.count(), 0);
+        assert!(agg.standard_error().is_infinite());
+    }
+
+    #[test]
+    fn test_private_aggregator_reset() {
+        let mut agg = PrivateAggregator::new(1.0);
+        agg.add(10.0);
+        agg.add(20.0);
+        agg.reset();
+        assert_eq!(agg.count(), 0);
+        assert_eq!(agg.estimate_mean(), 0.0);
+    }
+
+    #[test]
+    fn test_private_aggregator_sum() {
+        let mut agg = PrivateAggregator::new(1.0);
+        agg.add(10.0);
+        agg.add(20.0);
+        assert!((agg.estimate_sum() - 30.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_rappor_params() {
+        let rappor = Rappor::new(0.3, 0.7, 0.2);
+        let (f, p, q) = rappor.params();
+        assert!((f - 0.3).abs() < f64::EPSILON);
+        assert!((p - 0.7).abs() < f64::EPSILON);
+        assert!((q - 0.2).abs() < f64::EPSILON);
     }
 }
