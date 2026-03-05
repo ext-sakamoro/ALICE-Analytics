@@ -136,7 +136,7 @@ impl FnvHasher {
     /// Avalanche bit mixer (from `MurmurHash3` finalizer)
     /// Ensures all bits are well-distributed for `HyperLogLog`
     #[inline]
-    fn mix(mut h: u64) -> u64 {
+    const fn mix(mut h: u64) -> u64 {
         h ^= h >> 33;
         h = h.wrapping_mul(0xff51_afd7_ed55_8ccd);
         h ^= h >> 33;
@@ -216,7 +216,7 @@ macro_rules! impl_hyperloglog {
 
             /// Create a new empty `HyperLogLog`
             #[inline]
-            pub fn new() -> Self {
+            pub const fn new() -> Self {
                 #[allow(clippy::large_stack_arrays)]
                 Self {
                     registers: [0u8; $m],
@@ -225,7 +225,7 @@ macro_rules! impl_hyperloglog {
 
             /// Insert an already-hashed value
             #[inline]
-            pub fn insert_hash(&mut self, hash: u64) {
+            pub const fn insert_hash(&mut self, hash: u64) {
                 let idx = (hash as usize) & (Self::M - 1);
                 let w = hash >> $p;
                 // rho = position of first 1 bit in the (64-P) remaining bits
@@ -317,13 +317,13 @@ macro_rules! impl_hyperloglog {
 
             /// Get raw registers
             #[inline]
-            pub fn registers(&self) -> &[u8] {
+            pub const fn registers(&self) -> &[u8] {
                 &self.registers
             }
 
             /// Reset all registers to zero
             #[inline]
-            pub fn clear(&mut self) {
+            pub const fn clear(&mut self) {
                 #[allow(clippy::large_stack_arrays)]
                 {
                     self.registers = [0u8; $m];
@@ -512,12 +512,12 @@ macro_rules! impl_ddsketch {
             }
 
             #[inline]
-            pub fn count(&self) -> u64 {
+            pub const fn count(&self) -> u64 {
                 self.count
             }
 
             #[inline]
-            pub fn sum(&self) -> f64 {
+            pub const fn sum(&self) -> f64 {
                 self.sum
             }
 
@@ -531,21 +531,21 @@ macro_rules! impl_ddsketch {
             }
 
             #[inline]
-            pub fn min(&self) -> f64 {
+            pub const fn min(&self) -> f64 {
                 self.min
             }
 
             #[inline]
-            pub fn max(&self) -> f64 {
+            pub const fn max(&self) -> f64 {
                 self.max
             }
 
             #[inline]
-            pub fn alpha(&self) -> f64 {
+            pub const fn alpha(&self) -> f64 {
                 self.alpha
             }
 
-            pub fn clear(&mut self) {
+            pub const fn clear(&mut self) {
                 self.positive_bins = [0u64; $bins];
                 self.negative_bins = [0u64; $bins];
                 self.zero_count = 0;
@@ -616,7 +616,7 @@ macro_rules! impl_countmin {
             pub const DEPTH: usize = $d;
 
             #[inline]
-            pub fn new() -> Self {
+            pub const fn new() -> Self {
                 #[allow(clippy::large_stack_arrays)]
                 Self {
                     counters: [[0u64; $w]; $d],
@@ -625,7 +625,7 @@ macro_rules! impl_countmin {
             }
 
             #[inline]
-            fn hash_for_row(hash: u64, row: usize) -> usize {
+            const fn hash_for_row(hash: u64, row: usize) -> usize {
                 let h = hash.wrapping_add((row as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15));
                 let mixed = h ^ (h >> 33);
                 let mixed = mixed.wrapping_mul(0xff51_afd7_ed55_8ccd);
@@ -677,12 +677,12 @@ macro_rules! impl_countmin {
             }
 
             #[inline]
-            pub fn total(&self) -> u64 {
+            pub const fn total(&self) -> u64 {
                 self.total
             }
 
             #[inline]
-            pub fn clear(&mut self) {
+            pub const fn clear(&mut self) {
                 #[allow(clippy::large_stack_arrays)]
                 {
                     self.counters = [[0u64; $w]; $d];
@@ -757,7 +757,7 @@ macro_rules! impl_heavy_hitters {
             pub const K: usize = $k;
 
             #[inline]
-            pub fn new() -> Self {
+            pub const fn new() -> Self {
                 Self {
                     cms: $cms_name::new(),
                     top_k: [HeavyHitterEntry { hash: 0, count: 0 }; $k],
@@ -813,11 +813,11 @@ macro_rules! impl_heavy_hitters {
             }
 
             #[inline]
-            pub fn cms(&self) -> &$cms_name {
+            pub const fn cms(&self) -> &$cms_name {
                 &self.cms
             }
 
-            pub fn clear(&mut self) {
+            pub const fn clear(&mut self) {
                 self.cms.clear();
                 self.top_k = [HeavyHitterEntry { hash: 0, count: 0 }; $k];
                 self.count = 0;
@@ -845,6 +845,7 @@ pub type HeavyHitters = HeavyHitters10;
 // ============================================================================
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
 
@@ -872,8 +873,7 @@ mod tests {
         // Relaxed tolerance due to statistical nature
         assert!(
             estimate > 800.0 && estimate < 1200.0,
-            "estimate = {}",
-            estimate
+            "estimate = {estimate}"
         );
     }
 
@@ -893,8 +893,7 @@ mod tests {
         let estimate = hll1.cardinality();
         assert!(
             estimate > 800.0 && estimate < 1200.0,
-            "estimate = {}",
-            estimate
+            "estimate = {estimate}"
         );
     }
 
@@ -903,16 +902,15 @@ mod tests {
         let mut hll = HyperLogLog16::new();
 
         // Use explicit hash for consistency with other tests
-        for i in 0..100000u64 {
+        for i in 0..100_000_u64 {
             hll.insert_hash(FnvHasher::hash_u64(i));
         }
 
         let estimate = hll.cardinality();
         // With 100K values in 64K registers, expect reasonable accuracy (±25%)
         assert!(
-            estimate > 75000.0 && estimate < 125000.0,
-            "estimate = {}",
-            estimate
+            estimate > 75000.0 && estimate < 125_000.0,
+            "estimate = {estimate}"
         );
     }
 
@@ -930,10 +928,10 @@ mod tests {
         assert!((sketch.mean() - 55.0).abs() < 0.001);
 
         let p50 = sketch.quantile(0.5);
-        assert!(p50 > 40.0 && p50 < 70.0, "p50 = {}", p50);
+        assert!(p50 > 40.0 && p50 < 70.0, "p50 = {p50}");
 
         let p99 = sketch.quantile(0.99);
-        assert!(p99 > 80.0 && p99 <= 100.0, "p99 = {}", p99);
+        assert!(p99 > 80.0 && p99 <= 100.0, "p99 = {p99}");
     }
 
     #[test]
@@ -1043,7 +1041,7 @@ mod tests {
         let mut hll = HyperLogLog16::new();
         hll.insert_hash(FnvHasher::hash_u64(42));
         let estimate = hll.cardinality();
-        assert!(estimate > 0.0 && estimate < 5.0, "estimate = {}", estimate);
+        assert!(estimate > 0.0 && estimate < 5.0, "estimate = {estimate}");
     }
 
     #[test]
@@ -1094,8 +1092,7 @@ mod tests {
         // HLL10 has ~3.2% error, allow ±50%
         assert!(
             estimate > 500.0 && estimate < 1500.0,
-            "estimate = {}",
-            estimate
+            "estimate = {estimate}"
         );
     }
 
@@ -1108,8 +1105,7 @@ mod tests {
         let estimate = hll.cardinality();
         assert!(
             estimate > 700.0 && estimate < 1300.0,
-            "estimate = {}",
-            estimate
+            "estimate = {estimate}"
         );
     }
 
@@ -1287,8 +1283,7 @@ mod tests {
                 hh.insert_hash(i);
             }
         }
-        let top: Vec<_> = hh.top().collect();
-        assert_eq!(top.len(), 10);
+        assert_eq!(hh.top().count(), 10);
     }
 
     #[test]
@@ -1301,13 +1296,13 @@ mod tests {
     #[test]
     fn test_fast_log2_approx() {
         let approx = fast_log2_approx(1024.0);
-        assert!((approx - 10.0).abs() < 0.1, "approx = {}", approx);
+        assert!((approx - 10.0).abs() < 0.1, "approx = {approx}");
     }
 
     #[test]
     fn test_fast_log2_approx_one() {
         let approx = fast_log2_approx(1.0);
-        assert!(approx.abs() < 0.01, "approx = {}", approx);
+        assert!(approx.abs() < 0.01, "approx = {approx}");
     }
 
     #[test]

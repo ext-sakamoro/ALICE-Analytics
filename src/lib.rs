@@ -139,6 +139,7 @@ pub use queue_bridge::{
 // ============================================================================
 
 #[cfg(test)]
+#[allow(clippy::float_cmp, clippy::large_stack_frames)]
 mod tests {
     use super::prelude::*;
 
@@ -147,16 +148,15 @@ mod tests {
         let mut hll = HyperLogLog16::new();
 
         // Insert 100000 unique values using explicit hash for consistency
-        for i in 0..100000u64 {
+        for i in 0..100_000_u64 {
             hll.insert_hash(FnvHasher::hash_u64(i));
         }
 
         let estimate = hll.cardinality();
         // HyperLogLog16 has ~0.4% standard error, allow ±25% for robustness
         assert!(
-            estimate > 75000.0 && estimate < 125000.0,
-            "estimate = {}",
-            estimate
+            estimate > 75000.0 && estimate < 125_000.0,
+            "estimate = {estimate}"
         );
     }
 
@@ -174,9 +174,9 @@ mod tests {
         let p99 = sketch.quantile(0.99);
 
         // P50 should be around 50
-        assert!(p50 > 45.0 && p50 < 55.0, "p50 = {}", p50);
+        assert!(p50 > 45.0 && p50 < 55.0, "p50 = {p50}");
         // P99 should be around 99
-        assert!(p99 > 95.0 && p99 <= 100.0, "p99 = {}", p99);
+        assert!(p99 > 95.0 && p99 <= 100.0, "p99 = {p99}");
     }
 
     #[test]
@@ -220,9 +220,7 @@ mod tests {
         // Should be within 1 of true value (with high probability)
         assert!(
             (avg - true_value).abs() < 1.0,
-            "avg = {}, true = {}",
-            avg,
-            true_value
+            "avg = {avg}, true = {true_value}"
         );
     }
 
@@ -278,8 +276,7 @@ mod tests {
         let cardinality = user_slot.hll.cardinality();
         assert!(
             cardinality > 30.0 && cardinality < 70.0,
-            "cardinality = {}",
-            cardinality
+            "cardinality = {cardinality}"
         );
     }
 
@@ -304,8 +301,7 @@ mod tests {
         // Should be close to 1000 (allow ±20% for statistical variance)
         assert!(
             estimate > 800.0 && estimate < 1200.0,
-            "estimate = {}",
-            estimate
+            "estimate = {estimate}"
         );
     }
 

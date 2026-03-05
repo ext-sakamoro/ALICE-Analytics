@@ -38,7 +38,7 @@ impl<T: Copy + Default, const N: usize> RingBuffer<T, N> {
 
     /// Push an item (returns false if buffer is full)
     #[inline]
-    pub fn push(&mut self, item: T) -> bool {
+    pub const fn push(&mut self, item: T) -> bool {
         let next_write = (self.write_pos + 1) % N;
         if next_write == self.read_pos {
             // Buffer full
@@ -52,7 +52,7 @@ impl<T: Copy + Default, const N: usize> RingBuffer<T, N> {
 
     /// Pop an item (returns None if buffer is empty)
     #[inline]
-    pub fn pop(&mut self) -> Option<T> {
+    pub const fn pop(&mut self) -> Option<T> {
         if self.read_pos == self.write_pos {
             // Buffer empty
             return None;
@@ -64,19 +64,19 @@ impl<T: Copy + Default, const N: usize> RingBuffer<T, N> {
 
     /// Check if buffer is empty
     #[inline]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.read_pos == self.write_pos
     }
 
     /// Check if buffer is full
     #[inline]
-    pub fn is_full(&self) -> bool {
+    pub const fn is_full(&self) -> bool {
         (self.write_pos + 1) % N == self.read_pos
     }
 
     /// Get current length
     #[inline]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         if self.write_pos >= self.read_pos {
             self.write_pos - self.read_pos
         } else {
@@ -92,12 +92,12 @@ impl<T: Copy + Default, const N: usize> RingBuffer<T, N> {
 
     /// Get count of dropped items
     #[inline]
-    pub fn dropped(&self) -> u64 {
+    pub const fn dropped(&self) -> u64 {
         self.dropped
     }
 
     /// Clear the buffer
-    pub fn clear(&mut self) {
+    pub const fn clear(&mut self) {
         self.write_pos = 0;
         self.read_pos = 0;
         self.dropped = 0;
@@ -263,7 +263,7 @@ impl MetricSlot {
     }
 
     /// Reset the slot
-    pub fn reset(&mut self) {
+    pub const fn reset(&mut self) {
         self.counter = 0.0;
         self.gauge = 0.0;
         self.hll.clear();
@@ -350,7 +350,7 @@ impl<const SLOTS: usize, const QUEUE_SIZE: usize> MetricPipeline<SLOTS, QUEUE_SI
     ///
     /// Returns false if queue is full (event dropped)
     #[inline]
-    pub fn submit(&mut self, event: MetricEvent) -> bool {
+    pub const fn submit(&mut self, event: MetricEvent) -> bool {
         self.queue.push(event)
     }
 
@@ -409,21 +409,21 @@ impl<const SLOTS: usize, const QUEUE_SIZE: usize> MetricPipeline<SLOTS, QUEUE_SI
     /// Get total events processed
     #[inline]
     #[must_use]
-    pub fn total_events(&self) -> u64 {
+    pub const fn total_events(&self) -> u64 {
         self.total_events
     }
 
     /// Get count of dropped events
     #[inline]
     #[must_use]
-    pub fn dropped_events(&self) -> u64 {
+    pub const fn dropped_events(&self) -> u64 {
         self.queue.dropped()
     }
 
     /// Get queue length
     #[inline]
     #[must_use]
-    pub fn queue_len(&self) -> usize {
+    pub const fn queue_len(&self) -> usize {
         self.queue.len()
     }
 
@@ -491,7 +491,7 @@ pub struct MetricRegistry<const N: usize> {
 impl<const N: usize> MetricRegistry<N> {
     /// Create a new empty registry
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         const NONE_ENTRY: Option<MetricEntry> = None;
         Self {
             entries: [NONE_ENTRY; N],
@@ -547,7 +547,7 @@ impl<const N: usize> MetricRegistry<N> {
     /// Get count of registered metrics
     #[inline]
     #[must_use]
-    pub fn count(&self) -> usize {
+    pub const fn count(&self) -> usize {
         self.count
     }
 }
@@ -612,6 +612,7 @@ impl From<&MetricSlot> for MetricSnapshot {
 // ============================================================================
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
     use crate::sketch::FnvHasher;
@@ -912,7 +913,7 @@ mod tests {
     fn test_metric_snapshot_debug() {
         let slot = MetricSlot::new(1, 0.05);
         let snapshot = MetricSnapshot::from(&slot);
-        let s = format!("{:?}", snapshot);
+        let s = format!("{snapshot:?}");
         assert!(s.contains("name_hash"));
     }
 }

@@ -35,7 +35,7 @@ impl StreamingMedian {
 
     /// Create a new streaming median estimator
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             buffer: [0.0; DEFAULT_WINDOW],
             sorted: [0.0; DEFAULT_WINDOW],
@@ -149,19 +149,19 @@ impl StreamingMedian {
     /// Get count of values
     #[inline]
     #[must_use]
-    pub fn count(&self) -> usize {
+    pub const fn count(&self) -> usize {
         self.count
     }
 
     /// Check if buffer is full
     #[inline]
     #[must_use]
-    pub fn is_full(&self) -> bool {
+    pub const fn is_full(&self) -> bool {
         self.count >= DEFAULT_WINDOW
     }
 
     /// Clear the buffer
-    pub fn clear(&mut self) {
+    pub const fn clear(&mut self) {
         self.buffer = [0.0; DEFAULT_WINDOW];
         self.sorted = [0.0; DEFAULT_WINDOW];
         self.pos = 0;
@@ -236,7 +236,7 @@ impl MadDetector {
     /// # Arguments
     /// * `threshold_k` - Number of MAD units for anomaly threshold (typically 3.0)
     #[must_use]
-    pub fn new(threshold_k: f64) -> Self {
+    pub const fn new(threshold_k: f64) -> Self {
         Self {
             values_median: StreamingMedian::new(),
             deviations_median: StreamingMedian::new(),
@@ -344,25 +344,25 @@ impl MadDetector {
     /// Get the threshold multiplier
     #[inline]
     #[must_use]
-    pub fn threshold_k(&self) -> f64 {
+    pub const fn threshold_k(&self) -> f64 {
         self.threshold_k
     }
 
     /// Set the threshold multiplier
     #[inline]
-    pub fn set_threshold_k(&mut self, k: f64) {
+    pub const fn set_threshold_k(&mut self, k: f64) {
         self.threshold_k = k;
     }
 
     /// Get count of observations
     #[inline]
     #[must_use]
-    pub fn count(&self) -> usize {
+    pub const fn count(&self) -> usize {
         self.count
     }
 
     /// Clear all observations
-    pub fn clear(&mut self) {
+    pub const fn clear(&mut self) {
         self.values_median.clear();
         self.deviations_median.clear();
         self.recent_values = [0.0; DEFAULT_WINDOW];
@@ -419,7 +419,7 @@ impl EwmaDetector {
     /// * `alpha` - Smoothing factor (0.0-1.0, higher = more reactive)
     /// * `threshold_k` - Number of standard deviations for anomaly threshold
     #[must_use]
-    pub fn new(alpha: f64, threshold_k: f64) -> Self {
+    pub const fn new(alpha: f64, threshold_k: f64) -> Self {
         Self {
             alpha: alpha.clamp(0.001, 1.0),
             ewma: 0.0,
@@ -446,7 +446,8 @@ impl EwmaDetector {
         self.ewma += self.alpha * deviation;
 
         // Update variance EWMA
-        self.ewma_var = (1.0 - self.alpha) * (self.ewma_var + self.alpha * deviation * deviation);
+        self.ewma_var =
+            (1.0 - self.alpha) * (self.alpha * deviation).mul_add(deviation, self.ewma_var);
     }
 
     /// Check if a value is an anomaly (without updating)
@@ -488,7 +489,7 @@ impl EwmaDetector {
     /// Get current EWMA
     #[inline]
     #[must_use]
-    pub fn ewma(&self) -> f64 {
+    pub const fn ewma(&self) -> f64 {
         self.ewma
     }
 
@@ -502,38 +503,38 @@ impl EwmaDetector {
     /// Get smoothing factor
     #[inline]
     #[must_use]
-    pub fn alpha(&self) -> f64 {
+    pub const fn alpha(&self) -> f64 {
         self.alpha
     }
 
     /// Set smoothing factor
     #[inline]
-    pub fn set_alpha(&mut self, alpha: f64) {
+    pub const fn set_alpha(&mut self, alpha: f64) {
         self.alpha = alpha.clamp(0.001, 1.0);
     }
 
     /// Get threshold multiplier
     #[inline]
     #[must_use]
-    pub fn threshold_k(&self) -> f64 {
+    pub const fn threshold_k(&self) -> f64 {
         self.threshold_k
     }
 
     /// Set threshold multiplier
     #[inline]
-    pub fn set_threshold_k(&mut self, k: f64) {
+    pub const fn set_threshold_k(&mut self, k: f64) {
         self.threshold_k = k;
     }
 
     /// Get count of observations
     #[inline]
     #[must_use]
-    pub fn count(&self) -> u64 {
+    pub const fn count(&self) -> u64 {
         self.count
     }
 
     /// Reset the detector
-    pub fn reset(&mut self) {
+    pub const fn reset(&mut self) {
         self.ewma = 0.0;
         self.ewma_var = 0.0;
         self.initialized = false;
@@ -564,7 +565,7 @@ pub struct ZScoreDetector {
 impl ZScoreDetector {
     /// Create a new Z-score detector
     #[must_use]
-    pub fn new(threshold_k: f64) -> Self {
+    pub const fn new(threshold_k: f64) -> Self {
         Self {
             mean: 0.0,
             m2: 0.0,
@@ -636,19 +637,19 @@ impl ZScoreDetector {
     /// Get current mean
     #[inline]
     #[must_use]
-    pub fn mean(&self) -> f64 {
+    pub const fn mean(&self) -> f64 {
         self.mean
     }
 
     /// Get count
     #[inline]
     #[must_use]
-    pub fn count(&self) -> u64 {
+    pub const fn count(&self) -> u64 {
         self.count
     }
 
     /// Reset the detector
-    pub fn reset(&mut self) {
+    pub const fn reset(&mut self) {
         self.mean = 0.0;
         self.m2 = 0.0;
         self.count = 0;
@@ -702,7 +703,7 @@ pub struct CompositeDetector {
 impl CompositeDetector {
     /// Create a new composite detector with default settings
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             mad: MadDetector::new(3.0),
             ewma: EwmaDetector::new(0.1, 3.0),
@@ -713,7 +714,7 @@ impl CompositeDetector {
 
     /// Create with custom thresholds
     #[must_use]
-    pub fn with_thresholds(mad_k: f64, ewma_alpha: f64, ewma_k: f64, zscore_k: f64) -> Self {
+    pub const fn with_thresholds(mad_k: f64, ewma_alpha: f64, ewma_k: f64, zscore_k: f64) -> Self {
         Self {
             mad: MadDetector::new(mad_k),
             ewma: EwmaDetector::new(ewma_alpha, ewma_k),
@@ -756,12 +757,12 @@ impl CompositeDetector {
     /// Get count of observations
     #[inline]
     #[must_use]
-    pub fn count(&self) -> u64 {
+    pub const fn count(&self) -> u64 {
         self.zscore.count()
     }
 
     /// Reset all detectors
-    pub fn reset(&mut self) {
+    pub const fn reset(&mut self) {
         self.mad.clear();
         self.ewma.reset();
         self.zscore.reset();
@@ -779,6 +780,7 @@ impl Default for CompositeDetector {
 // ============================================================================
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
 
@@ -1147,7 +1149,7 @@ mod tests {
             timestamp: 12345,
             metric_id: 1,
         };
-        let cloned = event.clone();
+        let cloned = event;
         assert_eq!(cloned.value, 100.0);
         assert_eq!(cloned.metric_id, 1);
     }
@@ -1161,7 +1163,7 @@ mod tests {
             timestamp: 0,
             metric_id: 0,
         };
-        let s = format!("{:?}", event);
+        let s = format!("{event:?}");
         assert!(s.contains("value"));
     }
 }
