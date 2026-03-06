@@ -21,9 +21,9 @@ pub struct TumblingWindow {
     pub window_ms: u64,
     /// 現在のウィンドウ開始時刻。
     current_start: u64,
-    /// 現在のウィンドウのMetricSlot。
+    /// 現在のウィンドウの `MetricSlot`。
     current: MetricSlot,
-    /// DDSketch alpha。
+    /// `DDSketch` alpha。
     alpha: f64,
 }
 
@@ -48,10 +48,7 @@ impl TumblingWindow {
 
         // ウィンドウ境界を超えたか
         if timestamp_ms >= self.current_start + self.window_ms {
-            let completed = core::mem::replace(
-                &mut self.current,
-                MetricSlot::new(0, self.alpha),
-            );
+            let completed = core::mem::replace(&mut self.current, MetricSlot::new(0, self.alpha));
             let result = WindowResult {
                 start_ms: self.current_start,
                 end_ms: self.current_start + self.window_ms,
@@ -81,10 +78,7 @@ impl TumblingWindow {
     /// 現在のウィンドウを強制的にフラッシュ。
     #[must_use]
     pub fn flush(&mut self) -> WindowResult {
-        let completed = core::mem::replace(
-            &mut self.current,
-            MetricSlot::new(0, self.alpha),
-        );
+        let completed = core::mem::replace(&mut self.current, MetricSlot::new(0, self.alpha));
         let result = WindowResult {
             start_ms: self.current_start,
             end_ms: self.current_start + self.window_ms,
@@ -134,7 +128,7 @@ pub struct SlidingWindow<const N: usize> {
 impl<const N: usize> SlidingWindow<N> {
     /// 新しいスライディングウィンドウを作成。
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             buffer: [0.0; N],
             write_pos: 0,
@@ -251,7 +245,7 @@ impl<const N: usize> SlidingWindow<N> {
     }
 
     /// ウィンドウをクリア。
-    pub fn clear(&mut self) {
+    pub const fn clear(&mut self) {
         self.write_pos = 0;
         self.count = 0;
         self.sum = 0.0;
@@ -353,7 +347,7 @@ impl HierarchicalRollup {
 
     /// 指定レベルの最新結果を取得。
     #[must_use]
-    pub fn result(&self, level: usize) -> Option<&WindowResult> {
+    pub const fn result(&self, level: usize) -> Option<&WindowResult> {
         if level < 3 {
             self.results[level].as_ref()
         } else {

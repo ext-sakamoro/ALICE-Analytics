@@ -107,6 +107,7 @@ pub mod python;
 pub mod queue_bridge;
 pub mod sketch;
 pub mod stats;
+pub mod streaming_ops;
 pub mod window;
 
 /// Prelude for convenient imports
@@ -129,11 +130,13 @@ pub mod prelude {
         HyperLogLog10, HyperLogLog12, HyperLogLog14, HyperLogLog16, Mergeable,
     };
     pub use crate::stats::{
-        percentile_rank, iqr, quantile_sorted, CovarianceMatrix, IqrResult, StreamingStats,
+        iqr, percentile_rank, quantile_sorted, CovarianceMatrix, IqrResult, StreamingStats,
     };
-    pub use crate::window::{
-        HierarchicalRollup, SlidingWindow, TumblingWindow, WindowResult,
+    pub use crate::streaming_ops::{
+        ChangeRate, ExponentialMovingAverage, LinearRegression, LinearRegressionFull,
+        SimpleMovingAverage,
     };
+    pub use crate::window::{HierarchicalRollup, SlidingWindow, TumblingWindow, WindowResult};
 }
 
 // Re-export main types at crate root

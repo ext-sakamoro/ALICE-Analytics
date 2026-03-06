@@ -1,7 +1,7 @@
 //! Advanced Statistical Functions
 //!
 //! パーセンタイルランク、IQR、共分散/相関行列、Welford法オンライン統計。
-//! no_std対応、ゼロアロケーション設計。
+//! `no_std` 対応、ゼロアロケーション設計。
 
 // ============================================================================
 // Percentile Rank
@@ -9,7 +9,7 @@
 
 /// ソート済み配列中の値のパーセンタイルランク。
 ///
-/// `value`がsorted_data中で何パーセント以下にあるかを返す [0.0, 100.0]。
+/// `value` が `sorted_data` 中で何パーセント以下にあるかを返す `[0.0, 100.0]`。
 #[inline]
 #[must_use]
 pub fn percentile_rank(sorted_data: &[f64], value: f64) -> f64 {
@@ -27,7 +27,7 @@ pub fn percentile_rank(sorted_data: &[f64], value: f64) -> f64 {
     }
     // パーセンタイルランク = (below + 0.5 * equal) / N * 100
     let n = sorted_data.len() as f64;
-    (count_below as f64 + 0.5 * count_equal as f64) / n * 100.0
+    0.5f64.mul_add(count_equal as f64, count_below as f64) / n * 100.0
 }
 
 // ============================================================================
@@ -71,8 +71,8 @@ pub fn iqr(sorted_data: &[f64]) -> Option<IqrResult> {
         median,
         q3,
         iqr: iqr_val,
-        lower_fence: q1 - 1.5 * iqr_val,
-        upper_fence: q3 + 1.5 * iqr_val,
+        lower_fence: 1.5f64.mul_add(-iqr_val, q1),
+        upper_fence: 1.5f64.mul_add(iqr_val, q3),
     })
 }
 
@@ -95,7 +95,7 @@ pub fn quantile_sorted(sorted_data: &[f64], q: f64) -> f64 {
         return sorted_data[lower];
     }
     let frac = pos - lower as f64;
-    sorted_data[lower] * (1.0 - frac) + sorted_data[upper] * frac
+    sorted_data[lower].mul_add(1.0 - frac, sorted_data[upper] * frac)
 }
 
 // ============================================================================
@@ -185,8 +185,12 @@ impl<const D: usize> CovarianceMatrix<D> {
     /// 変数iの平均。
     #[inline]
     #[must_use]
-    pub fn mean(&self, i: usize) -> f64 {
-        if i < D { self.means[i] } else { 0.0 }
+    pub const fn mean(&self, i: usize) -> f64 {
+        if i < D {
+            self.means[i]
+        } else {
+            0.0
+        }
     }
 
     /// 観測数。
@@ -222,7 +226,7 @@ pub struct StreamingStats {
 }
 
 impl StreamingStats {
-    /// 新しいStreamingStatsを作成。
+    /// 新しい `StreamingStats` を作成。
     #[must_use]
     pub const fn new() -> Self {
         Self {
@@ -250,10 +254,11 @@ impl StreamingStats {
         self.mean += delta_n;
 
         // 4次モーメント更新（Pebay 2008）
-        self.m4 += term1 * delta_n2 * (n * n - 3.0 * n + 3.0)
-            + 6.0 * delta_n2 * self.m2
-            - 4.0 * delta_n * self.m3;
-        self.m3 += term1 * delta_n * (n - 2.0) - 3.0 * delta_n * self.m2;
+        self.m4 += (4.0 * delta_n).mul_add(
+            -self.m3,
+            (term1 * delta_n2).mul_add(n.mul_add(n, -(3.0 * n)) + 3.0, 6.0 * delta_n2 * self.m2),
+        );
+        self.m3 += (term1 * delta_n).mul_add(n - 2.0, -(3.0 * delta_n * self.m2));
         self.m2 += term1;
 
         if value < self.min {
@@ -338,8 +343,14 @@ impl StreamingStats {
     }
 
     /// リセット。
-    pub fn reset(&mut self) {
-        *self = Self::new();
+    pub const fn reset(&mut self) {
+        self.count = 0;
+        self.mean = 0.0;
+        self.m2 = 0.0;
+        self.m3 = 0.0;
+        self.m4 = 0.0;
+        self.min = f64::INFINITY;
+        self.max = f64::NEG_INFINITY;
     }
 }
 
