@@ -1,15 +1,15 @@
 //! Data Export — JSON / Prometheus テキスト形式
 //!
-//! MetricSnapshotからJSON文字列やPrometheus exposition formatへの変換。
+//! `MetricSnapshot` から JSON 文字列や Prometheus exposition format への変換。
 //! 外部依存なし（手動フォーマット）。
 
 #[cfg(feature = "std")]
 extern crate alloc;
 
 #[cfg(feature = "std")]
-use alloc::string::String;
-#[cfg(feature = "std")]
 use alloc::format;
+#[cfg(feature = "std")]
+use alloc::string::String;
 
 use crate::pipeline::MetricSnapshot;
 
@@ -17,7 +17,7 @@ use crate::pipeline::MetricSnapshot;
 // JSON Export
 // ============================================================================
 
-/// MetricSnapshotをJSON文字列に変換。
+/// `MetricSnapshot` を JSON 文字列に変換。
 #[cfg(feature = "std")]
 #[must_use]
 pub fn snapshot_to_json(snapshot: &MetricSnapshot) -> String {
@@ -51,7 +51,7 @@ pub fn snapshot_to_json(snapshot: &MetricSnapshot) -> String {
     )
 }
 
-/// 複数のMetricSnapshotをJSON配列に変換。
+/// 複数の `MetricSnapshot` を JSON 配列に変換。
 #[cfg(feature = "std")]
 #[must_use]
 pub fn snapshots_to_json(snapshots: &[MetricSnapshot]) -> String {
@@ -70,7 +70,7 @@ pub fn snapshots_to_json(snapshots: &[MetricSnapshot]) -> String {
 // Prometheus Exposition Format
 // ============================================================================
 
-/// MetricSnapshotをPrometheus exposition formatに変換。
+/// `MetricSnapshot` を Prometheus exposition format に変換。
 ///
 /// ```text
 /// # TYPE metric_counter counter
@@ -83,55 +83,63 @@ pub fn snapshots_to_json(snapshots: &[MetricSnapshot]) -> String {
 #[cfg(feature = "std")]
 #[must_use]
 pub fn snapshot_to_prometheus(snapshot: &MetricSnapshot, prefix: &str) -> String {
+    use core::fmt::Write;
     let hash = snapshot.name_hash;
     let mut out = String::with_capacity(512);
 
     // Counter
-    out.push_str(&format!("# TYPE {prefix}_counter counter\n"));
-    out.push_str(&format!(
-        "{prefix}_counter{{name_hash=\"{hash}\"}} {}\n",
+    let _ = writeln!(out, "# TYPE {prefix}_counter counter");
+    let _ = writeln!(
+        out,
+        "{prefix}_counter{{name_hash=\"{hash}\"}} {}",
         format_f64(snapshot.counter)
-    ));
+    );
 
     // Gauge
-    out.push_str(&format!("# TYPE {prefix}_gauge gauge\n"));
-    out.push_str(&format!(
-        "{prefix}_gauge{{name_hash=\"{hash}\"}} {}\n",
+    let _ = writeln!(out, "# TYPE {prefix}_gauge gauge");
+    let _ = writeln!(
+        out,
+        "{prefix}_gauge{{name_hash=\"{hash}\"}} {}",
         format_f64(snapshot.gauge)
-    ));
+    );
 
     // Cardinality
-    out.push_str(&format!("# TYPE {prefix}_cardinality gauge\n"));
-    out.push_str(&format!(
-        "{prefix}_cardinality{{name_hash=\"{hash}\"}} {}\n",
+    let _ = writeln!(out, "# TYPE {prefix}_cardinality gauge");
+    let _ = writeln!(
+        out,
+        "{prefix}_cardinality{{name_hash=\"{hash}\"}} {}",
         format_f64(snapshot.cardinality)
-    ));
+    );
 
     // Quantiles
-    out.push_str(&format!("# TYPE {prefix}_latency summary\n"));
-    out.push_str(&format!(
-        "{prefix}_latency{{name_hash=\"{hash}\",quantile=\"0.5\"}} {}\n",
+    let _ = writeln!(out, "# TYPE {prefix}_latency summary");
+    let _ = writeln!(
+        out,
+        "{prefix}_latency{{name_hash=\"{hash}\",quantile=\"0.5\"}} {}",
         format_f64(snapshot.p50)
-    ));
-    out.push_str(&format!(
-        "{prefix}_latency{{name_hash=\"{hash}\",quantile=\"0.95\"}} {}\n",
+    );
+    let _ = writeln!(
+        out,
+        "{prefix}_latency{{name_hash=\"{hash}\",quantile=\"0.95\"}} {}",
         format_f64(snapshot.p95)
-    ));
-    out.push_str(&format!(
-        "{prefix}_latency{{name_hash=\"{hash}\",quantile=\"0.99\"}} {}\n",
+    );
+    let _ = writeln!(
+        out,
+        "{prefix}_latency{{name_hash=\"{hash}\",quantile=\"0.99\"}} {}",
         format_f64(snapshot.p99)
-    ));
+    );
 
     // Event count
-    out.push_str(&format!(
-        "{prefix}_events_total{{name_hash=\"{hash}\"}} {}\n",
+    let _ = writeln!(
+        out,
+        "{prefix}_events_total{{name_hash=\"{hash}\"}} {}",
         snapshot.event_count
-    ));
+    );
 
     out
 }
 
-/// 複数のMetricSnapshotをPrometheus形式に変換。
+/// 複数の `MetricSnapshot` を Prometheus 形式に変換。
 #[cfg(feature = "std")]
 #[must_use]
 pub fn snapshots_to_prometheus(snapshots: &[MetricSnapshot], prefix: &str) -> String {
