@@ -620,7 +620,7 @@ mod tests {
         // y = 2x + 1
         for i in 0..100 {
             let x = i as f64;
-            lr.observe(x, 2.0 * x + 1.0);
+            lr.observe(x, 2.0f64.mul_add(x, 1.0));
         }
         assert!((lr.slope() - 2.0).abs() < 1e-6, "slope = {}", lr.slope());
         assert!(
@@ -636,7 +636,7 @@ mod tests {
         // y = 3x - 2
         for i in 0..50 {
             let x = i as f64;
-            lr.observe(x, 3.0 * x - 2.0);
+            lr.observe(x, 3.0f64.mul_add(x, -2.0));
         }
         let pred = lr.predict(100.0);
         assert!((pred - 298.0).abs() < 1e-4, "pred = {pred}");
@@ -683,7 +683,7 @@ mod tests {
         // 完全な線形関係 → R²≈1.0
         for i in 0..100 {
             let x = i as f64;
-            lr.observe(x, 2.0 * x + 1.0);
+            lr.observe(x, 2.0f64.mul_add(x, 1.0));
         }
         assert!(
             (lr.r_squared() - 1.0).abs() < 1e-6,
@@ -707,7 +707,7 @@ mod tests {
         let mut lr = LinearRegressionFull::new();
         for i in 0..50 {
             let x = i as f64;
-            lr.observe(x, x * 0.5 + 10.0);
+            lr.observe(x, x.mul_add(0.5, 10.0));
         }
         let pred = lr.predict(100.0);
         assert!((pred - 60.0).abs() < 1e-4, "pred = {pred}");
