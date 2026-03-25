@@ -2,7 +2,7 @@
 name = "alice-analytics"
 version = "0.1.0"
 edition = "2021"
-authors = ["Moroya Sakamoto <ext-sakamoro@github.com>"]
+authors = ["Moroya Sakamoto <sakamoro@alicelaw.net>"]
 description = "High-Performance Telemetry & Statistical Estimation with Probabilistic Data Structures"
 license = "AGPL-3.0"
 repository = "https://github.com/ext-sakamoro/ALICE-Analytics"
