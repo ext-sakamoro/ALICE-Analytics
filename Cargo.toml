@@ -2,46 +2,12 @@
 name = "alice-analytics"
 version = "0.1.0"
 edition = "2021"
-authors = ["Moroya Sakamoto <sakamoro@alicelaw.net>"]
-description = "High-Performance Telemetry & Statistical Estimation with Probabilistic Data Structures"
-license = "AGPL-3.0"
-repository = "https://github.com/ext-sakamoro/ALICE-Analytics"
-keywords = ["analytics", "sketch", "hyperloglog", "differential-privacy", "streaming"]
-categories = ["algorithms", "data-structures", "science"]
-publish = false
-
-[lib]
-name = "alice_analytics"
-path = "src/lib.rs"
-crate-type = ["rlib", "cdylib"]
+license = "MIT OR Apache-2.0"
 
 [features]
 default = ["std"]
 std = []
-simd = []  # SIMD-accelerated hash and register updates
-queue = ["alice-queue"]  # ALICE-Queue bridge (Message → MetricEvent streaming)
-db = ["dep:alice-db", "std"]  # ALICE-DB bridge (persist analytics to time-series)
-pyo3 = ["dep:pyo3", "dep:numpy", "std"]  # Python bindings
+simd = []  # SIMD-accelerated hash and register updates (x86_64 AVX2)
 
-[dependencies]
-# ALICE-Queue bridge (optional)
-alice-queue = { path = "../ALICE-Queue", optional = true }
-alice-db = { path = "../ALICE-DB", optional = true, default-features = false }
-pyo3 = { version = "0.27", features = ["extension-module"], optional = true }
-numpy = { version = "0.27", optional = true }
-
-[profile.release]
-opt-level = 3
-lto = "fat"
-codegen-units = 1
-panic = "abort"
-strip = true
-
-[dev-dependencies]
-# criterion = "0.5"
-
-[profile.bench]
-opt-level = 3
-lto = "thin"
-codegen-units = 1
-debug = false
+[lib]
+path = "src/lib.rs"
