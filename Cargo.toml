@@ -2,7 +2,12 @@
 name = "alice-analytics"
 version = "0.1.0"
 edition = "2021"
+authors = ["Moroya Sakamoto <sakamoro@alicelaw.net>"]
+description = "High-performance telemetry & probabilistic statistical estimation — HyperLogLog++, DDSketch, Count-Min Sketch, local differential privacy, streaming anomaly detection"
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/ext-sakamoro/ALICE-Analytics"
+keywords = ["telemetry", "hyperloglog", "sketch", "cardinality", "no_std"]
+categories = ["algorithms", "science", "no-std"]
 
 [features]
 default = ["std"]
