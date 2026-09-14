@@ -12,7 +12,7 @@ categories = ["algorithms", "science", "no-std"]
 [features]
 default = ["std"]
 std = []
-simd = []  # SIMD-accelerated hash and register updates (x86_64 AVX2)
+simd = []  # no-op since 2026-09-14: the only user (HyperLogLog AVX2 zero-count) was dead code and lacked runtime feature detection; kept for semver
 
 [lib]
 path = "src/lib.rs"
