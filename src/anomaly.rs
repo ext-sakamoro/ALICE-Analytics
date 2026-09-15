@@ -3,6 +3,9 @@
 //! Real-time outlier detection using robust statistics.
 //! Designed for telemetry streams where batch processing is not feasible.
 
+#[cfg(not(feature = "std"))]
+use crate::math::FloatExt;
+
 // ============================================================================
 // Streaming Median (for MAD calculation)
 // ============================================================================

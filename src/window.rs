@@ -3,6 +3,8 @@
 //! タンブリング/スライディングウィンドウによる時系列集約。
 //! MetricSlotをウィンドウ単位でrotateし、時間ベースの集約を提供。
 
+#[cfg(not(feature = "std"))]
+use crate::math::FloatExt;
 use crate::pipeline::MetricSlot;
 
 // ============================================================================

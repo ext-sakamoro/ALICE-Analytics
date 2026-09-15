@@ -16,6 +16,8 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
+pub(crate) mod math;
+
 pub mod anomaly;
 pub mod export;
 pub mod pipeline;

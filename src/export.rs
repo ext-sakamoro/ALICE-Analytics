@@ -11,6 +11,7 @@ use alloc::format;
 #[cfg(feature = "std")]
 use alloc::string::String;
 
+#[cfg(feature = "std")]
 use crate::pipeline::MetricSnapshot;
 
 // ============================================================================

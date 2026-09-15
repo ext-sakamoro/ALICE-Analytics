@@ -3,6 +3,9 @@
 //! Privacy-preserving data collection where noise is added at the source.
 //! Individual data points are deniable, but aggregate statistics emerge.
 
+#[cfg(not(feature = "std"))]
+use crate::math::FloatExt;
+
 // ============================================================================
 // Random Number Generation (ChaCha20-based for determinism)
 // ============================================================================

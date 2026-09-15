@@ -16,3 +16,7 @@ simd = []  # no-op since 2026-09-14: the only user (HyperLogLog AVX2 zero-count)
 
 [lib]
 path = "src/lib.rs"
+
+[dependencies]
+# no_std build の float 超越関数 (src/math.rs、std build では未使用)
+libm = "0.2"

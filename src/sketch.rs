@@ -4,6 +4,8 @@
 //! - `DDSketch`: Relative-error quantile estimation
 //! - Count-Min Sketch: Frequency estimation for heavy hitters
 
+#[cfg(not(feature = "std"))]
+use crate::math::FloatExt;
 use core::hash::{Hash, Hasher};
 
 // ============================================================================
@@ -435,7 +437,7 @@ macro_rules! impl_ddsketch {
             #[inline(always)]
             #[allow(dead_code)]
             fn bucket_index_fast(&self, value: f64) -> usize {
-                let log2_gamma = self.ln_gamma / std::f64::consts::LN_2;
+                let log2_gamma = self.ln_gamma / core::f64::consts::LN_2;
                 let inv_log2_gamma = 1.0 / log2_gamma;
                 let log2_value = fast_log2_approx(value);
                 let idx = (log2_value * inv_log2_gamma).ceil() as i32 + self.offset;
