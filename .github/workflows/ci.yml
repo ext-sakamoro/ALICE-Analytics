@@ -28,8 +28,9 @@ jobs:
       - name: cargo fmt --check
         run: cargo fmt --all -- --check
 
-      - name: cargo clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+      # pedantic は 2026-09-15 に 137 → 0 化済 → gate
+      - name: cargo clippy (pedantic)
+        run: cargo clippy --all-targets --all-features -- -W clippy::pedantic -D warnings
 
       - name: cargo test
         run: cargo test --all-features
@@ -55,7 +56,7 @@ jobs:
       - name: Check (no_std, bare-metal thumbv7em-none-eabihf)
         run: cargo check --lib --no-default-features --target thumbv7em-none-eabihf
       - name: Clippy (no_std, bare-metal)
-        run: cargo clippy --lib --no-default-features --target thumbv7em-none-eabihf -- -D warnings
+        run: cargo clippy --lib --no-default-features --target thumbv7em-none-eabihf -- -W clippy::pedantic -D warnings
 
   feature-powerset:
     name: Feature powerset (cargo-hack, depth 2)
