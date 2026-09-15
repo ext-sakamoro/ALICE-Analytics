@@ -5,7 +5,7 @@
 //!
 //! # Modules
 //!
-//! - [`sketch`]: HyperLogLog / DDSketch / Count-Min / Heavy Hitters
+//! - [`sketch`]: `HyperLogLog` / `DDSketch` / Count-Min / Heavy Hitters
 //! - [`stats`]: Percentile rank, IQR, covariance, Welford streaming stats
 //! - [`window`]: Tumbling / sliding / hierarchical window aggregates
 //! - [`anomaly`]: MAD / Z-Score / EWMA / composite anomaly detectors

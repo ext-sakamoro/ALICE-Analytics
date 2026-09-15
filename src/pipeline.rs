@@ -3,6 +3,8 @@
 //! Zero-allocation metric collection into pre-allocated sketches.
 //! Designed for high-throughput telemetry without GC pauses.
 
+use crate::math::{f64_u64, hash_index, u64_f64};
+
 use crate::sketch::{DDSketch256, HyperLogLog10, Mergeable};
 
 // ============================================================================
@@ -185,7 +187,7 @@ impl MetricEvent {
         Self {
             name_hash,
             metric_type: MetricType::Unique,
-            value: item_hash as f64,
+            value: u64_f64(item_hash),
             timestamp: 0,
         }
     }
@@ -257,7 +259,7 @@ impl MetricSlot {
                 self.ddsketch.insert(event.value);
             }
             MetricType::Unique => {
-                self.hll.insert_hash(event.value as u64);
+                self.hll.insert_hash(f64_u64(event.value));
             }
         }
     }
@@ -366,7 +368,7 @@ impl<const SLOTS: usize, const QUEUE_SIZE: usize> MetricPipeline<SLOTS, QUEUE_SI
         self.total_events += 1;
 
         // Find or create slot for this metric
-        let slot_idx = (event.name_hash as usize) % SLOTS;
+        let slot_idx = hash_index(event.name_hash) % SLOTS;
 
         // Check if slot exists and matches
         if let Some(ref mut slot) = self.slots[slot_idx] {
@@ -387,7 +389,7 @@ impl<const SLOTS: usize, const QUEUE_SIZE: usize> MetricPipeline<SLOTS, QUEUE_SI
     /// Get a metric slot by name hash
     #[must_use]
     pub fn get_slot(&self, name_hash: u64) -> Option<&MetricSlot> {
-        let slot_idx = (name_hash as usize) % SLOTS;
+        let slot_idx = hash_index(name_hash) % SLOTS;
         self.slots[slot_idx]
             .as_ref()
             .filter(|s| s.name_hash == name_hash)
@@ -395,7 +397,7 @@ impl<const SLOTS: usize, const QUEUE_SIZE: usize> MetricPipeline<SLOTS, QUEUE_SI
 
     /// Get mutable reference to a metric slot
     pub fn get_slot_mut(&mut self, name_hash: u64) -> Option<&mut MetricSlot> {
-        let slot_idx = (name_hash as usize) % SLOTS;
+        let slot_idx = hash_index(name_hash) % SLOTS;
         self.slots[slot_idx]
             .as_mut()
             .filter(|s| s.name_hash == name_hash)

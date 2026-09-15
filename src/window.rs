@@ -3,6 +3,7 @@
 //! タンブリング/スライディングウィンドウによる時系列集約。
 //! MetricSlotをウィンドウ単位でrotateし、時間ベースの集約を提供。
 
+use crate::math::usize_f64;
 #[cfg(not(feature = "std"))]
 use crate::math::FloatExt;
 use crate::pipeline::MetricSlot;
@@ -170,7 +171,7 @@ impl<const N: usize> SlidingWindow<N> {
         if self.count == 0 {
             return 0.0;
         }
-        self.sum / self.count as f64
+        self.sum / usize_f64(self.count)
     }
 
     /// 合計値。
@@ -236,7 +237,7 @@ impl<const N: usize> SlidingWindow<N> {
             let d = self.buffer[i] - mean;
             sum_sq += d * d;
         }
-        sum_sq / self.count as f64
+        sum_sq / usize_f64(self.count)
     }
 
     /// 標準偏差。
@@ -383,6 +384,7 @@ impl HierarchicalRollup {
 #[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
+    use crate::math::u64_f64;
 
     #[test]
     fn tumbling_window_basic() {
@@ -412,7 +414,7 @@ mod tests {
     fn tumbling_window_statistics() {
         let mut w = TumblingWindow::new(100, 0.05);
         for i in 0..10 {
-            w.insert((i + 1) as f64 * 10.0, i * 5);
+            w.insert(u64_f64(i + 1) * 10.0, i * 5);
         }
         let result = w.flush();
         assert!(result.mean > 0.0);

@@ -5,6 +5,7 @@
 
 #[cfg(not(feature = "std"))]
 use crate::math::FloatExt;
+use crate::math::{f64_i64, hash_index, i64_f64, u64_f64};
 
 // ============================================================================
 // Random Number Generation (ChaCha20-based for determinism)
@@ -33,22 +34,25 @@ impl XorShift64 {
         }
     }
 
-    /// Create from system entropy (uses address as seed if no std)
+    /// Create from system entropy (`std` only: `SystemTime`)
+    ///
+    /// `no_std` には entropy source が無いので存在しない (2026-09-15 まで固定 seed を返す
+    /// stub があり、差分プライバシーの noise が決定論になっていた) — `no_std` では
+    /// `XorShift64::new(seed)` / `*::with_seed` / `with_probability` / `with_seed_params` に
+    /// caller が entropy を渡す
     #[cfg(feature = "std")]
     #[must_use]
     pub fn from_entropy() -> Self {
         use std::time::{SystemTime, UNIX_EPOCH};
         let seed = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_nanos() as u64)
-            .unwrap_or(0x853c_49e6_748f_ea9b);
+            // 下位 64 bit で十分 (seed 用途、u128 → u64 の切り捨ては意図)
+            .map_or(0x853c_49e6_748f_ea9b, |d| {
+                #[allow(clippy::cast_possible_truncation)]
+                let low = d.as_nanos() as u64;
+                low
+            });
         Self::new(seed)
-    }
-
-    #[cfg(not(feature = "std"))]
-    pub fn from_entropy() -> Self {
-        // Use a fixed seed in no_std environments
-        Self::new(0x853c_49e6_748f_ea9b)
     }
 
     /// Generate next u64
@@ -66,8 +70,8 @@ impl XorShift64 {
     #[inline(always)]
     pub fn next_f64(&mut self) -> f64 {
         // Multiply by 1/2^53 instead of dividing
-        const RCP_POW2_53: f64 = 1.0 / (1u64 << 53) as f64;
-        (self.next_u64() >> 11) as f64 * RCP_POW2_53
+        const RCP_POW2_53: f64 = 1.0 / u64_f64(1u64 << 53);
+        u64_f64(self.next_u64() >> 11) * RCP_POW2_53
     }
 
     /// Generate uniform f64 in [low, high)
@@ -83,6 +87,7 @@ impl XorShift64 {
     }
 }
 
+#[cfg(feature = "std")]
 impl Default for XorShift64 {
     fn default() -> Self {
         Self::from_entropy()
@@ -113,6 +118,9 @@ impl LaplaceNoise {
     /// # Arguments
     /// * `sensitivity` - Maximum change in output for one input change (Δf)
     /// * `epsilon` - Privacy parameter ε (smaller = more privacy)
+    ///
+    /// `std` only (system entropy); `no_std` は [`Self::with_seed`]
+    #[cfg(feature = "std")]
     #[must_use]
     pub fn new(sensitivity: f64, epsilon: f64) -> Self {
         let scale = sensitivity / epsilon;
@@ -150,7 +158,7 @@ impl LaplaceNoise {
     /// Add noise to an integer value (rounds result)
     #[inline]
     pub fn privatize_int(&mut self, value: i64) -> i64 {
-        (value as f64 + self.sample()).round() as i64
+        f64_i64((i64_f64(value) + self.sample()).round())
     }
 
     /// Get the scale parameter
@@ -184,6 +192,9 @@ impl RandomizedResponse {
     /// Create from privacy parameter epsilon
     ///
     /// Higher epsilon = more accuracy, less privacy
+    ///
+    /// `std` only (system entropy); `no_std` は [`Self::with_probability`]
+    #[cfg(feature = "std")]
     #[must_use]
     pub fn new(epsilon: f64) -> Self {
         // p = e^ε / (1 + e^ε)
@@ -238,8 +249,8 @@ impl RandomizedResponse {
         if n == 0 {
             return 0.0;
         }
-        let inv_n = 1.0 / n as f64;
-        let observed_rate = k as f64 * inv_n;
+        let inv_n = 1.0 / u64_f64(n);
+        let observed_rate = u64_f64(k) * inv_n;
         // Debiasing: true_rate = (observed_rate - 0.5*(1-p)) / (p - 0.5*(1-p))
         // Simplifies to: true_rate = (observed_rate - 0.5 + 0.5*p) / (p - 0.5 + 0.5*p)
         //              = (2*observed_rate - 1 + p) / (2p - 1 + p)
@@ -286,19 +297,29 @@ impl Rappor {
     /// * `f` - Probability of flipping a bit in permanent response (0.0 to 0.5)
     /// * `p` - Probability of setting a 1 bit to 1 in instantaneous response
     /// * `q` - Probability of setting a 0 bit to 1 in instantaneous response
+    ///
+    /// `std` only (system entropy); `no_std` は [`Self::with_seed_params`]
+    #[cfg(feature = "std")]
     #[must_use]
     pub fn new(f: f64, p: f64, q: f64) -> Self {
+        Self::with_seed_params(f, p, q, XorShift64::from_entropy().next_u64())
+    }
+
+    /// Create with explicit parameters and RNG seed (`no_std` 用、entropy は caller が供給)
+    #[must_use]
+    pub fn with_seed_params(f: f64, p: f64, q: f64, seed: u64) -> Self {
         Self {
             f: f.clamp(0.0, 0.5),
             p: p.clamp(0.0, 1.0),
             q: q.clamp(0.0, 1.0),
-            rng: XorShift64::from_entropy(),
+            rng: XorShift64::new(seed),
         }
     }
 
     /// Create with typical parameters for ε-differential privacy
     ///
     /// Uses f=0.5, p=0.75, q=0.25 for approximately ε=2 privacy
+    #[cfg(feature = "std")]
     #[must_use]
     pub fn default_params() -> Self {
         Self::new(0.5, 0.75, 0.25)
@@ -311,9 +332,9 @@ impl Rappor {
 
         let mut bloom = [0u8; RAPPOR_BITS];
         // Use multiple hash functions
-        for i in 0..3 {
-            let h = FnvHasher::hash_u128((value as u128) | ((i as u128) << 64));
-            let idx = (h as usize) % RAPPOR_BITS;
+        for i in 0..3u128 {
+            let h = FnvHasher::hash_u128(u128::from(value) | (i << 64));
+            let idx = hash_index(h) % RAPPOR_BITS;
             bloom[idx] = 1;
         }
         bloom
@@ -481,7 +502,7 @@ impl PrivateAggregator {
         if self.count == 0 {
             0.0
         } else {
-            let inv_count = 1.0 / self.count as f64;
+            let inv_count = 1.0 / u64_f64(self.count);
             self.noisy_sum * inv_count
         }
     }
@@ -500,7 +521,7 @@ impl PrivateAggregator {
         if self.count == 0 {
             f64::INFINITY
         } else {
-            let inv_sqrt_n = 1.0 / (self.count as f64).sqrt();
+            let inv_sqrt_n = 1.0 / (u64_f64(self.count)).sqrt();
             self.noise_scale * core::f64::consts::SQRT_2 * inv_sqrt_n
         }
     }
@@ -550,7 +571,7 @@ mod tests {
         for _ in 0..n {
             sum += noise.sample();
         }
-        let mean = sum / n as f64;
+        let mean = sum / f64::from(n);
         assert!(mean.abs() < 0.1, "mean = {mean}");
     }
 
@@ -585,7 +606,7 @@ mod tests {
         let mut positive_reports = 0u64;
         for i in 0..n {
             // Simulate true value with 30% positive rate
-            let truth = (i as f64 / n as f64) < true_rate;
+            let truth = (u64_f64(i) / u64_f64(n)) < true_rate;
             if rr.privatize(truth) {
                 positive_reports += 1;
             }
@@ -623,8 +644,8 @@ mod tests {
         let n = 10000;
 
         for _ in 0..n {
-            let noisy = noise.privatize(true_value);
-            aggregator.add(noisy);
+            let privatized = noise.privatize(true_value);
+            aggregator.add(privatized);
         }
 
         let estimated_mean = aggregator.estimate_mean();

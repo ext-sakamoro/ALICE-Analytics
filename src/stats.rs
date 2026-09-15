@@ -5,6 +5,7 @@
 
 #[cfg(not(feature = "std"))]
 use crate::math::FloatExt;
+use crate::math::{f64_usize, u64_f64, usize_f64};
 
 // ============================================================================
 // Percentile Rank
@@ -29,8 +30,8 @@ pub fn percentile_rank(sorted_data: &[f64], value: f64) -> f64 {
         }
     }
     // パーセンタイルランク = (below + 0.5 * equal) / N * 100
-    let n = sorted_data.len() as f64;
-    0.5f64.mul_add(count_equal as f64, count_below as f64) / n * 100.0
+    let n = usize_f64(sorted_data.len());
+    0.5f64.mul_add(usize_f64(count_equal), usize_f64(count_below)) / n * 100.0
 }
 
 // ============================================================================
@@ -91,13 +92,13 @@ pub fn quantile_sorted(sorted_data: &[f64], q: f64) -> f64 {
         return sorted_data[0];
     }
     let q = q.clamp(0.0, 1.0);
-    let pos = q * (n - 1) as f64;
-    let lower = pos.floor() as usize;
-    let upper = pos.ceil() as usize;
+    let pos = q * usize_f64(n - 1);
+    let lower = f64_usize(pos.floor());
+    let upper = f64_usize(pos.ceil());
     if lower == upper {
         return sorted_data[lower];
     }
-    let frac = pos - lower as f64;
+    let frac = pos - usize_f64(lower);
     sorted_data[lower].mul_add(1.0 - frac, sorted_data[upper] * frac)
 }
 
@@ -131,7 +132,7 @@ impl<const D: usize> CovarianceMatrix<D> {
     /// 観測値ベクトルを追加（Welfordオンラインアルゴリズム）。
     pub fn observe(&mut self, values: &[f64; D]) {
         self.count += 1;
-        let n = self.count as f64;
+        let n = u64_f64(self.count);
 
         let mut dx = [0.0; D];
         for (i, d) in dx.iter_mut().enumerate() {
@@ -159,7 +160,7 @@ impl<const D: usize> CovarianceMatrix<D> {
             return 0.0;
         }
         let (r, c) = if i <= j { (i, j) } else { (j, i) };
-        self.co_moments[r][c] / (self.count - 1) as f64
+        self.co_moments[r][c] / u64_f64(self.count - 1)
     }
 
     /// 相関係数 r(i, j)。
@@ -247,12 +248,12 @@ impl StreamingStats {
     pub fn observe(&mut self, value: f64) {
         let n1 = self.count;
         self.count += 1;
-        let n = self.count as f64;
+        let n = u64_f64(self.count);
 
         let delta = value - self.mean;
         let delta_n = delta / n;
         let delta_n2 = delta_n * delta_n;
-        let term1 = delta * delta_n * n1 as f64;
+        let term1 = delta * delta_n * u64_f64(n1);
 
         self.mean += delta_n;
 
@@ -292,7 +293,7 @@ impl StreamingStats {
         if self.count < 2 {
             return 0.0;
         }
-        self.m2 / self.count as f64
+        self.m2 / u64_f64(self.count)
     }
 
     /// 標本分散。
@@ -301,7 +302,7 @@ impl StreamingStats {
         if self.count < 2 {
             return 0.0;
         }
-        self.m2 / (self.count - 1) as f64
+        self.m2 / u64_f64(self.count - 1)
     }
 
     /// 標準偏差。
@@ -317,7 +318,7 @@ impl StreamingStats {
         if self.count < 3 || self.m2 < f64::EPSILON {
             return 0.0;
         }
-        let n = self.count as f64;
+        let n = u64_f64(self.count);
         n.sqrt() * self.m3 / self.m2.powf(1.5)
     }
 
@@ -327,7 +328,7 @@ impl StreamingStats {
         if self.count < 4 || self.m2 < f64::EPSILON {
             return 0.0;
         }
-        let n = self.count as f64;
+        let n = u64_f64(self.count);
         n * self.m4 / (self.m2 * self.m2) - 3.0
     }
 
@@ -438,7 +439,7 @@ mod tests {
         let mut cov = CovarianceMatrix::<2>::new();
         // 完全正相関: x=y
         for i in 0..100 {
-            let v = i as f64;
+            let v = f64::from(i);
             cov.observe(&[v, v]);
         }
         let r = cov.correlation(0, 1);
@@ -450,7 +451,7 @@ mod tests {
         let mut cov = CovarianceMatrix::<2>::new();
         // 完全負相関: x = -y
         for i in 0..100 {
-            let v = i as f64;
+            let v = f64::from(i);
             cov.observe(&[v, -v]);
         }
         let r = cov.correlation(0, 1);
@@ -469,7 +470,7 @@ mod tests {
         let mut cov = CovarianceMatrix::<2>::new();
         // 0,1,2,...,99 → sample variance = 833.25
         for i in 0..100 {
-            cov.observe(&[i as f64, 0.0]);
+            cov.observe(&[f64::from(i), 0.0]);
         }
         let var = cov.variance(0);
         // Welford co-moment / (n-1) で標本分散
@@ -532,7 +533,7 @@ mod tests {
         let mut s = StreamingStats::new();
         // 一様分布の尖度は約-1.2
         for i in 0..1000 {
-            s.observe(i as f64);
+            s.observe(f64::from(i));
         }
         assert!(s.kurtosis() < 0.0);
     }

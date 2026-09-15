@@ -3,6 +3,7 @@
 //! Real-time outlier detection using robust statistics.
 //! Designed for telemetry streams where batch processing is not feasible.
 
+use crate::math::u64_f64;
 #[cfg(not(feature = "std"))]
 use crate::math::FloatExt;
 
@@ -135,7 +136,7 @@ impl StreamingMedian {
     }
 
     /// Get the current median estimate - O(1)
-    #[inline(always)]
+    #[inline]
     pub fn median(&mut self) -> f64 {
         if self.count == 0 {
             return 0.0;
@@ -143,7 +144,7 @@ impl StreamingMedian {
 
         let mid = self.count / 2;
         if self.count.is_multiple_of(2) {
-            (self.sorted[mid - 1] + self.sorted[mid]) * 0.5
+            f64::midpoint(self.sorted[mid - 1], self.sorted[mid])
         } else {
             self.sorted[mid]
         }
@@ -580,7 +581,7 @@ impl ZScoreDetector {
     /// Observe a new value (updates running statistics)
     pub fn observe(&mut self, value: f64) {
         self.count += 1;
-        let inv_count = 1.0 / self.count as f64;
+        let inv_count = 1.0 / u64_f64(self.count);
         let delta = value - self.mean;
         self.mean += delta * inv_count;
         let delta2 = value - self.mean;
@@ -588,13 +589,13 @@ impl ZScoreDetector {
     }
 
     /// Get the variance
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn variance(&self) -> f64 {
         if self.count < 2 {
             0.0
         } else {
-            self.m2 / (self.count - 1) as f64
+            self.m2 / u64_f64(self.count - 1)
         }
     }
 
@@ -786,6 +787,7 @@ impl Default for CompositeDetector {
 #[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
+    use crate::math::usize_f64;
 
     #[test]
     fn test_streaming_median() {
@@ -836,7 +838,7 @@ mod tests {
 
         // Train on values with some variance
         for i in 0..100 {
-            let value = 10.0 + (i % 3) as f64 - 1.0; // 9, 10, 11
+            let value = 10.0 + f64::from(i % 3) - 1.0; // 9, 10, 11
             detector.observe(value);
         }
 
@@ -931,7 +933,7 @@ mod tests {
     fn test_streaming_median_full() {
         let mut sm = StreamingMedian::new();
         for i in 0..DEFAULT_WINDOW {
-            sm.push(i as f64);
+            sm.push(usize_f64(i));
         }
         assert!(sm.is_full());
         assert_eq!(sm.count(), DEFAULT_WINDOW);
@@ -942,7 +944,7 @@ mod tests {
         let mut sm = StreamingMedian::new();
         // Fill and then wrap
         for i in 0..(DEFAULT_WINDOW + 10) {
-            sm.push(i as f64);
+            sm.push(usize_f64(i));
         }
         assert_eq!(sm.count(), DEFAULT_WINDOW);
         let median = sm.median();

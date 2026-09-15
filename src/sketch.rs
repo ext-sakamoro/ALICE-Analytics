@@ -6,6 +6,7 @@
 
 #[cfg(not(feature = "std"))]
 use crate::math::FloatExt;
+use crate::math::{f64_i32, f64_u64, hash_index, i64_f64, u64_f64, usize_f64};
 use core::hash::{Hash, Hasher};
 
 // ============================================================================
@@ -87,20 +88,22 @@ const RCP_POW2_52: f64 = 1.0 / 4_503_599_627_370_496.0; // 1/2^52, precomputed
 
 /// Fast approximate log2 using IEEE 754 bit extraction
 /// Returns floor(log2(x)) for positive x, useful for bucket indexing
-#[inline(always)]
+#[inline]
 fn fast_log2_approx(x: f64) -> f64 {
     // IEEE 754 double: sign(1) | exponent(11) | mantissa(52)
     // For positive x: log2(x) ≈ exponent - 1023 + mantissa_fraction
     let bits = x.to_bits();
+    // 11 bit の指数なので i64 に収まる (u64 → i64 の wrap は起きない)
+    #[allow(clippy::cast_possible_wrap)]
     let exponent = ((bits >> 52) & 0x7FF) as i64;
     let mantissa = bits & 0x000F_FFFF_FFFF_FFFF;
 
     // exponent - 1023 gives the integer part of log2
     // mantissa * (1/2^52) gives a value in [0, 1) for linear interpolation
     let int_part = exponent - 1023;
-    let frac_part = mantissa as f64 * RCP_POW2_52;
+    let frac_part = u64_f64(mantissa) * RCP_POW2_52;
 
-    int_part as f64 + frac_part
+    i64_f64(int_part) + frac_part
 }
 
 // ============================================================================
@@ -178,7 +181,7 @@ impl Hasher for FnvHasher {
     #[inline]
     fn write(&mut self, bytes: &[u8]) {
         for &byte in bytes {
-            self.state ^= byte as u64;
+            self.state ^= u64::from(byte);
             self.state = self.state.wrapping_mul(Self::FNV_PRIME);
         }
     }
@@ -228,14 +231,19 @@ macro_rules! impl_hyperloglog {
             /// Insert an already-hashed value
             #[inline]
             pub const fn insert_hash(&mut self, hash: u64) {
-                let idx = (hash as usize) & (Self::M - 1);
+                let idx = hash_index(hash) & (Self::M - 1);
                 let w = hash >> $p;
                 // rho = position of first 1 bit in the (64-P) remaining bits
                 // leading_zeros(w) includes the P bits we shifted away, so subtract them
                 let rho = if w == 0 {
-                    (64 - $p + 1) as u8
+                    // P ≤ 16 なので 64 - P + 1 ≤ 65 = u8 に収まる (rho は 1..=65)
+                    #[allow(clippy::cast_possible_truncation)]
+                    let rho = (64 - $p + 1) as u8;
+                    rho
                 } else {
-                    (w.leading_zeros() as usize - $p + 1) as u8
+                    #[allow(clippy::cast_possible_truncation)]
+                    let rho = (w.leading_zeros() as usize - $p + 1) as u8;
+                    rho
                 };
                 if rho > self.registers[idx] {
                     self.registers[idx] = rho;
@@ -272,12 +280,12 @@ macro_rules! impl_hyperloglog {
                     }
                 }
 
-                let m = Self::M as f64;
+                let m = usize_f64(Self::M);
                 let inv_sum = 1.0 / sum;
                 let raw_estimate = Self::ALPHA * m * m * inv_sum;
 
                 if raw_estimate <= 2.5 * m && zeros > 0 {
-                    let inv_zeros = 1.0 / zeros as f64;
+                    let inv_zeros = 1.0 / usize_f64(zeros);
                     m * (m * inv_zeros).ln()
                 } else {
                     raw_estimate
@@ -428,8 +436,8 @@ macro_rules! impl_ddsketch {
             /// Uses standard `ln()` for quantile accuracy (`DDSketch` requires precise buckets)
             #[inline]
             fn bucket_index(&self, value: f64) -> usize {
-                let idx = (value.ln() * self.inv_ln_gamma).ceil() as i32 + self.offset;
-                idx.max(0) as usize
+                let idx = f64_i32((value.ln() * self.inv_ln_gamma).ceil()) + self.offset;
+                usize::try_from(idx.max(0)).unwrap_or(0)
             }
 
             /// Fast bucket index using IEEE 754 bit extraction (for non-critical paths)
@@ -440,13 +448,13 @@ macro_rules! impl_ddsketch {
                 let log2_gamma = self.ln_gamma / core::f64::consts::LN_2;
                 let inv_log2_gamma = 1.0 / log2_gamma;
                 let log2_value = fast_log2_approx(value);
-                let idx = (log2_value * inv_log2_gamma).ceil() as i32 + self.offset;
-                idx.max(0) as usize
+                let idx = f64_i32((log2_value * inv_log2_gamma).ceil()) + self.offset;
+                usize::try_from(idx.max(0)).unwrap_or(0)
             }
 
             #[inline]
             fn bucket_lower_bound(&self, idx: usize) -> f64 {
-                let exp = (idx as i32 - self.offset) as f64;
+                let exp = f64::from(i32::try_from(idx).unwrap_or(i32::MAX) - self.offset);
                 self.gamma.powf(exp - 1.0)
             }
 
@@ -455,7 +463,7 @@ macro_rules! impl_ddsketch {
                     return 0.0;
                 }
 
-                let rank = (q * self.count as f64).ceil() as u64;
+                let rank = f64_u64((q * u64_f64(self.count)).ceil());
                 let mut cumulative = 0u64;
 
                 for (idx, &count) in self.negative_bins.iter().enumerate().rev() {
@@ -495,7 +503,7 @@ macro_rules! impl_ddsketch {
                 if self.count == 0 {
                     0.0
                 } else {
-                    self.sum * (1.0 / self.count as f64)
+                    self.sum * (1.0 / u64_f64(self.count))
                 }
             }
 
@@ -599,7 +607,7 @@ macro_rules! impl_countmin {
                 let mixed = h ^ (h >> 33);
                 let mixed = mixed.wrapping_mul(0xff51_afd7_ed55_8ccd);
                 let mixed = mixed ^ (mixed >> 33);
-                (mixed as usize) & ($w - 1)
+                hash_index(mixed) & ($w - 1)
             }
 
             #[inline]
@@ -661,12 +669,12 @@ macro_rules! impl_countmin {
 
             #[inline(always)]
             pub fn error_bound(&self) -> f64 {
-                core::f64::consts::E * (1.0 / ($w as f64))
+                core::f64::consts::E * (1.0 / f64::from($w))
             }
 
             #[inline]
             pub fn confidence(&self) -> f64 {
-                1.0 - (-($d as f64)).exp()
+                1.0 - (-f64::from($d)).exp()
             }
         }
 

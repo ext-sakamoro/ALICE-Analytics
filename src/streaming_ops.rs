@@ -7,6 +7,7 @@
 
 #[cfg(not(feature = "std"))]
 use crate::math::FloatExt;
+use crate::math::{u64_f64, usize_f64};
 
 // ============================================================================
 // Change Rate — 変化率
@@ -57,7 +58,7 @@ impl ChangeRate {
             return Some(self.rate);
         }
 
-        self.rate = (value - self.prev_value) / dt as f64;
+        self.rate = (value - self.prev_value) / u64_f64(dt);
         self.prev_value = value;
         self.prev_ts = timestamp_ms;
         Some(self.rate)
@@ -136,7 +137,7 @@ impl ExponentialMovingAverage {
     #[must_use]
     pub fn from_span(span: u64) -> Self {
         assert!(span > 0, "span must be > 0");
-        Self::new(2.0 / (span as f64 + 1.0))
+        Self::new(2.0 / (u64_f64(span) + 1.0))
     }
 
     /// 観測値を追加。
@@ -227,7 +228,7 @@ impl<const N: usize> SimpleMovingAverage<N> {
         if self.count == 0 {
             return 0.0;
         }
-        self.sum / self.count as f64
+        self.sum / usize_f64(self.count)
     }
 
     /// 有効な要素数。
@@ -303,7 +304,7 @@ impl LinearRegression {
     /// 観測値 (x, y) を追加。
     pub fn observe(&mut self, x: f64, y: f64) {
         self.count += 1;
-        let n = self.count as f64;
+        let n = u64_f64(self.count);
 
         let dx = x - self.mean_x;
         let dy = y - self.mean_y;
@@ -622,7 +623,7 @@ mod tests {
         let mut lr = LinearRegression::new();
         // y = 2x + 1
         for i in 0..100 {
-            let x = i as f64;
+            let x = f64::from(i);
             lr.observe(x, 2.0f64.mul_add(x, 1.0));
         }
         assert!((lr.slope() - 2.0).abs() < 1e-6, "slope = {}", lr.slope());
@@ -638,7 +639,7 @@ mod tests {
         let mut lr = LinearRegression::new();
         // y = 3x - 2
         for i in 0..50 {
-            let x = i as f64;
+            let x = f64::from(i);
             lr.observe(x, 3.0f64.mul_add(x, -2.0));
         }
         let pred = lr.predict(100.0);
@@ -649,7 +650,7 @@ mod tests {
     fn linreg_constant() {
         let mut lr = LinearRegression::new();
         for i in 0..50 {
-            lr.observe(i as f64, 42.0);
+            lr.observe(f64::from(i), 42.0);
         }
         assert!((lr.slope() - 0.0).abs() < 1e-10);
         assert!((lr.intercept() - 42.0).abs() < 1e-6);
@@ -685,7 +686,7 @@ mod tests {
         let mut lr = LinearRegressionFull::new();
         // 完全な線形関係 → R²≈1.0
         for i in 0..100 {
-            let x = i as f64;
+            let x = f64::from(i);
             lr.observe(x, 2.0f64.mul_add(x, 1.0));
         }
         assert!(
@@ -700,7 +701,7 @@ mod tests {
         let mut lr = LinearRegressionFull::new();
         // x増加、yは定数 → R²≈0
         for i in 0..100 {
-            lr.observe(i as f64, 42.0);
+            lr.observe(f64::from(i), 42.0);
         }
         assert!(lr.r_squared() < 0.01, "R² = {}", lr.r_squared());
     }
@@ -709,7 +710,7 @@ mod tests {
     fn linreg_full_predict() {
         let mut lr = LinearRegressionFull::new();
         for i in 0..50 {
-            let x = i as f64;
+            let x = f64::from(i);
             lr.observe(x, x.mul_add(0.5, 10.0));
         }
         let pred = lr.predict(100.0);
