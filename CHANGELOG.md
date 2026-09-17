@@ -4,6 +4,8 @@ All notable changes to ALICE-Analytics will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-17
+
 ### Added
 - `tests/analytic_oracle.rs` — 閉形式 / 2-pass 参照との突合 oracle 8 本 (CLAUDE.md § 解析解突合テスト規律、2026-09-17): Pébay 1-pass moment (mean / 分散 / g₁ / 超過尖度、順序独立)、R-7 quantile / percentile rank / Tukey fence、共分散行列 (対称・ρ = 1 / 0)、sliding window / SMA / EMA 閉形式 (1 − (1−α)ᵏ、α = 2/(span+1)) / change rate、streaming 回帰 (exact 直線 R² = 1、正規方程式)、HyperLogLog 3σ / **DDSketch 全 quantile ≤ α** (正負) / Count-Min ≥ 真値 + ε = e/w / heavy hitter / FNV-1a → fmix64、running median / MAD / EWMA・EWMV 漸化式、xorshift 決定性 / Laplace 2b² / randomized response の不偏推定
 
