@@ -417,16 +417,16 @@ macro_rules! impl_ddsketch {
                     self.max = value;
                 }
 
+                // Out-of-range magnitudes collapse into the edge bins (the
+                // α guarantee holds inside γ^(−offset) ..= γ^(bins − offset));
+                // until 2026-09-17 they were counted but stored nowhere, so
+                // every quantile above them shifted by one rank per lost value.
                 if value > 0.0 {
-                    let idx = self.bucket_index(value);
-                    if idx < $bins {
-                        self.positive_bins[idx] += 1;
-                    }
+                    let idx = self.bucket_index(value).min($bins - 1);
+                    self.positive_bins[idx] += 1;
                 } else if value < 0.0 {
-                    let idx = self.bucket_index(-value);
-                    if idx < $bins {
-                        self.negative_bins[idx] += 1;
-                    }
+                    let idx = self.bucket_index(-value).min($bins - 1);
+                    self.negative_bins[idx] += 1;
                 } else {
                     self.zero_count += 1;
                 }
@@ -452,42 +452,52 @@ macro_rules! impl_ddsketch {
                 usize::try_from(idx.max(0)).unwrap_or(0)
             }
 
+            /// Representative value of bin `idx` (which covers
+            /// `(γ^(i−1), γ^i]`, `i = idx − offset`): `2γ^i / (γ + 1)`, the point
+            /// whose relative distance to both bin edges is exactly α — the
+            /// `DDSketch` guarantee (Masson, Rim & Lee 2019).
+            ///
+            /// History (2026-09-17, oracle `tests/analytic_oracle.rs`): the
+            /// **lower bound** γ^(i−1) was returned, so a value near the top of
+            /// its bin came back up to γ − 1 = 2α/(1−α) too small (3.1 % at
+            /// α = 0.02 on a 6-decade stream) — outside the published bound.
             #[inline]
-            fn bucket_lower_bound(&self, idx: usize) -> f64 {
+            fn bucket_representative(&self, idx: usize) -> f64 {
                 let exp = f64::from(i32::try_from(idx).unwrap_or(i32::MAX) - self.offset);
-                self.gamma.powf(exp - 1.0)
+                2.0 * self.gamma.powf(exp) / (self.gamma + 1.0)
             }
 
             pub fn quantile(&self, q: f64) -> f64 {
                 if self.count == 0 {
                     return 0.0;
                 }
-
-                let rank = f64_u64((q * u64_f64(self.count)).ceil());
+                let rank = f64_u64((q * u64_f64(self.count)).ceil()).max(1);
+                // a bin representative may lie outside the observed range;
+                // the true order statistic never does
+                let clamp = |v: f64| v.clamp(self.min, self.max);
                 let mut cumulative = 0u64;
-
+                // negative values ascend from the largest magnitude (most
+                // negative) — until 2026-09-17 the bins were walked from the
+                // smallest magnitude, so the order of every negative quantile
+                // was reversed
                 for (idx, &count) in self.negative_bins.iter().enumerate().rev() {
                     cumulative += count;
                     if cumulative >= rank {
-                        return -self.bucket_lower_bound(idx);
+                        return clamp(-self.bucket_representative(idx));
                     }
                 }
-
                 cumulative += self.zero_count;
                 if cumulative >= rank {
                     return 0.0;
                 }
-
                 for (idx, &count) in self.positive_bins.iter().enumerate() {
                     cumulative += count;
                     if cumulative >= rank {
-                        return self.bucket_lower_bound(idx);
+                        return clamp(self.bucket_representative(idx));
                     }
                 }
-
                 self.max
             }
-
             #[inline]
             pub const fn count(&self) -> u64 {
                 self.count
