@@ -242,7 +242,9 @@ def check(root: str) -> tuple[list[str], dict[str, int]]:
         dup = sorted({h for h in heads if heads.count(h) > 1})
         if dup:
             errors.append(f"CHANGELOG.md: version headings appear twice: {dup}")
-        if heads and heads[0] != "Unreleased":
+        # `[Unreleased]` is optional (right after a release there is nothing
+        # pending), but when present it comes first
+        if "Unreleased" in heads and heads[0] != "Unreleased":
             errors.append(f"CHANGELOG.md: the first version heading is [{heads[0]}], not [Unreleased]")
         released = [h for h in heads if h != "Unreleased"]
         for a, b in zip(released, released[1:]):

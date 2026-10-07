@@ -292,6 +292,13 @@ class Changelog(unittest.TestCase):
         e = errors({"CHANGELOG.md": CHANGELOG.replace("## [Unreleased]", "## [1.5.0] - 2026-10-04\n\n## [Unreleased]")})
         self.assertTrue(any("not [Unreleased]" in x for x in e), e)
 
+    def test_released_only_changelog_passes(self):
+        # right after a release there is nothing pending, so `[Unreleased]`
+        # is absent: the heading order check must not require it, and the
+        # category check must not look for categories that cannot exist
+        cl = CHANGELOG.replace("## [Unreleased]\n", "## [1.5.0] - 2026-10-07\n", 1)
+        self.assertEqual(errors({"CHANGELOG.md": cl}), [])
+
     def test_versions_descending(self):
         e = errors({"CHANGELOG.md": CHANGELOG.replace("## [1.3.0]", "## [1.4.1]")})
         self.assertTrue(any("is not newer" in x for x in e), e)

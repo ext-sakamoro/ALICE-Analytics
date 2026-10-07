@@ -1,8 +1,10 @@
 # Changelog
 
 All notable changes to ALICE-Analytics will be documented in this file.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.2.0] - 2026-10-07
 
 ### Added
 - `law` feature と `law` module: `alice_zip::law::SignalLaw` に対する点集合の残差 `y − f(x)` を `DDSketch2048` に流し込み、`p50` / `p90` / `p99` (sketch の相対誤差 α 以内)、`mean` / `min` / `max` / `max_abs` (厳密値)、件数を返す `residual_summary` と、ストリーミング版 `ResidualSketch` (`push` / `extend` / `quantile` / `summary`、α とスケールを指定可能)
