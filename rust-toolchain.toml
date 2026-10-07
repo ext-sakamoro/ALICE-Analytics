@@ -1,4 +1,5 @@
-# Rust toolchain pin (feedback_clippy_rust_version_drift 準拠)
+# Rust toolchain pin: clippy lints change between releases, so CI and local
+# builds use the same version
 [toolchain]
 channel = "1.98.1"
 components = ["rustfmt", "clippy"]

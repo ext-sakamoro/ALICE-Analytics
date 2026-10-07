@@ -1,14 +1,8 @@
 name: Fuzz
 
-# canonical CI template: [[reference_alice_ci_canonical_template]]
-# ALICE-SDF v1.7.7 (commit 52d26f9) を base に ALICE-Analytics 用に調整
-#
-# 目的:
-# - 3 fuzz target (fuzz_event_parse / fuzz_metric_aggregate / fuzz_sketch_insert) を time-boxed 実行
-# - 攻撃者制御 telemetry data で panic ゼロ + OOM 予防を検証
-#
-# 罠:
-# - cargo-fuzz は nightly toolchain 必須 (rust-toolchain 不使用時も明示指定)
+# Runs each fuzz target for a bounded time: telemetry values chosen by an
+# attacker (NaN / ±Inf / subnormal / extreme counts) must not panic or exhaust
+# memory. cargo-fuzz needs a nightly toolchain.
 
 on:
   push:
@@ -17,16 +11,14 @@ on:
       - 'src/**'
       - 'fuzz/**'
       - '.github/workflows/fuzz.yml'
-      - '.github/actions/**'
   pull_request:
     branches: [main]
     paths:
       - 'src/**'
       - 'fuzz/**'
       - '.github/workflows/fuzz.yml'
-      - '.github/actions/**'
   schedule:
-    # 毎日 03:00 UTC = 12:00 JST (idle 時間帯)
+    # every day 03:00 UTC
     - cron: '0 3 * * *'
   workflow_dispatch:
     inputs:
@@ -57,7 +49,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # cargo-fuzz は nightly toolchain 必須
       - name: Install nightly toolchain
         uses: dtolnay/rust-toolchain@nightly
 
@@ -65,15 +56,12 @@ jobs:
         with:
           workspaces: fuzz
 
-      - name: Create ALICE optional bridge stubs
-        uses: ./.github/actions/alice-stubs
-
       - name: Install cargo-fuzz
-        run: cargo install cargo-fuzz --locked
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-fuzz
 
-      # build は blocking: compile error を continue-on-error で隠さない
-      # (canonical 罠 #22: job-level continue-on-error だと fuzz target の
-      #  compile error が green 表示で silent になる)
+      # the build blocks: a target that does not compile must not pass
       - name: Build fuzz target
         run: |
           cd fuzz
@@ -88,7 +76,7 @@ jobs:
           fi
           echo "seconds=$DURATION" >> "$GITHUB_OUTPUT"
 
-      # run は informational: crash 発見は block せず artifact で triage
+      # the run is informational: a crash is uploaded for triage, not blocking
       - name: Run fuzz target (time-boxed)
         id: run
         continue-on-error: true

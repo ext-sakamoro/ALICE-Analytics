@@ -1,8 +1,13 @@
-name: ALICE Analytics CI
+name: CI
+
+# scripts/preflight.sh runs the same commands with the same arguments locally;
+# a step added here is added there in the same commit.
 
 on:
-  push: { branches: [main] }
-  pull_request: { branches: [main] }
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -13,50 +18,53 @@ env:
 
 jobs:
   test:
-    name: cargo test / clippy / fmt
-    runs-on: ubuntu-latest
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # - macos-latest      → aarch64-apple-darwin
+        # - ubuntu-24.04-arm  → aarch64-unknown-linux-gnu
+        # - ubuntu-latest     → x86_64-unknown-linux-gnu
+        # - windows-latest    → x86_64-pc-windows-msvc
+        os: [macos-latest, ubuntu-24.04-arm, ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v5
+      # the toolchain itself comes from rust-toolchain.toml
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
 
-      - name: Create ALICE optional bridge stubs
-        uses: ./.github/actions/alice-stubs
-
-      - name: cargo fmt --check
-        run: cargo fmt --all -- --check
-
-      # pedantic は 2026-09-15 に 137 → 0 化済 → gate
-      - name: cargo clippy (pedantic)
-        run: cargo clippy --all-targets --all-features -- -W clippy::pedantic -D warnings
-
-      - name: cargo test
+      - name: Test (unit + integration + doc, every feature)
         run: cargo test --all-features
 
-  # 2026-09-15 追加 (canonical 罠 #29 遡及): crates.io no-std category を掲げつつ
-  # --no-default-features は 38 error で一度も通っていなかった (f64 mul_add / sqrt / ln 等 + std::f64::consts)
-  # src/math.rs FloatExt (libm) で修正、bare-metal thumbv7em (rust-toolchain.toml の targets) で証明
-  no_std:
-    name: no_std (host + bare-metal thumbv7em)
+      - name: Test (unit + integration + doc, default features)
+        run: cargo test
+
+      - name: Example (residual_summary, law feature)
+        run: cargo run --example residual_summary --features law
+
+  no-std:
+    name: Build (no_std, host + thumbv7em-none-eabihf)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
+      # installs the target for the toolchain pinned in rust-toolchain.toml
+      - name: Add thumbv7em-none-eabihf
+        run: rustup target add thumbv7em-none-eabihf
       - uses: Swatinem/rust-cache@v2
-      - name: Create ALICE optional bridge stubs
-        uses: ./.github/actions/alice-stubs
-      - name: Check (no_std, host)
+      - name: Check (lib, no_std, host)
         run: cargo check --lib --no-default-features
-      - name: Check (no_std + simd, host)
-        run: cargo check --lib --no-default-features --features simd
-      - name: Check (no_std, bare-metal thumbv7em-none-eabihf)
-        run: cargo check --lib --no-default-features --target thumbv7em-none-eabihf
-      - name: Clippy (no_std, bare-metal)
-        run: cargo clippy --lib --no-default-features --target thumbv7em-none-eabihf -- -W clippy::pedantic -D warnings
+      - name: Check (lib, no_std + law, host)
+        run: cargo check --lib --no-default-features --features law
+      # a bare-metal target has no std at all, so this is the build that proves
+      # the library compiles without it
+      - name: Build (lib, no_std, thumbv7em-none-eabihf)
+        run: cargo build --lib --no-default-features --target thumbv7em-none-eabihf
+      - name: Build (lib, no_std + law, thumbv7em-none-eabihf)
+        run: cargo build --lib --no-default-features --features law --target thumbv7em-none-eabihf
+      - name: Clippy (lib, no_std + law, thumbv7em-none-eabihf)
+        run: cargo clippy --lib --no-default-features --features law --target thumbv7em-none-eabihf -- -W clippy::pedantic -D warnings
 
   feature-powerset:
     name: Feature powerset (cargo-hack, depth 2)
@@ -65,27 +73,87 @@ jobs:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Create ALICE optional bridge stubs
-        uses: ./.github/actions/alice-stubs
       - name: Install cargo-hack
-        uses: taiki-e/install-action@cargo-hack
-      - run: cargo hack check --lib --feature-powerset --depth 2
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-hack
+      - name: cargo hack check (lib, feature powerset, depth 2)
+        run: cargo hack check --lib --feature-powerset --depth 2
 
-  doc:
-    name: Doc (-D warnings)
+  clippy:
+    name: Clippy (pedantic, -D warnings)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Create ALICE optional bridge stubs
-        uses: ./.github/actions/alice-stubs
-      - run: cargo doc --no-deps --all-features
+      - name: Clippy (default features, all targets)
+        run: cargo clippy --all-targets -- -W clippy::pedantic -D warnings
+      - name: Clippy (all features, all targets)
+        run: cargo clippy --all-targets --all-features -- -W clippy::pedantic -D warnings
+
+  # The declared `rust-version` compiled with exactly that toolchain. Bump
+  # `rust-version` in Cargo.toml and the version below in the same commit.
+  msrv:
+    name: MSRV (rust-version = 1.87)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@1.87
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo check on MSRV (lib, default features)
+        run: cargo +1.87 check --lib
+      - name: cargo check on MSRV (lib, all features)
+        run: cargo +1.87 check --lib --all-features
+
+  doc:
+    name: Doc (RUSTDOCFLAGS=-Dwarnings)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo doc (no-deps, default features)
+        run: cargo doc --lib --no-deps
+        env:
+          RUSTDOCFLAGS: "-Dwarnings"
+      - name: cargo doc (no-deps, all features)
+        run: cargo doc --lib --no-deps --all-features
         env:
           RUSTDOCFLAGS: "-Dwarnings"
 
+  docs-lint:
+    # run on every OS so a locale or path difference in the checker itself
+    # shows up here rather than as a silent pass
+    name: Docs lint (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Docs lint (tests)
+        run: python scripts/test_docs_lint.py
+      - name: Docs lint (public documents, CHANGELOG structure)
+        run: python scripts/docs_lint.py --check
+
+  fmt:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
   actionlint:
-    name: actionlint (workflow YAML 検証)
+    name: actionlint (workflow YAML)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5

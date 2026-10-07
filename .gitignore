@@ -1,9 +1,6 @@
-# Claude Code
-CLAUDE.md
-.claude/
-
 /target/
 Cargo.lock
 .DS_Store
 *.swp
 *.swo
+__pycache__/

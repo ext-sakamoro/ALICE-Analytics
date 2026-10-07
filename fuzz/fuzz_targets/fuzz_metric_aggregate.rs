@@ -9,8 +9,6 @@
 //! - percentile_rank / IQR での sorted 前提違反 panic
 //!
 //! を全て有限時間で panic なく完了することを保証する
-//!
-//! canonical CI template [[reference_alice_ci_canonical_template]] 準拠
 
 #![no_main]
 
