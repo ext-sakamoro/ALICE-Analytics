@@ -211,10 +211,35 @@ impl RandomizedResponse {
     }
 
     /// Create with explicit probability and seed
+    ///
+    /// # Panics
+    ///
+    /// `p_true` が `[0.5, 1.0]` の外 (`NaN` / 無限大を含む、どちらも比較が
+    /// 偽になるので同じ assert で弾かれる) の場合
+    ///
+    /// 定義域の扱いは同 crate の [`ExponentialMovingAverage::new`] に合わせた
+    /// (範囲外は黙って丸めず panic する) 2026-10-07 までは
+    /// `clamp(0.5, 1.0)` だったので、`0.0` を渡すと黙って `0.5` に、`2.0` は
+    /// `1.0` になり、**`NaN` は `clamp` が `NaN` を返すので丸められずに残り**、
+    /// `p_true()` が `NaN` を報告する機構ができていた 丸めは呼び出し側が
+    /// 頼んだのと違う ε の機構を作るので、推定値の意味が変わる
+    ///
+    /// `0.5` は「常に無作為に答える」という意味のある下端なので許す
+    /// (`new(0.0)` がちょうど `0.5` を作る)
+    ///
+    /// [`ExponentialMovingAverage::new`]: crate::streaming_ops::ExponentialMovingAverage::new
     #[must_use]
+    // `RangeInclusive::contains` is not a `const fn`, so the range cannot be
+    // spelled the way clippy prefers without dropping `const` from a public
+    // constructor.
+    #[allow(clippy::manual_range_contains)]
     pub const fn with_probability(p_true: f64, seed: u64) -> Self {
+        assert!(
+            p_true >= 0.5 && p_true <= 1.0,
+            "p_true must be in [0.5, 1.0]"
+        );
         Self {
-            p_true: p_true.clamp(0.5, 1.0),
+            p_true,
             rng: XorShift64::new(seed),
         }
     }
@@ -419,8 +444,30 @@ impl PrivacyBudget {
 
     /// Try to spend epsilon from budget
     ///
-    /// Returns true if budget allows, false if would exceed.
+    /// Returns `true` and charges the ledger if the request is well formed and
+    /// fits in the remaining budget; returns `false` and **leaves every field
+    /// untouched** otherwise.
+    ///
+    /// A request is well formed when `epsilon` is finite and not negative.
+    /// `0.0` (and `-0.0`) is well formed: it charges nothing and counts a
+    /// query.
+    ///
+    /// Rejecting a negative `epsilon` is the whole point of the type. Until
+    /// 2026-10-07 the guard was only the budget comparison
+    /// `total + epsilon <= max`, which a negative value passes trivially, so
+    /// `try_spend(-10.0)` returned `true` and *raised* the remaining budget
+    /// from 1 to 11; `-inf` raised it to infinity. A caller that spends a
+    /// negative epsilon between two honest queries escapes the limit the
+    /// budget exists to enforce. `NaN` and `+inf` were already refused,
+    /// though only as a side effect of the comparison being false — they are
+    /// now refused by the same explicit check.
     pub fn try_spend(&mut self, epsilon: f64) -> bool {
+        // `!(epsilon >= 0.0)` would also catch NaN, but spelling both
+        // conditions out keeps the intent readable: a non-finite or negative
+        // request is not a spend at all, and never reaches the ledger.
+        if !epsilon.is_finite() || epsilon < 0.0 {
+            return false;
+        }
         if self.total_epsilon + epsilon <= self.max_epsilon {
             self.total_epsilon += epsilon;
             self.query_count += 1;

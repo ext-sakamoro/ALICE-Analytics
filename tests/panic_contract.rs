@@ -455,21 +455,25 @@ fn a_zero_epsilon_gives_an_infinite_scale_without_wrapping() {
     );
 }
 
-/// The truthfulness probability is clamped into [0.5, 1]: below 0.5 the
-/// estimator would invert the sign of every reported proportion.
+/// The truthfulness probability must be inside [0.5, 1]: below 0.5 the
+/// estimator inverts the sign of every reported proportion.
+///
+/// The domain is enforced the way `ExponentialMovingAverage::new` enforces
+/// its own — an assertion rather than a silent correction. Measured
+/// precedent (`cargo test`, every boundary): that constructor rejects a
+/// negative factor, `-0.0`, `0.0`, anything above `1.0` including
+/// `1.0 + f64::EPSILON`, `NaN`, `inf` and `-inf`, and accepts everything from
+/// `f64::MIN_POSITIVE` up to and including `1.0`. A single `&&` of two
+/// comparisons covers the non-finite cases for free, because every comparison
+/// against `NaN` is false.
 #[test]
-fn a_randomized_response_probability_is_clamped_into_its_domain() {
-    assert_eq!(RandomizedResponse::with_probability(0.0, 7).p_true(), 0.5);
-    assert_eq!(RandomizedResponse::with_probability(2.0, 7).p_true(), 1.0);
-    // ⚠️ `f64::clamp` returns `NaN` when the value is `NaN`, so a misconfigured
-    // probability is *not* clamped and `p_true()` reports `NaN`. In effect the
-    // mechanism degrades to answering at random (every comparison against
-    // `NaN` is false), but the reported parameter is unusable. Pinned as the
-    // current behaviour; it belongs to the same open question as the `NaN`
-    // classification in `DDSketch::insert` and is expected to change with it.
-    assert!(RandomizedResponse::with_probability(f64::NAN, 7)
-        .p_true()
-        .is_nan());
+fn a_randomized_response_accepts_its_whole_domain_and_only_that() {
+    // the closed ends are inside the domain: 0.5 means "always answer at
+    // random" (which `new(0.0)` produces exactly), 1.0 means "always truthful"
+    assert_eq!(RandomizedResponse::with_probability(0.5, 7).p_true(), 0.5);
+    assert_eq!(RandomizedResponse::with_probability(1.0, 7).p_true(), 1.0);
+    // and the value is kept, not corrected
+    assert_eq!(RandomizedResponse::with_probability(0.75, 7).p_true(), 0.75);
 
     // p_true = 0.5 carries no information about the input, so the estimator
     // returns the prior 0.5 rather than dividing by zero
@@ -478,36 +482,112 @@ fn a_randomized_response_probability_is_clamped_into_its_domain() {
     assert_eq!(RandomizedResponse::estimate_proportion(0.75, 0, 0), 0.0);
 }
 
-/// `PrivacyBudget` against a bad spend request, pinned exactly as it behaves
-/// today.
-///
-/// ⚠️ A **negative** ε is accepted and *increases* the remaining budget
-/// (`spent` goes negative). That is a defect rather than a design: a
-/// differential privacy budget is a monotone ledger, and refilling it lets a
-/// caller run unlimited queries. It is pinned here rather than fixed because
-/// rejecting it changes the observable result of a published method, which is
-/// a separate decision. A reader who comes to fix it should expect to rewrite
-/// this test, not to work around it. `NaN` is already refused, which is the
-/// behaviour the negative case should have.
 #[test]
-fn a_privacy_budget_currently_accepts_a_negative_spend() {
+#[should_panic(expected = "p_true must be in [0.5, 1.0]")]
+fn a_randomized_response_rejects_a_probability_below_the_domain() {
+    let _ = RandomizedResponse::with_probability(0.0, 7);
+}
+
+#[test]
+#[should_panic(expected = "p_true must be in [0.5, 1.0]")]
+fn a_randomized_response_rejects_a_probability_above_the_domain() {
+    let _ = RandomizedResponse::with_probability(2.0, 7);
+}
+
+/// ⚠️ Until 2026-10-07 this was the one input the old `clamp(0.5, 1.0)` let
+/// through: `f64::clamp` returns `NaN` when the value is `NaN`, so a
+/// misconfigured probability was not corrected and `p_true()` reported `NaN`.
+#[test]
+#[should_panic(expected = "p_true must be in [0.5, 1.0]")]
+fn a_randomized_response_rejects_a_nan_probability() {
+    let _ = RandomizedResponse::with_probability(f64::NAN, 7);
+}
+
+#[test]
+#[should_panic(expected = "p_true must be in [0.5, 1.0]")]
+fn a_randomized_response_rejects_an_infinite_probability() {
+    let _ = RandomizedResponse::with_probability(f64::INFINITY, 7);
+}
+
+/// A malformed spend request is refused and leaves the ledger byte for byte
+/// unchanged.
+///
+/// This is the invariant the type exists for. Until 2026-10-07 the only guard
+/// was the budget comparison `total + epsilon <= max`, which a negative value
+/// passes trivially: `try_spend(-10.0)` returned `true` and *raised* the
+/// remaining budget from 1 to 11, and `-inf` raised it to infinity — so a
+/// caller could slip a negative epsilon between two honest queries and escape
+/// the limit entirely. `NaN` and `+inf` were refused, but only as a side
+/// effect of the comparison being false.
+///
+/// Refusal is asserted on every field, not just on the returned `bool`: a
+/// guard that returns `false` after charging the ledger would pass a
+/// `bool`-only test.
+#[test]
+fn a_malformed_spend_is_refused_and_leaves_the_ledger_untouched() {
+    for bad in [
+        -10.0f64,
+        -f64::MIN_POSITIVE,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+        f64::NAN,
+    ] {
+        let mut b = PrivacyBudget::new(1.0);
+        // spend something first, so "untouched" is distinguishable from "reset"
+        assert!(b.try_spend(0.25));
+        let (spent, remaining, queries) = (b.spent(), b.remaining(), b.query_count());
+        assert_eq!((spent, remaining, queries), (0.25, 0.75, 1));
+
+        assert!(!b.try_spend(bad), "{bad:e} must be refused");
+        assert_eq!(b.spent(), spent, "{bad:e} moved `spent`");
+        assert_eq!(b.remaining(), remaining, "{bad:e} moved `remaining`");
+        assert_eq!(b.query_count(), queries, "{bad:e} counted a query");
+        assert!(!b.is_exhausted(), "{bad:e} changed exhaustion");
+    }
+}
+
+/// Zero is well formed — it charges nothing and counts a query — and the
+/// limit is enforced at the boundary.
+#[test]
+fn a_well_formed_spend_is_monotone_and_bounded() {
     let mut b = PrivacyBudget::new(1.0);
     assert_eq!(b.remaining(), 1.0);
-    assert!(b.try_spend(-10.0), "currently accepted");
-    assert_eq!(b.spent(), -10.0, "the ledger goes negative");
-    assert_eq!(b.remaining(), 11.0, "and the budget is refilled");
 
-    // NaN is refused and leaves the ledger untouched
-    let mut b = PrivacyBudget::new(1.0);
-    assert!(!b.try_spend(f64::NAN));
-    assert_eq!(b.remaining(), 1.0);
-    assert!(!b.is_exhausted());
+    // 0.0 and -0.0 are both zero; `-0.0 < 0.0` is false in IEEE 754, so both
+    // are accepted and neither moves the ledger
+    for zero in [0.0f64, -0.0] {
+        assert!(b.try_spend(zero), "{zero:e} is a well-formed request");
+        assert_eq!(b.spent(), 0.0);
+        assert_eq!(b.remaining(), 1.0);
+    }
+    assert_eq!(b.query_count(), 2, "a zero spend still counts as a query");
 
-    // a well-formed spend is monotone and the limit is enforced
     assert!(b.try_spend(0.5));
+    assert_eq!(b.spent(), 0.5);
     assert_eq!(b.remaining(), 0.5);
+
     assert!(!b.try_spend(0.75), "over budget is refused");
+    assert_eq!(b.spent(), 0.5, "the refused amount is not charged");
     assert_eq!(b.remaining(), 0.5);
+
+    // exactly the remainder fits, and then the budget is exhausted
+    assert!(b.try_spend(0.5));
+    assert_eq!(b.remaining(), 0.0);
+    assert!(b.is_exhausted());
+    assert!(!b.try_spend(f64::EPSILON), "nothing fits once exhausted");
+    // ⚠️ a request below the ulp of the accumulated total is absorbed by the
+    // addition and therefore accepted: `1.0 + f64::MIN_POSITIVE` rounds back
+    // to `1.0`, so the comparison passes. It charges nothing, which is why
+    // this is a property of f64 rather than a hole in the limit
+    assert!(b.try_spend(f64::MIN_POSITIVE));
+    assert_eq!(b.spent(), 1.0, "an absorbed request charges nothing");
+    assert_eq!(b.remaining(), 0.0);
+
+    // a budget that starts non-positive accepts nothing above zero
+    let mut none = PrivacyBudget::new(-1.0);
+    assert!(!none.try_spend(0.5));
+    assert_eq!(none.spent(), 0.0);
+    assert_eq!(none.query_count(), 0);
 }
 
 /// `EwmaDetector` takes its smoothing factor without an assertion (unlike

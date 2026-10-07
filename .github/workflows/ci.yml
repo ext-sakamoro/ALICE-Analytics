@@ -40,6 +40,15 @@ jobs:
       - name: Test (unit + integration + doc, default features)
         run: cargo test
 
+      # The library is no_std, so its unit tests must also compile and run
+      # without the `std` feature: that is the only lane that executes the
+      # `libm` rounding path (`sqrt` / `ceil` / `floor` / `round` / `mul_add`)
+      # on a host. `--lib` only, so this stays a few seconds per OS.
+      - name: Test (lib unit tests, no_std)
+        run: cargo test --lib --no-default-features
+      - name: Test (lib unit tests, no_std + law)
+        run: cargo test --lib --no-default-features --features law
+
       - name: Example (residual_summary, law feature)
         run: cargo run --example residual_summary --features law
 

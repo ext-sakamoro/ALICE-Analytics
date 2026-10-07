@@ -10,8 +10,8 @@
 #
 # usage: scripts/preflight.sh [--quick]
 #   (none)   every gate: static checks, clippy, no_std builds, feature
-#            powerset, docs, the full test suites, the example, MSRV, and the
-#            security jobs (cargo audit / deny / machete)
+#            powerset, docs, the full test suites (including the no_std lib
+#            unit tests), the example, MSRV, and the security jobs (cargo audit / deny / machete)
 #   --quick  static checks, clippy, no_std builds, docs and `cargo test --lib`;
 #            skips the full suites, the example, the feature powerset, MSRV
 #            and the security jobs
@@ -82,9 +82,12 @@ if [[ $quick -eq 1 ]]; then
   echo; echo "preflight --quick OK (full test suites, example, feature powerset, MSRV and security jobs skipped)"; exit 0
 fi
 
-step "ci.yml / test: every feature, default features, example"
+step "ci.yml / test: every feature, default features, no_std lib, example"
 cargo test --all-features
 cargo test
+# the no_std lane: the only one that runs the libm rounding path on a host
+cargo test --lib --no-default-features
+cargo test --lib --no-default-features --features law
 cargo run --example residual_summary --features law
 
 step "ci.yml / feature-powerset: cargo hack (depth 2)"

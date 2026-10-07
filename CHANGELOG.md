@@ -31,6 +31,7 @@ All notable changes to ALICE-Analytics will be documented in this file.
 - `tests/analytic_oracle.rs` / `tests/law_residual.rs` / `examples/residual_summary.rs`: 禁止した inherent メソッド (`powf` / `exp` / `powi`) の呼出を `alice_det_math` 経由と結合順固定の整数冪に置換 期待値は変わらない (`ipow64` は `powi` と bit 一致、実測)
 - README の `no_std` の浮動小数点に関する記述を訂正 (超越関数は `std` の有無に関わらず `alice-det-math` 経由で、`libm` を使うのは `sqrt` / 丸め / `mul_add` だけ) 関連 crate に `alice-det-math` を追加
 
+- CI の `test` job と `scripts/preflight.sh` に `cargo test --lib --no-default-features` と `--features law` の 2 lane を追加 `no_std` の unit test が host で走る唯一の経路で、`libm` の丸め path (`sqrt` / `ceil` / `floor` / `round` / `mul_add`) をここで実行する `--lib` のみなので 1 OS あたり数秒
 ### Fixed
 - **`DDSketch::insert` が非有限 / 極大の大きさで bucket index を overflow させていた** — `bucket_index` の `f64_i32(...) + self.offset` は、`value` が `inf` (上流の 0 除算が届いた場合) や `alpha = 0` (γ = 1 ⇒ `inv_ln_gamma` が無限大) のとき `as i32` が `i32::MAX` に飽和した上で offset を足すため i32 を溢れる debug ビルドでは panic し、**release ビルドでは負に wrap して直後の `max(0)` で bin 0 に入っていた** (= 2026-09-17 に修正した「範囲外の値が rank をずらす」と同型の silent な破損) `saturating_add` にして、doc の既存契約どおり上端 / 下端の edge bin に収容する
 - **`TumblingWindow` / `HierarchicalRollup` が `u64::MAX` 近傍の時刻で overflow していた** — `current_start + window_ms` が debug では panic、release では wrap して `end_ms < start_ms` の結果を出していた `saturating_add` に変更 イベント数の計上は変わらない
@@ -38,6 +39,8 @@ All notable changes to ALICE-Analytics will be documented in this file.
 - `SlidingWindow::push` / `SimpleMovingAverage::observe` / `RingBuffer::push` の `N = 0` が index out of bounds / 0 除算で落ちていたのを、理由を述べた `assert!` に変更 (前提違反であることが message から分かる、挙動は panic のまま)
 - `stats::StreamingStats::skewness` の `m2.powf(1.5)` を `m2 * m2.sqrt()` に (数学的に同一、両方 IEEE 正確丸めなので決定論かつ `powf` より誤差が小さい)
 
+- **`PrivacyBudget::try_spend` が負の ε を受け付け、残予算を増やしていた** — 判定が予算比較 `total + epsilon <= max` だけだったので負値は無条件に通り、`try_spend(-10.0)` が `true` を返して残予算が 1 → 11 に、`-inf` では無限大になっていた 正直な 2 回の問い合わせの間に負の ε を挟めば、この型が存在する理由である上限を回避できる 非有限と負値を明示的に拒否し、拒否時は `total_epsilon` / `query_count` を一切触らない (`NaN` / `+inf` は従来も拒否されていたが、比較が偽になる副作用としてだった) `0.0` / `-0.0` は従来どおり well-formed (課金 0、問い合わせ 1 件として計上)
+- **`RandomizedResponse::with_probability` に `NaN` を渡すと `p_true()` が `NaN` を返していた** — `clamp(0.5, 1.0)` は self が `NaN` のとき `NaN` を返すので丸められずに残っていた 定義域 `[0.5, 1.0]` の扱いを同 crate の `ExponentialMovingAverage::new` に揃え、範囲外は黙って丸めず panic する (`# Panics` に記載) **Breaking:** `0.0` → `0.5`、`2.0` → `1.0` の暗黙の丸めも無くなる 丸めは呼び出し側が頼んだのと違う ε の機構を作るので、推定値の意味が変わる `0.5` (常に無作為) と `1.0` (常に正直) は意味のある端なので許す
 ## [0.1.1] - 2026-09-17
 
 ### Added
