@@ -1,5 +1,5 @@
 //! Analytic oracles — closed-form checks for the statistics in ALICE-Analytics
-//! (CLAUDE.md § 解析解突合テスト規律, 2026-09-17).
+//! (2026-09-17).
 //!
 //! Expected values come from closed forms or f64 two-pass references written
 //! in this file, never from the crate function under test.  Default
@@ -41,7 +41,9 @@
 )]
 
 use alice_analytics::anomaly::{EwmaDetector, MadDetector, StreamingMedian};
-use alice_analytics::sketch::{CountMinSketch, DDSketch, FnvHasher, HeavyHitters10, HyperLogLog};
+use alice_analytics::sketch::{
+    CountMinSketch, DDSketch, DDSketch256, FnvHasher, HeavyHitters10, HyperLogLog,
+};
 use alice_analytics::stats::{
     iqr, percentile_rank, quantile_sorted, CovarianceMatrix, StreamingStats,
 };
@@ -577,4 +579,40 @@ fn privacy_primitives_are_deterministic_and_statistically_calibrated() {
         (expected_rate * 1_000_000.0).round() as u64,
     );
     assert!((exact - t).abs() < 1e-5);
+}
+
+/// `accurate_range` of `DDSketch256` (offset 256/4 = 64): bins cover
+/// `(γ^(i−1), γ^i]`, `i = idx − 64`, `idx ∈ 0..256` ⇒ `[γ^−64, γ^191]`,
+/// `γ = (1 + α)/(1 − α)`. Inside the range the quantile is within α; one bin
+/// beyond either end it is not (the edge bin absorbs the value), so the range
+/// is tight.
+#[test]
+fn ddsketch_accurate_range_is_the_bin_layout_and_is_tight() {
+    let alpha = 0.05;
+    let g = (1.0 + alpha) / (1.0 - alpha);
+    let sk = DDSketch256::new(alpha);
+    let (lo, hi) = sk.accurate_range();
+    assert!((lo / g.powi(-64) - 1.0).abs() < 1e-12, "lo {lo}");
+    assert!((hi / g.powi(191) - 1.0).abs() < 1e-12, "hi {hi}");
+
+    // largest value at rank 2 of {1, v}; smallest at rank 1 of {v, 1}
+    let top = |v: f64| {
+        let mut s = DDSketch256::new(alpha);
+        s.insert(1.0);
+        s.insert(v);
+        (s.quantile(1.0) - v).abs() / v
+    };
+    let bottom = |v: f64| {
+        let mut s = DDSketch256::new(alpha);
+        s.insert(v);
+        s.insert(1.0);
+        (s.quantile(0.0) - v).abs() / v
+    };
+    let eps = 1e-12;
+    assert!(top(g.powf(190.5)) <= alpha + eps);
+    assert!(top(hi) <= alpha + eps);
+    assert!(top(g.powi(193)) > alpha, "beyond hi the bound must fail");
+    assert!(bottom(g.powf(-63.5)) <= alpha + eps);
+    assert!(bottom(lo) <= alpha + eps);
+    assert!(bottom(g.powi(-66)) > alpha, "below lo the bound must fail");
 }

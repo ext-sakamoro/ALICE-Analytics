@@ -418,7 +418,7 @@ macro_rules! impl_ddsketch {
                 }
 
                 // Out-of-range magnitudes collapse into the edge bins (the
-                // α guarantee holds inside γ^(−offset) ..= γ^(bins − offset));
+                // α guarantee holds inside `accurate_range()`);
                 // until 2026-09-17 they were counted but stored nowhere, so
                 // every quantile above them shifted by one rank per lost value.
                 if value > 0.0 {
@@ -530,6 +530,20 @@ macro_rules! impl_ddsketch {
             #[inline]
             pub const fn alpha(&self) -> f64 {
                 self.alpha
+            }
+
+            /// Magnitudes `[γ^(−offset), γ^(BINS − 1 − offset)]` for which the
+            /// relative-error guarantee holds (`offset = BINS / 4`)
+            ///
+            /// Bin `idx` covers `(γ^(i−1), γ^i]` with `i = idx − offset`; a
+            /// magnitude below the first bin or above the last one is counted
+            /// in that edge bin, so its quantile keeps the rank but not the
+            /// `α` bound. Zero is counted exactly and needs no bin.
+            #[must_use]
+            pub fn accurate_range(&self) -> (f64, f64) {
+                let lowest = -f64::from(self.offset);
+                let highest = f64::from(i32::try_from($bins - 1).unwrap_or(i32::MAX) - self.offset);
+                (self.gamma.powf(lowest), self.gamma.powf(highest))
             }
 
             pub const fn clear(&mut self) {

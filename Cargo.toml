@@ -2,6 +2,7 @@
 name = "alice-analytics"
 version = "0.1.1"
 edition = "2021"
+rust-version = "1.87"
 authors = ["Moroya Sakamoto <sakamoro@alicelaw.net>"]
 description = "High-performance telemetry & probabilistic statistical estimation — HyperLogLog++, DDSketch, Count-Min Sketch, local differential privacy, streaming anomaly detection"
 license = "MIT OR Apache-2.0"
@@ -12,6 +13,9 @@ categories = ["algorithms", "science", "no-std"]
 [features]
 default = ["std"]
 std = []
+# law::ResidualSketch / law::residual_summary — residual distribution of an
+# alice-zip SignalLaw (pulls in alice-zip without its std feature, plus alloc)
+law = ["dep:alice-zip"]
 simd = []  # no-op since 2026-09-14: the only user (HyperLogLog AVX2 zero-count) was dead code and lacked runtime feature detection; kept for semver
 
 [lib]
@@ -20,3 +24,8 @@ path = "src/lib.rs"
 [dependencies]
 # no_std build の float 超越関数 (src/math.rs、std build では未使用)
 libm = "0.2"
+alice-zip = { version = "0.5.1", default-features = false, optional = true }
+
+[[example]]
+name = "residual_summary"
+required-features = ["law"]
