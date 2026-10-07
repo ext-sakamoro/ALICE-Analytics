@@ -319,7 +319,8 @@ impl StreamingStats {
             return 0.0;
         }
         let n = u64_f64(self.count);
-        n.sqrt() * self.m3 / self.m2.powf(1.5)
+        // m2^1.5 = m2 * sqrt(m2): both operations are IEEE-exact, unlike powf
+        n.sqrt() * self.m3 / (self.m2 * self.m2.sqrt())
     }
 
     /// 尖度 (Excess Kurtosis)。

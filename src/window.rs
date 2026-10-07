@@ -43,6 +43,11 @@ impl TumblingWindow {
     }
 
     /// イベントを投入。ウィンドウ境界を超えた場合、完了したスロットを返す。
+    ///
+    /// 時刻は `saturating_add` で足す: `timestamp_ms` が `u64::MAX` 近傍だと
+    /// `current_start + window_ms` が溢れ、2026-10-07 までは debug build で
+    /// panic し release build では wrap して境界時刻が巻き戻っていた
+    /// 飽和させると最後のウィンドウが閉じなくなるだけで、`flush()` で取り出せる
     pub fn insert(&mut self, value: f64, timestamp_ms: u64) -> Option<WindowResult> {
         // 初回: ウィンドウ開始時刻を設定
         if self.current_start == 0 {
@@ -50,11 +55,11 @@ impl TumblingWindow {
         }
 
         // ウィンドウ境界を超えたか
-        if timestamp_ms >= self.current_start + self.window_ms {
+        if timestamp_ms >= self.current_start.saturating_add(self.window_ms) {
             let completed = core::mem::replace(&mut self.current, MetricSlot::new(0, self.alpha));
             let result = WindowResult {
                 start_ms: self.current_start,
-                end_ms: self.current_start + self.window_ms,
+                end_ms: self.current_start.saturating_add(self.window_ms),
                 event_count: completed.event_count,
                 counter: completed.counter,
                 gauge: completed.gauge,
@@ -84,7 +89,7 @@ impl TumblingWindow {
         let completed = core::mem::replace(&mut self.current, MetricSlot::new(0, self.alpha));
         let result = WindowResult {
             start_ms: self.current_start,
-            end_ms: self.current_start + self.window_ms,
+            end_ms: self.current_start.saturating_add(self.window_ms),
             event_count: completed.event_count,
             counter: completed.counter,
             gauge: completed.gauge,
@@ -143,7 +148,15 @@ impl<const N: usize> SlidingWindow<N> {
     }
 
     /// 値を追加。バッファが満杯の場合、最古の値を上書き。
+    ///
+    /// # Panics
+    ///
+    /// `N == 0` の場合 (幅 0 のウィンドウは保持できない) 回復可能な入力の誤りでは
+    /// なく型引数の前提違反なので `Result` にせず panic する
+    /// `SlidingWindow::<0>::new()` 自体は成功し、最初の `push` で panic する
+    /// 契約は `tests/panic_contract.rs` が pin する
     pub fn push(&mut self, value: f64) {
+        assert!(N > 0, "SlidingWindow needs N > 0 (got a zero-width window)");
         if self.count >= N {
             // 最古の値をsumから除去
             self.sum -= self.buffer[self.write_pos];

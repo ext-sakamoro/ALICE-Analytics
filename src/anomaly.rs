@@ -1159,6 +1159,9 @@ mod tests {
         assert_eq!(cloned.metric_id, 1);
     }
 
+    // `format!` / `Vec` / the entropy-seeded constructors are `std`-only,
+    // so this case cannot run on the `no_std` build
+    #[cfg(feature = "std")]
     #[test]
     fn test_anomaly_event_debug() {
         let event = AnomalyEvent {

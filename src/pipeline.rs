@@ -40,7 +40,13 @@ impl<T: Copy + Default, const N: usize> RingBuffer<T, N> {
 
     /// Push an item (returns false if buffer is full)
     #[inline]
+    /// # Panics
+    ///
+    /// `N == 0` の場合 (容量 0 のリングバッファは書き込み位置を持てない)
+    /// 型引数の前提違反なので `Result` にせず panic する 契約は
+    /// `tests/panic_contract.rs` が pin する
     pub const fn push(&mut self, item: T) -> bool {
+        assert!(N > 0, "RingBuffer needs N > 0 (got a zero-capacity buffer)");
         let next_write = (self.write_pos + 1) % N;
         if next_write == self.read_pos {
             // Buffer full
@@ -71,9 +77,13 @@ impl<T: Copy + Default, const N: usize> RingBuffer<T, N> {
     }
 
     /// Check if buffer is full
+    ///
+    /// `N <= 1` has no usable slot (one is always reserved to tell full from
+    /// empty), so such a buffer is full from the start; answering that keeps
+    /// this accessor total for `N == 0`, where `% N` would divide by zero.
     #[inline]
     pub const fn is_full(&self) -> bool {
-        (self.write_pos + 1) % N == self.read_pos
+        N <= 1 || (self.write_pos + 1) % N == self.read_pos
     }
 
     /// Get current length
@@ -87,9 +97,13 @@ impl<T: Copy + Default, const N: usize> RingBuffer<T, N> {
     }
 
     /// Get capacity
+    ///
+    /// One slot is always empty to distinguish full from empty, so the usable
+    /// capacity is `N - 1`; `saturating_sub` keeps the accessor total for
+    /// `N == 0`, where the subtraction would underflow.
     #[inline]
     pub const fn capacity(&self) -> usize {
-        N - 1 // One slot is always empty to distinguish full from empty
+        N.saturating_sub(1)
     }
 
     /// Get count of dropped items
@@ -911,6 +925,9 @@ mod tests {
         assert_eq!(entry.name_str(), "http.requests");
     }
 
+    // `format!` / `Vec` / the entropy-seeded constructors are `std`-only,
+    // so this case cannot run on the `no_std` build
+    #[cfg(feature = "std")]
     #[test]
     fn test_metric_snapshot_debug() {
         let slot = MetricSlot::new(1, 0.05);

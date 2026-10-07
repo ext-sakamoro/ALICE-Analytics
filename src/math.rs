@@ -1,20 +1,48 @@
-//! `no_std` 用の float 数学関数 shim
+//! float 数学関数: 決定論的な超越関数と、`no_std` 用の丸め / `sqrt` shim
 //!
-//! `std` あり: `f64` の inherent method をそのまま使う (本 module は空)
-//! `std` なし (`--no-default-features`): core には float の超越関数が無いため、
-//! 同名 method を [`FloatExt`] trait で提供し [`libm`] (pure Rust、`no_std`) に委譲する
-//! 各 module は `#[cfg(not(feature = "std"))] use crate::math::FloatExt;` で取り込む
+//! # 決定論
 //!
-//! 精度注意: `libm` と platform libm は最終 ulp で異なりうる (`HyperLogLog` / `DDSketch` の
-//! 推定値が std build と `no_std` build で完全一致することは保証しない)
+//! `ln` / `exp` / `powf` は platform libm の実装差で最終 ulp が OS / CPU / compiler
+//! ごとに変わる ⇒ 本 crate は [`alice_det_math`] (IEEE 754 の基本演算のみで構成、
+//! 固定の演算順) に委譲する std / `no_std` のどちらでも同じ bit を返す
+//! `clippy.toml` の `disallowed-methods` が inherent method 側を禁止して再発を止め、
+//! `tests/determinism_golden.rs` が出力の SHA-256 を pin する
+//!
+//! `+ - * / sqrt` / `mul_add` と `ceil` / `floor` / `round` は IEEE 754 が正確丸めを
+//! 要求するので target 非依存 (`mul_add` は融合積和の単一丸めが規定で、FMA 命令が
+//! 無い target では正確丸めの software fma になる) `no_std` には inherent method が
+//! 無いため [`FloatExt`] で [`libm`] (pure Rust、正確丸め) に委譲する
+
+/// 固定順の整数冪 (2 進法による繰り返し二乗、`n` の bit を下位から)
+///
+/// `f64::powi` は LLVM が乗算木の結合順を自由に選べるので target 間で bit が
+/// 一致しない ⇒ 演算順をここで固定する `|n|` に対して O(log n) 回の乗算なので
+/// `alice_det_math::powf64` (≤ 16 ulp) より誤差が小さい (`γ^1535` で実測 9e-14 → 0)
+#[inline]
+pub(crate) fn ipow64(x: f64, n: i32) -> f64 {
+    let mut base = x;
+    let mut e = n.unsigned_abs();
+    let mut acc = 1.0f64;
+    while e > 0 {
+        if e & 1 == 1 {
+            acc *= base;
+        }
+        e >>= 1;
+        if e > 0 {
+            base *= base;
+        }
+    }
+    if n < 0 {
+        1.0 / acc
+    } else {
+        acc
+    }
+}
 
 #[cfg(not(feature = "std"))]
 pub trait FloatExt: Sized {
     fn mul_add(self, a: Self, b: Self) -> Self;
     fn sqrt(self) -> Self;
-    fn ln(self) -> Self;
-    fn exp(self) -> Self;
-    fn powf(self, n: Self) -> Self;
     fn ceil(self) -> Self;
     fn floor(self) -> Self;
     fn round(self) -> Self;
@@ -29,18 +57,6 @@ impl FloatExt for f64 {
     #[inline]
     fn sqrt(self) -> Self {
         libm::sqrt(self)
-    }
-    #[inline]
-    fn ln(self) -> Self {
-        libm::log(self)
-    }
-    #[inline]
-    fn exp(self) -> Self {
-        libm::exp(self)
-    }
-    #[inline]
-    fn powf(self, n: Self) -> Self {
-        libm::pow(self, n)
     }
     #[inline]
     fn ceil(self) -> Self {

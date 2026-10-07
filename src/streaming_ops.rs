@@ -209,7 +209,17 @@ impl<const N: usize> SimpleMovingAverage<N> {
     }
 
     /// 観測値を追加。
+    ///
+    /// # Panics
+    ///
+    /// `N == 0` の場合 (幅 0 の移動平均は定義できない) 型引数の前提違反なので
+    /// `Result` にせず panic する `SimpleMovingAverage::<0>::new()` 自体は成功し、
+    /// 最初の `observe` で panic する 契約は `tests/panic_contract.rs` が pin する
     pub fn observe(&mut self, value: f64) {
+        assert!(
+            N > 0,
+            "SimpleMovingAverage needs N > 0 (got a zero-width window)"
+        );
         if self.count >= N {
             self.sum -= self.buffer[self.write_pos];
         }

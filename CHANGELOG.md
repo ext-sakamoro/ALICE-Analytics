@@ -14,6 +14,12 @@ All notable changes to ALICE-Analytics will be documented in this file.
 - `tests/law_residual.rs` (閉形式の順序統計量との突合 18 本) と `tests/analytic_oracle.rs` に `accurate_range` の範囲と境界外での上限不成立の検査
 - `README_JP.md`、`scripts/docs_lint.py` (公開文書の語彙、CHANGELOG 構造、README の例と crate doctest の一致) と `scripts/test_docs_lint.py`、`scripts/stub_guard.sh`
 - crate レベルの doctest (README の最初の例と同一)
+- **決定論 (プラットフォーム間の bit 一致)**: 超越関数 (`ln` / `exp` / `powf`) を `alice-det-math` 0.3 (`default-features = false`、`std` feature は本 crate の `std` に連動) 経由に変更 プラットフォームの `libm` は最後の ulp が macOS / glibc / MSVC / wasm で異なるため、sketch を複数マシンで merge する / テレメトリを再生する / 監査が生イベントから分位点を再計算する経路で推定値が割れていた `std` ビルドと `no_std` ビルドも bit まで一致する
+  - `clippy.toml` (新規): `f32` / `f64` の inherent な超越関数 48 個 + `powi` 2 個を `disallowed-methods` に登録 CI の `cargo clippy --all-targets --all-features -- -D warnings` が red gate になる `sqrt` と `mul_add` は IEEE 754 が正確丸めを要求するので意図的に対象外 (理由を `clippy.toml` の冒頭に記載)
+  - `src/math.rs`: 結合順を固定した整数冪 `ipow64` (繰り返し二乗) を追加 `DDSketch` の bin 代表値と `accurate_range()` が使う `γⁿ` に適用 `powi` は乗算木の結合順が未規定、`powf64` は `|y| = 1535` で相対誤差 8.9e-14 まで出るのに対し `ipow64` は 0 (`powi` と bit 一致、実測) `FloatExt` からは `ln` / `exp` / `powf` を削除し、`no_std` でも `libm` の超越関数を使えないようにした
+- `tests/determinism_golden.rs` (7 本): `sketch` / `stats` / `window` / `anomaly` / `privacy` / `streaming_ops` / `law` の出力を bit 単位で直列化して SHA-256 を定数と突合 各シナリオは直列化 byte 数が 0 でないことを先に assert する (モジュールを実行しなくなったシナリオが空バッファのハッシュで通るのを防ぐ) 変異 12 通り (det-math を platform libm に戻す / `ipow64` を `powf` に戻す / 係数・符号・境界を変える / ガードを外す) が全て red になることを実測
+- `tests/panic_contract.rs` (25 本): 退化入力の契約試験 空入力 / 定義域外 / 非有限 / `u64::MAX` 近傍の時刻 / 幅 0 の const generic に対して「値」「飽和値」「panic」のどれが正かを明示して assert `should_panic` は `expected` 付き 「panic しない」だけを assert する空振りを避けるため値で突合する
+- `README.md` / `README_JP.md` に `## Determinism` / `## 決定論` 節 (層別の根拠、2 層の機械強制、保証の外、`claim-test` 注記)
 
 ### Changed
 - `rust-version = "1.87"` を宣言 (1.86 では `is_multiple_of` が未安定でビルドできないことを実測)
@@ -21,6 +27,16 @@ All notable changes to ALICE-Analytics will be documented in this file.
 - 何もしない composite action を削除、deny.toml の license 許可を依存グラフに存在するもの (MIT / Apache-2.0) に限定し wildcard と未知の registry / git を deny
 - README を全面改稿 (ライセンス表記を Cargo.toml の `MIT OR Apache-2.0` に一致させ、存在しない bridge module の記述を削除)
 - `DDSketch` の範囲外の値に関するコメントの上端を `accurate_range()` に合わせて訂正
+- `Cargo.toml`: `std` feature が `alice-det-math/std` を伝播する `[lints.clippy]` に `suboptimal_flops` / `imprecise_flops` の `allow` を理由付きで追加 (det-math 経由の呼出を `mul_add` / platform `libm` の形に書き戻す提案を crate の性質として 1 箇所で止める、`alice-det-math` 自身と同じ形) `[dev-dependencies]` に `sha2` (golden ハッシュ用)
+- `tests/analytic_oracle.rs` / `tests/law_residual.rs` / `examples/residual_summary.rs`: 禁止した inherent メソッド (`powf` / `exp` / `powi`) の呼出を `alice_det_math` 経由と結合順固定の整数冪に置換 期待値は変わらない (`ipow64` は `powi` と bit 一致、実測)
+- README の `no_std` の浮動小数点に関する記述を訂正 (超越関数は `std` の有無に関わらず `alice-det-math` 経由で、`libm` を使うのは `sqrt` / 丸め / `mul_add` だけ) 関連 crate に `alice-det-math` を追加
+
+### Fixed
+- **`DDSketch::insert` が非有限 / 極大の大きさで bucket index を overflow させていた** — `bucket_index` の `f64_i32(...) + self.offset` は、`value` が `inf` (上流の 0 除算が届いた場合) や `alpha = 0` (γ = 1 ⇒ `inv_ln_gamma` が無限大) のとき `as i32` が `i32::MAX` に飽和した上で offset を足すため i32 を溢れる debug ビルドでは panic し、**release ビルドでは負に wrap して直後の `max(0)` で bin 0 に入っていた** (= 2026-09-17 に修正した「範囲外の値が rank をずらす」と同型の silent な破損) `saturating_add` にして、doc の既存契約どおり上端 / 下端の edge bin に収容する
+- **`TumblingWindow` / `HierarchicalRollup` が `u64::MAX` 近傍の時刻で overflow していた** — `current_start + window_ms` が debug では panic、release では wrap して `end_ms < start_ms` の結果を出していた `saturating_add` に変更 イベント数の計上は変わらない
+- `RingBuffer::capacity()` が `N = 0` で underflow、`is_full()` が `% N` で 0 除算していた `N.saturating_sub(1)` と `N <= 1` の早期 return にして read 系アクセサを全域化 (書き込み系は `N > 0` を前提とする panic を維持し、doc の `# Panics` と `should_panic` で明文化)
+- `SlidingWindow::push` / `SimpleMovingAverage::observe` / `RingBuffer::push` の `N = 0` が index out of bounds / 0 除算で落ちていたのを、理由を述べた `assert!` に変更 (前提違反であることが message から分かる、挙動は panic のまま)
+- `stats::StreamingStats::skewness` の `m2.powf(1.5)` を `m2 * m2.sqrt()` に (数学的に同一、両方 IEEE 正確丸めなので決定論かつ `powf` より誤差が小さい)
 
 ## [0.1.1] - 2026-09-17
 

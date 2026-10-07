@@ -23,6 +23,7 @@ License: MIT OR Apache-2.0
 - [Feature](#feature)
 - [モジュール](#モジュール)
 - [誤差の上限](#誤差の上限)
+- [決定論](#決定論)
 - [最小サポート Rust バージョン](#最小サポート-rust-バージョン)
 - [ビルドとテスト](#ビルドとテスト)
 - [関連 crate](#関連-crate)
@@ -101,9 +102,12 @@ if let Some(d) = s.distribution {
 | `law` | no | `law` モジュール: `alice_zip::law::SignalLaw` の残差要約 (`std` feature 無しの `alice-zip` と `alloc` を使う) |
 | `simd` | no | 効果なし 既存の feature 指定がそのままビルドできるよう残している |
 
-`std` 無しでは浮動小数点関数は `libm` を使い (プラットフォームのライブラリと最後の
-ulp で異なりうる)、プライバシー機構は seed を明示して作る CI は
-`thumbv7em-none-eabihf` 向けに `law` 有り・無しの両方でライブラリをビルドする
+`std` 無しではプライバシー機構は seed を明示して作り、`sqrt` / `ceil` / `floor` /
+`round` / `mul_add` は `libm` を使う IEEE 754 はこの 5 つに正確丸めを要求するので、
+inherent method と同じ bit を返す 超越関数は `std` の有無に関わらず
+`alice-det-math` を経由するので、`no_std` ビルドと `std` ビルドは bit まで一致する
+([決定論](#決定論) 参照) CI は `thumbv7em-none-eabihf` 向けに `law` 有り・無しの
+両方でライブラリをビルドする
 
 ## モジュール
 
@@ -131,6 +135,47 @@ ulp で異なりうる)、プライバシー機構は seed を明示して作る
 これらの test の期待値は test ファイル内に書いた閉形式または 2-pass の参照計算で、
 検査対象の関数の出力ではない
 
+## 決定論
+
+同じ入力は、サポートする全ターゲットで **同じ bit** を返す sketch は複数のマシンで
+merge され、テレメトリは再生され、監査は生イベントから分位点を再計算する —
+2 つのホストで最後の ulp が違えば、推定値が 2 つに割れる
+
+| 層 | 対象 | bit 一致する理由 |
+|----|------|-----------------|
+| IEEE の基本演算 | `+ − × ÷`、`sqrt`、`mul_add`、`ceil` / `floor` / `round` | IEEE 754 が正確丸めを要求するので全ターゲットが一致する `mul_add` は単一丸めの融合積和で、FMA 命令の無いターゲットでは正確丸めの software `fma` になる |
+| 超越関数 | `ln`、`exp`、`powf` | [`alice-det-math`](https://crates.io/crates/alice-det-math) 経由 上の演算だけを固定した評価順で組んだ実装 プラットフォームの `libm` は **使わない** (最後の ulp が macOS / glibc / MSVC / wasm で異なる) |
+| 整数冪 | `DDSketch` の bin 配置で使う `γⁿ` | 結合順を固定した繰り返し二乗 `powi` は乗算木の結合順が未規定なので使わない |
+| 擬似乱数 | `XorShift64` とそこから seed を取る全機構 | 状態は整数で、seed を与えるコンストラクタは厳密に再生する エントロピー由来のコンストラクタ (`std` のみ) は設計上再現しない |
+
+強制は機械的に 2 層でかける:
+
+* `clippy.toml` が `f32` / `f64` の inherent な超越関数を `disallowed-methods` に
+  並べ、CI が `cargo clippy --all-targets --all-features -- -D warnings` を走らせる
+  ⇒ `x.ln()` を書き戻すと silent な乖離ではなくコンパイルエラーになる **書いた
+  マシン上で捕まえる**のはこの層
+* `tests/determinism_golden.rs` が 7 つのシナリオ (浮動小数点演算を持つモジュール
+  ごとに 1 つ) の出力を bit 単位で直列化し、SHA-256 を記録済みの定数と突き合わせる
+  各シナリオは直列化した byte 数が 0 でないことも assert するので、モジュールを
+  実行しなくなったシナリオは空バッファのハッシュで通るのではなく fail する CI は
+  macOS `aarch64`、Linux `x86_64`、Linux `aarch64`、Windows `x86_64` で実行する
+
+<!-- claim-test: golden_sketch -->
+<!-- claim-test: golden_stats -->
+<!-- claim-test: golden_window -->
+<!-- claim-test: golden_anomaly -->
+<!-- claim-test: golden_privacy -->
+<!-- claim-test: golden_streaming_ops -->
+<!-- claim-test: golden_law -->
+
+**決定論は正しさではない** golden ハッシュは今日の挙動を — 誤りを含めて — 固定する
+だけで、上の誤差の上限は閉形式との突合で別に検査している 2 つは独立で、両方が必要
+
+**保証の外**: 基本演算で IEEE 754 に従わないターゲット (SSE2 無しの x87 向け
+32-bit x86)、fast-math 系のフラグを付けたビルド、エントロピー由来のプライバシー
+機構のコンストラクタ 本 crate や `alice-det-math` の **バージョンを跨いだ** 一致も
+保証しない (保証するのは、あるバージョンにおけるプラットフォーム間の一致)
+
 ## 最小サポート Rust バージョン
 
 `rust-version = "1.87"` (実測: 1.86 ではライブラリがビルドできない) CI は 1.87 で
@@ -141,6 +186,8 @@ ulp で異なりうる)、プライバシー機構は seed を明示して作る
 
 ```sh
 cargo test --all-features
+cargo test --all-features --test determinism_golden  # プラットフォーム間の bit 一致
+cargo test --all-features --test panic_contract      # 退化入力の契約
 cargo build --lib --no-default-features --features law --target thumbv7em-none-eabihf
 scripts/preflight.sh          # every CI gate that runs locally
 scripts/preflight.sh --quick  # static checks, clippy, builds, docs, cargo test --lib
@@ -148,6 +195,8 @@ scripts/preflight.sh --quick  # static checks, clippy, builds, docs, cargo test 
 
 ## 関連 crate
 
+- [`alice-det-math`](https://crates.io/crates/alice-det-math) — 全ての浮動小数点
+  経路が通る、プラットフォーム間で bit 一致する `ln` / `exp` / `powf`
 - [`alice-zip`](https://crates.io/crates/alice-zip) — `law::SignalLaw`: 成立範囲、
   残差統計、出典、oracle ケースを伴う fit 済みの law `law` feature はその残差分布を
   要約する

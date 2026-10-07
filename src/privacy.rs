@@ -6,6 +6,10 @@
 #[cfg(not(feature = "std"))]
 use crate::math::FloatExt;
 use crate::math::{f64_i64, hash_index, i64_f64, u64_f64};
+use alice_det_math::ln64;
+// the only caller (`RandomizedResponse::new`) needs system entropy
+#[cfg(feature = "std")]
+use alice_det_math::exp64;
 
 // ============================================================================
 // Random Number Generation (ChaCha20-based for determinism)
@@ -146,7 +150,7 @@ impl LaplaceNoise {
         // Inverse transform sampling: X = μ - b * sign(U - 0.5) * ln(1 - 2|U - 0.5|)
         let u = self.rng.next_f64() - 0.5;
         let sign = if u < 0.0 { -1.0 } else { 1.0 };
-        -sign * self.scale * 2.0f64.mul_add(-u.abs(), 1.0).ln()
+        -sign * self.scale * ln64(2.0f64.mul_add(-u.abs(), 1.0))
     }
 
     /// Add noise to a value
@@ -198,7 +202,7 @@ impl RandomizedResponse {
     #[must_use]
     pub fn new(epsilon: f64) -> Self {
         // p = e^ε / (1 + e^ε)
-        let exp_eps = epsilon.exp();
+        let exp_eps = exp64(epsilon);
         let p_true = exp_eps / (1.0 + exp_eps);
         Self {
             p_true,
@@ -656,6 +660,9 @@ mod tests {
         );
     }
 
+    // `format!` / `Vec` / the entropy-seeded constructors are `std`-only,
+    // so this case cannot run on the `no_std` build
+    #[cfg(feature = "std")]
     #[test]
     fn test_rappor() {
         let mut rappor = Rappor::default_params();
@@ -716,6 +723,9 @@ mod tests {
         assert!(trues > 4000 && trues < 6000, "trues = {trues}");
     }
 
+    // `format!` / `Vec` / the entropy-seeded constructors are `std`-only,
+    // so this case cannot run on the `no_std` build
+    #[cfg(feature = "std")]
     #[test]
     fn test_xorshift_default() {
         let mut rng = XorShift64::default();
@@ -807,6 +817,9 @@ mod tests {
         assert!((agg.estimate_sum() - 30.0).abs() < f64::EPSILON);
     }
 
+    // `format!` / `Vec` / the entropy-seeded constructors are `std`-only,
+    // so this case cannot run on the `no_std` build
+    #[cfg(feature = "std")]
     #[test]
     fn test_rappor_params() {
         let rappor = Rappor::new(0.3, 0.7, 0.2);

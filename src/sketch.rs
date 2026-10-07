@@ -6,7 +6,8 @@
 
 #[cfg(not(feature = "std"))]
 use crate::math::FloatExt;
-use crate::math::{f64_i32, f64_u64, hash_index, i64_f64, u64_f64, usize_f64};
+use crate::math::{f64_i32, f64_u64, hash_index, i64_f64, ipow64, u64_f64, usize_f64};
+use alice_det_math::{exp64, ln64};
 use core::hash::{Hash, Hasher};
 
 // ============================================================================
@@ -286,7 +287,7 @@ macro_rules! impl_hyperloglog {
 
                 if raw_estimate <= 2.5 * m && zeros > 0 {
                     let inv_zeros = 1.0 / usize_f64(zeros);
-                    m * (m * inv_zeros).ln()
+                    m * ln64(m * inv_zeros)
                 } else {
                     raw_estimate
                 }
@@ -383,7 +384,7 @@ macro_rules! impl_ddsketch {
 
             pub fn new(alpha: f64) -> Self {
                 let gamma = (1.0 + alpha) / (1.0 - alpha);
-                let ln_gamma = gamma.ln();
+                let ln_gamma = ln64(gamma);
                 // Offset to center around 1.0 (ln(1.0) = 0)
                 // For typical latencies (1ms - 10s), we want indices to fit in BINS
                 // With offset at BINS/4, we can handle values from gamma^(-BINS/4) to gamma^(3*BINS/4)
@@ -405,6 +406,25 @@ macro_rules! impl_ddsketch {
                 }
             }
 
+            /// Add one observation.
+            ///
+            /// Contract for inputs outside the usual range:
+            ///
+            /// * a magnitude outside [`accurate_range`](Self::accurate_range)
+            ///   (including `±inf`) is counted and filed in the nearest edge
+            ///   bin, so later ranks do not shift; the `α` bound does not hold
+            ///   for it;
+            /// * `0.0` is counted exactly and needs no bin;
+            /// * **`NaN` is counted in `count`, poisons `sum` (and therefore
+            ///   `mean`), and is filed with the exact zeros** — it fails both
+            ///   `value > 0.0` and `value < 0.0`. A stream of nothing but
+            ///   `NaN` therefore reports `quantile(q) == 0.0`. This is the
+            ///   current behaviour, not a considered design: how a
+            ///   non-finite sample should be classified is shared with
+            ///   `law::ResidualSummary` (feature `law`), which counts it
+            ///   separately as `non_finite`, and the two will be decided
+            ///   together. `tests/panic_contract.rs` pins it so that a change
+            ///   is deliberate.
             #[inline]
             pub fn insert(&mut self, value: f64) {
                 self.count += 1;
@@ -434,9 +454,22 @@ macro_rules! impl_ddsketch {
 
             /// Bucket index calculation
             /// Uses standard `ln()` for quantile accuracy (`DDSketch` requires precise buckets)
+            ///
+            /// `saturating_add` rather than `+`: a non-finite or extreme
+            /// magnitude (an upstream division by zero reaching a telemetry
+            /// stream, or `alpha = 0`, which makes `inv_ln_gamma` infinite)
+            /// saturates the `as i32` cast at `i32::MAX`, and adding the
+            /// offset to that overflows. Before 2026-10-07 that panicked in a
+            /// debug build and wrapped to a negative index in a release one,
+            /// where `max(0)` then filed the value in bin 0 — the same
+            /// rank shift that the 2026-09-17 edge-bin fix removed, in the
+            /// opposite direction. Saturating keeps it in the top edge bin,
+            /// which is what `accurate_range()` already documents for
+            /// magnitudes outside the guaranteed range.
             #[inline]
             fn bucket_index(&self, value: f64) -> usize {
-                let idx = f64_i32((value.ln() * self.inv_ln_gamma).ceil()) + self.offset;
+                let idx =
+                    f64_i32((ln64(value) * self.inv_ln_gamma).ceil()).saturating_add(self.offset);
                 usize::try_from(idx.max(0)).unwrap_or(0)
             }
 
@@ -448,7 +481,7 @@ macro_rules! impl_ddsketch {
                 let log2_gamma = self.ln_gamma / core::f64::consts::LN_2;
                 let inv_log2_gamma = 1.0 / log2_gamma;
                 let log2_value = fast_log2_approx(value);
-                let idx = f64_i32((log2_value * inv_log2_gamma).ceil()) + self.offset;
+                let idx = f64_i32((log2_value * inv_log2_gamma).ceil()).saturating_add(self.offset);
                 usize::try_from(idx.max(0)).unwrap_or(0)
             }
 
@@ -463,8 +496,8 @@ macro_rules! impl_ddsketch {
             /// α = 0.02 on a 6-decade stream) — outside the published bound.
             #[inline]
             fn bucket_representative(&self, idx: usize) -> f64 {
-                let exp = f64::from(i32::try_from(idx).unwrap_or(i32::MAX) - self.offset);
-                2.0 * self.gamma.powf(exp) / (self.gamma + 1.0)
+                let exp = i32::try_from(idx).unwrap_or(i32::MAX) - self.offset;
+                2.0 * ipow64(self.gamma, exp) / (self.gamma + 1.0)
             }
 
             pub fn quantile(&self, q: f64) -> f64 {
@@ -541,9 +574,9 @@ macro_rules! impl_ddsketch {
             /// `α` bound. Zero is counted exactly and needs no bin.
             #[must_use]
             pub fn accurate_range(&self) -> (f64, f64) {
-                let lowest = -f64::from(self.offset);
-                let highest = f64::from(i32::try_from($bins - 1).unwrap_or(i32::MAX) - self.offset);
-                (self.gamma.powf(lowest), self.gamma.powf(highest))
+                let lowest = -self.offset;
+                let highest = i32::try_from($bins - 1).unwrap_or(i32::MAX) - self.offset;
+                (ipow64(self.gamma, lowest), ipow64(self.gamma, highest))
             }
 
             pub const fn clear(&mut self) {
@@ -698,7 +731,7 @@ macro_rules! impl_countmin {
 
             #[inline]
             pub fn confidence(&self) -> f64 {
-                1.0 - (-f64::from($d)).exp()
+                1.0 - exp64(-f64::from($d))
             }
         }
 
@@ -970,6 +1003,9 @@ mod tests {
         assert!(cms1.estimate_hash(1) >= 100);
     }
 
+    // `format!` / `Vec` / the entropy-seeded constructors are `std`-only,
+    // so this case cannot run on the `no_std` build
+    #[cfg(feature = "std")]
     #[test]
     fn test_heavy_hitters() {
         let mut hh = HeavyHitters5::new();

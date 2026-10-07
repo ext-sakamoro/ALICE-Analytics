@@ -306,12 +306,37 @@ fn invalid_accuracy_and_scale_are_rejected() {
 // the accurate range and the residual scale
 // ---------------------------------------------------------------------------
 
+/// Fixed-order integer power: `f64::powi` lowers to a multiplication tree
+/// whose association order is not specified, so it is not bit-exact across
+/// targets and `clippy.toml` bans it. Binary exponentiation with the bits of
+/// `n` taken from the least significant upwards (the same order as
+/// `alice_analytics`'s own internal helper).
+fn ipow(x: f64, n: i32) -> f64 {
+    let mut base = x;
+    let mut e = n.unsigned_abs();
+    let mut acc = 1.0f64;
+    while e > 0 {
+        if e & 1 == 1 {
+            acc *= base;
+        }
+        e >>= 1;
+        if e > 0 {
+            base *= base;
+        }
+    }
+    if n < 0 {
+        1.0 / acc
+    } else {
+        acc
+    }
+}
+
 /// `DDSketch2048` (offset `2048/4 = 512`): bins cover `(γ^(i−1), γ^i]` for
 /// `i = idx − 512`, `idx ∈ 0..2048` ⇒ guaranteed magnitudes
 /// `[γ^−512, γ^1535]`, `γ = (1 + α)/(1 − α)`
 fn closed_form_range(alpha: f64, scale: f64) -> (f64, f64) {
     let g = (1.0 + alpha) / (1.0 - alpha);
-    (scale * g.powi(-512), scale * g.powi(1535))
+    (scale * ipow(g, -512), scale * ipow(g, 1535))
 }
 
 #[test]
@@ -342,7 +367,7 @@ fn explicit_scale_is_rounded_down_to_a_power_of_two() {
     let sk = ResidualSketch::with_scale(&law, 0.01, 0.75).unwrap();
     assert_eq!(sk.scale(), 0.5);
     let sk = ResidualSketch::with_scale(&law, 0.01, 1e-9).unwrap();
-    assert_eq!(sk.scale(), 2f64.powi(-30)); // 2^-30 ≈ 9.31e-10 ≤ 1e-9 < 2^-29
+    assert_eq!(sk.scale(), ipow(2.0, -30)); // 2^-30 ≈ 9.31e-10 ≤ 1e-9 < 2^-29
 }
 
 /// a law fitted to noisy evidence with RMS ≈ 1e-7: residuals of that size are
@@ -366,7 +391,7 @@ fn default_scale_follows_the_law_residual() {
     assert!((rms / 1e-7 - 1.0).abs() < 1e-6, "rms {rms}");
     let sk = ResidualSketch::new(&law, 0.01).unwrap();
     // largest power of two ≤ 1e-7 is 2^-24 ≈ 5.96e-8
-    assert_eq!(sk.scale(), 2f64.powi(-24));
+    assert_eq!(sk.scale(), ipow(2.0, -24));
 
     let rs: Vec<f64> = (1..=1000).map(|i| f64::from(i) * 1e-9).collect(); // 1e-9 … 1e-6
     let pts: Vec<(f64, f64)> = rs.iter().map(|&r| (4.0, truth(4.0) + r)).collect();
@@ -418,7 +443,7 @@ fn residual_above_the_accurate_range_is_counted() {
     // scale 2^-24 ⇒ the top of the accurate range is 2^-24·γ^1535 ≈ 1.2e6
     let law = small_noise_law();
     let mut sk = ResidualSketch::new(&law, 0.01).unwrap();
-    let (_, hi) = closed_form_range(0.01, 2f64.powi(-24));
+    let (_, hi) = closed_form_range(0.01, ipow(2.0, -24));
     assert!(hi < 1e7);
     sk.push(4.0, truth(4.0) + 1e-7);
     sk.push(4.0, truth(4.0) + 1e7);

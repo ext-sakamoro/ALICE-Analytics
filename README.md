@@ -25,6 +25,7 @@ License: MIT OR Apache-2.0
 - [Features](#features)
 - [Modules](#modules)
 - [Error bounds](#error-bounds)
+- [Determinism](#determinism)
 - [Minimum supported Rust version](#minimum-supported-rust-version)
 - [Building and testing](#building-and-testing)
 - [Related crates](#related-crates)
@@ -104,9 +105,13 @@ A complete program is in `examples/residual_summary.rs`
 | `law` | no | `law` module: residual summary of an `alice_zip::law::SignalLaw` (adds `alice-zip` without its `std` feature, and `alloc`) |
 | `simd` | no | no effect; kept so existing feature lists still build |
 
-Without `std` the float functions come from `libm` (results may differ from the
-platform library in the last ulp), and the privacy mechanisms take an explicit
-seed. CI builds the library for `thumbv7em-none-eabihf` with and without `law`.
+Without `std` the privacy mechanisms take an explicit seed, and `sqrt` /
+`ceil` / `floor` / `round` / `mul_add` come from `libm`; IEEE 754 requires all
+five to be correctly rounded, so they return the same bits as the inherent
+methods. The transcendentals go through `alice-det-math` in both builds, so a
+`no_std` build and a `std` build agree bit for bit (see
+[Determinism](#determinism)). CI builds the library for
+`thumbv7em-none-eabihf` with and without `law`.
 
 ## Modules
 
@@ -134,6 +139,52 @@ seed. CI builds the library for `thumbv7em-none-eabihf` with and without `law`.
 The expected values in these tests are closed forms or two-pass references
 written in the test files, not outputs of the functions under test.
 
+## Determinism
+
+The same inputs produce the **same bits** on every supported target. This
+matters because sketches are merged across machines, telemetry is replayed,
+and an audit may re-derive a quantile from the raw events: a last-ulp
+difference between two hosts turns an estimate into two estimates.
+
+| Tier | What | Why it is bit-exact |
+|------|------|---------------------|
+| IEEE basic operations | `+ − × ÷`, `sqrt`, `mul_add`, `ceil` / `floor` / `round` | IEEE 754 requires correct rounding, so every target agrees. `mul_add` is a fused multiply-add with a single rounding; a target without an FMA instruction uses the correctly rounded software `fma` |
+| Transcendentals | `ln`, `exp`, `powf` | Routed through [`alice-det-math`](https://crates.io/crates/alice-det-math), whose kernels are built from the operations above in a fixed evaluation order. The platform `libm` is **not** used: its last ulp differs between macOS, glibc, MSVC and wasm |
+| Integer powers | `γⁿ` for the `DDSketch` bin layout | Binary exponentiation with a fixed association order, rather than `powi`, whose multiplication tree is unspecified |
+| Pseudo-random | `XorShift64` and everything seeded from it | Integer state; a seeded constructor replays exactly. The entropy-seeded constructors (`std` only) are by design not reproducible |
+
+Enforcement is mechanical, in two layers:
+
+* `clippy.toml` lists the inherent `f32` / `f64` transcendentals under
+  `disallowed-methods`, and CI runs
+  `cargo clippy --all-targets --all-features -- -D warnings`, so reintroducing
+  `x.ln()` is a compile error rather than a silent divergence. This is the
+  layer that catches a regression on the machine that writes it.
+* `tests/determinism_golden.rs` serialises the outputs of seven scenarios
+  (one per module with float arithmetic) bit for bit and compares a SHA-256
+  against a recorded constant. Each scenario also asserts that it serialised a
+  non-zero number of bytes, so a scenario that stops exercising its module
+  fails instead of passing on the hash of an empty buffer. CI runs the file on
+  macOS `aarch64`, Linux `x86_64`, Linux `aarch64` and Windows `x86_64`.
+
+<!-- claim-test: golden_sketch -->
+<!-- claim-test: golden_stats -->
+<!-- claim-test: golden_window -->
+<!-- claim-test: golden_anomaly -->
+<!-- claim-test: golden_privacy -->
+<!-- claim-test: golden_streaming_ops -->
+<!-- claim-test: golden_law -->
+
+**Determinism is not correctness.** A golden hash pins whatever the code does
+today, including a mistake; the error bounds above are checked separately
+against closed forms. The two are independent and both are required.
+
+**Outside the guarantee**: a target that does not honour IEEE 754 for the
+basic operations (32-bit x86 built for x87 without SSE2), any build with
+fast-math style flags, and the entropy-seeded privacy constructors. Results
+across a *version* change of this crate or of `alice-det-math` are also not
+pinned — only results across platforms at a given version.
+
 ## Minimum supported Rust version
 
 `rust-version = "1.87"` (measured: 1.86 does not build the library). CI checks
@@ -144,6 +195,8 @@ toolchain is pinned in `rust-toolchain.toml`.
 
 ```sh
 cargo test --all-features
+cargo test --all-features --test determinism_golden  # cross-platform bit equality
+cargo test --all-features --test panic_contract      # degenerate-input contracts
 cargo build --lib --no-default-features --features law --target thumbv7em-none-eabihf
 scripts/preflight.sh          # every CI gate that runs locally
 scripts/preflight.sh --quick  # static checks, clippy, builds, docs, cargo test --lib
@@ -151,6 +204,9 @@ scripts/preflight.sh --quick  # static checks, clippy, builds, docs, cargo test 
 
 ## Related crates
 
+- [`alice-det-math`](https://crates.io/crates/alice-det-math) — the
+  cross-platform bit-exact `ln` / `exp` / `powf` every float path here goes
+  through
 - [`alice-zip`](https://crates.io/crates/alice-zip) — `law::SignalLaw`: a
   fitted law with its valid range, residual statistics, provenance and oracle
   cases, whose residual distribution the `law` feature summarises

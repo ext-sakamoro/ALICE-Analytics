@@ -12,7 +12,7 @@ categories = ["algorithms", "science", "no-std"]
 
 [features]
 default = ["std"]
-std = []
+std = ["alice-det-math/std"]
 # law::ResidualSketch / law::residual_summary — residual distribution of an
 # alice-zip SignalLaw (pulls in alice-zip without its std feature, plus alloc)
 law = ["dep:alice-zip"]
@@ -22,9 +22,28 @@ simd = []  # no-op since 2026-09-14: the only user (HyperLogLog AVX2 zero-count)
 path = "src/lib.rs"
 
 [dependencies]
-# no_std build の float 超越関数 (src/math.rs、std build では未使用)
+# Cross-platform bit-exact transcendentals (ln / exp / powf): the platform
+# `libm` differs in the last ulp between macOS / glibc / MSVC / wasm, so every
+# transcendental goes through this crate on std and no_std alike. Enforced by
+# clippy.toml `disallowed-methods`, pinned by tests/determinism_golden.rs.
+alice-det-math = { version = "0.3", default-features = false }
+# no_std build の float 丸め / sqrt (src/math.rs、std build では未使用)
 libm = "0.2"
 alice-zip = { version = "0.5.1", default-features = false, optional = true }
+
+# The float lints that suggest re-fusing arithmetic are off as a property of
+# the crate, not case by case: every transcendental goes through
+# `alice-det-math` (see clippy.toml), and these two lints propose rewriting
+# those calls back into `mul_add` / platform `libm` forms. `alice-det-math`
+# itself declares them the same way. Not enabled by the `pedantic` set the CI
+# passes today, so this is a guard for the day `nursery` is switched on.
+[lints.clippy]
+suboptimal_flops = "allow"
+imprecise_flops = "allow"
+
+[dev-dependencies]
+# determinism golden hashes (tests/determinism_golden.rs)
+sha2 = "0.10"
 
 [[example]]
 name = "residual_summary"

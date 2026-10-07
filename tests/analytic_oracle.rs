@@ -52,6 +52,7 @@ use alice_analytics::streaming_ops::{
     SimpleMovingAverage,
 };
 use alice_analytics::window::SlidingWindow;
+use alice_det_math::{exp64, powf64};
 
 fn lcg(seed: &mut u64) -> f64 {
     *seed = seed
@@ -60,15 +61,47 @@ fn lcg(seed: &mut u64) -> f64 {
     (*seed >> 11) as f64 / (1u64 << 53) as f64
 }
 
+/// Fixed-order integer power: `f64::powi` lowers to a multiplication tree
+/// whose association order is not specified, so it is not bit-exact across
+/// targets and `clippy.toml` bans it. Binary exponentiation with the bits of
+/// `n` taken from the least significant upwards (the same order as
+/// `alice_analytics`'s own internal helper).
+fn ipow(x: f64, n: i32) -> f64 {
+    let mut base = x;
+    let mut e = n.unsigned_abs();
+    let mut acc = 1.0f64;
+    while e > 0 {
+        if e & 1 == 1 {
+            acc *= base;
+        }
+        e >>= 1;
+        if e > 0 {
+            base *= base;
+        }
+    }
+    if n < 0 {
+        1.0 / acc
+    } else {
+        acc
+    }
+}
+
 fn two_pass(xs: &[f64]) -> (f64, f64, f64, f64, f64) {
     let n = xs.len() as f64;
     let mean = xs.iter().sum::<f64>() / n;
-    let m2 = xs.iter().map(|x| (x - mean).powi(2)).sum::<f64>();
-    let m3 = xs.iter().map(|x| (x - mean).powi(3)).sum::<f64>();
-    let m4 = xs.iter().map(|x| (x - mean).powi(4)).sum::<f64>();
+    let m2 = xs.iter().map(|x| (x - mean) * (x - mean)).sum::<f64>();
+    let m3 = xs
+        .iter()
+        .map(|x| (x - mean) * (x - mean) * (x - mean))
+        .sum::<f64>();
+    let m4 = xs
+        .iter()
+        .map(|x| (x - mean) * (x - mean) * (x - mean) * (x - mean))
+        .sum::<f64>();
     let var = m2 / n;
     let svar = m2 / (n - 1.0);
-    let skew = n.sqrt() * m3 / m2.powf(1.5);
+    // m2^1.5 = m2 * sqrt(m2): both operations are IEEE-exact, unlike powf
+    let skew = n.sqrt() * m3 / (m2 * m2.sqrt());
     let kurt = n * m4 / (m2 * m2) - 3.0;
     (mean, var, svar, skew, kurt)
 }
@@ -220,7 +253,7 @@ fn sliding_window_and_moving_averages_are_the_closed_forms_of_the_last_n() {
         let last = &xs[k.saturating_sub(7)..=k];
         let n = last.len() as f64;
         let mean = last.iter().sum::<f64>() / n;
-        let var = last.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / n;
+        let var = last.iter().map(|v| (v - mean) * (v - mean)).sum::<f64>() / n;
         assert!((w.mean() - mean).abs() < 1e-12, "k={k} mean");
         assert!((sma.value() - mean).abs() < 1e-12, "k={k} sma");
         assert_eq!(
@@ -246,7 +279,7 @@ fn sliding_window_and_moving_averages_are_the_closed_forms_of_the_last_n() {
     ema.observe(0.0);
     for k in 1..=40 {
         ema.observe(1.0);
-        let expected = 1.0 - (1.0 - alpha).powi(k);
+        let expected = 1.0 - ipow(1.0 - alpha, k);
         assert!(
             (ema.value() - expected).abs() < 1e-12,
             "step {k}: {} vs {expected}",
@@ -311,7 +344,8 @@ fn streaming_regression_recovers_an_exact_line_and_matches_the_normal_equations(
     let syy: f64 = pts.iter().map(|p| p.1 * p.1).sum();
     let a = (n * sxy - sx * sy) / (n * sxx - sx * sx);
     let b = (sy - a * sx) / n;
-    let r2 = (n * sxy - sx * sy).powi(2) / ((n * sxx - sx * sx) * (n * syy - sy * sy));
+    let sxy_c = n * sxy - sx * sy;
+    let r2 = sxy_c * sxy_c / ((n * sxx - sx * sx) * (n * syy - sy * sy));
     assert!(
         (lr.slope() - a).abs() < 1e-9 * a.abs(),
         "slope {} vs {a}",
@@ -350,7 +384,7 @@ fn sketches_stay_inside_their_published_error_bounds() {
     let mut dd = DDSketch::new(alpha);
     let mut seed = 3u64;
     let mut values: Vec<f64> = (0..20_000)
-        .map(|_| (lcg(&mut seed) * 12.0).exp() * 0.01)
+        .map(|_| exp64(lcg(&mut seed) * 12.0) * 0.01)
         .collect();
     for &v in &values {
         dd.insert(v);
@@ -399,14 +433,15 @@ fn sketches_stay_inside_their_published_error_bounds() {
     let mut truth = std::collections::HashMap::new();
     let mut total = 0u64;
     for _ in 0..50_000u64 {
-        let item = (lcg(&mut seed).powi(3) * 5000.0) as u64;
+        let u = lcg(&mut seed);
+        let item = (u * u * u * 5000.0) as u64;
         cm.insert(&item);
         *truth.entry(item).or_insert(0u64) += 1;
         total += 1;
     }
     let eps = std::f64::consts::E / 1024.0;
     assert!((cm.error_bound() - eps).abs() < 1e-12);
-    assert!((cm.confidence() - (1.0 - (-5f64).exp())).abs() < 1e-12);
+    assert!((cm.confidence() - (1.0 - exp64(-5.0))).abs() < 1e-12);
     let mut violations = 0;
     for (item, &count) in &truth {
         let est = cm.estimate(item);
@@ -592,8 +627,8 @@ fn ddsketch_accurate_range_is_the_bin_layout_and_is_tight() {
     let g = (1.0 + alpha) / (1.0 - alpha);
     let sk = DDSketch256::new(alpha);
     let (lo, hi) = sk.accurate_range();
-    assert!((lo / g.powi(-64) - 1.0).abs() < 1e-12, "lo {lo}");
-    assert!((hi / g.powi(191) - 1.0).abs() < 1e-12, "hi {hi}");
+    assert!((lo / ipow(g, -64) - 1.0).abs() < 1e-12, "lo {lo}");
+    assert!((hi / ipow(g, 191) - 1.0).abs() < 1e-12, "hi {hi}");
 
     // largest value at rank 2 of {1, v}; smallest at rank 1 of {v, 1}
     let top = |v: f64| {
@@ -609,10 +644,12 @@ fn ddsketch_accurate_range_is_the_bin_layout_and_is_tight() {
         (s.quantile(0.0) - v).abs() / v
     };
     let eps = 1e-12;
-    assert!(top(g.powf(190.5)) <= alpha + eps);
+    assert!(top(powf64(g, 190.5)) <= alpha + eps);
     assert!(top(hi) <= alpha + eps);
-    assert!(top(g.powi(193)) > alpha, "beyond hi the bound must fail");
-    assert!(bottom(g.powf(-63.5)) <= alpha + eps);
+    assert!(ipow(g, 193) > hi);
+    assert!(top(ipow(g, 193)) > alpha, "beyond hi the bound must fail");
+    assert!(bottom(powf64(g, -63.5)) <= alpha + eps);
     assert!(bottom(lo) <= alpha + eps);
-    assert!(bottom(g.powi(-66)) > alpha, "below lo the bound must fail");
+    assert!(ipow(g, -66) < lo);
+    assert!(bottom(ipow(g, -66)) > alpha, "below lo the bound must fail");
 }
