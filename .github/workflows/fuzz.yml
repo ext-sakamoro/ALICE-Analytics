@@ -57,9 +57,9 @@ jobs:
           workspaces: fuzz
 
       - name: Install cargo-fuzz
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-fuzz
+        # built from source: the prebuilt cargo-fuzz binary targets musl by
+        # default, which the sanitizer build cannot use
+        run: cargo install cargo-fuzz --locked
 
       # the build blocks: a target that does not compile must not pass
       - name: Build fuzz target
