@@ -40,7 +40,7 @@ use alice_analytics::pipeline::RingBuffer;
 use alice_analytics::privacy::{
     LaplaceNoise, PrivacyBudget, PrivateAggregator, RandomizedResponse,
 };
-use alice_analytics::sketch::{CountMinSketch, DDSketch, HyperLogLog};
+use alice_analytics::sketch::{CountMinSketch, DDSketch, HyperLogLog, Mergeable};
 use alice_analytics::stats::{iqr, percentile_rank, quantile_sorted, StreamingStats};
 use alice_analytics::streaming_ops::{
     ChangeRate, ExponentialMovingAverage, LinearRegression, SimpleMovingAverage,
@@ -163,44 +163,70 @@ fn ema_accepts_the_boundary_factor_of_one() {
 // Non-finite and extreme magnitudes in a sketch
 // ---------------------------------------------------------------------------
 
-/// `inf` is the realistic shape of an upstream division by zero. The correct
-/// answer is the documented one for a magnitude outside `accurate_range()`:
-/// it is counted, filed in the edge bin so later ranks do not shift, and the
-/// reported quantile is clamped to the observed range. It must not overflow
-/// the bucket index.
+/// A non-finite sample is not a magnitude: it is counted on its own and
+/// touches nothing else.
+///
+/// `inf` is the realistic shape of an upstream division by zero and `NaN` of
+/// a missing sample. The classification follows `law::PointClass::NonFinite`
+/// (feature `law`), which groups "NaN or infinite" and keeps such points out
+/// of the summary — so `count`, `sum`, `min`, `max` and every bin stay as if
+/// the sample had not arrived, and the ranks `quantile` computes remain the
+/// ranks of the values that reached a bin.
 #[test]
-fn an_infinite_magnitude_is_counted_and_filed_in_the_edge_bin() {
+fn a_non_finite_sample_is_counted_on_its_own_and_touches_nothing_else() {
     let mut dd = DDSketch::new(0.01);
-    dd.insert(f64::INFINITY);
-    assert_eq!(dd.count(), 1);
-    // the only observation is +inf, so every order statistic is +inf
-    assert_eq!(dd.quantile(0.0), f64::INFINITY);
-    assert_eq!(dd.quantile(1.0), f64::INFINITY);
+    for v in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        dd.insert(v);
+    }
+    assert_eq!(dd.non_finite(), 3);
+    assert_eq!(dd.count(), 0, "a non-finite sample is not summarised");
+    assert_eq!(dd.sum(), 0.0, "and cannot poison the sum");
+    assert_eq!(dd.mean(), 0.0);
+    assert_eq!(
+        dd.min(),
+        f64::INFINITY,
+        "the empty-state sentinel is untouched"
+    );
+    assert_eq!(dd.max(), f64::NEG_INFINITY);
+    // the sketch is still empty, so the quantile is the empty-state answer
+    assert_eq!(dd.quantile(0.5), 0.0);
 
-    // with finite company the ranks are preserved and the edge-bin
-    // representative is the top (bottom) of the accurate range, not bin 0
+    // mixed with finite company: the finite values keep their own ranks
     let mut dd = DDSketch::new(0.01);
-    dd.insert(1.0);
+    for v in [1.0, 2.0, 3.0] {
+        dd.insert(v);
+    }
+    dd.insert(f64::NAN);
     dd.insert(f64::INFINITY);
     dd.insert(f64::NEG_INFINITY);
     assert_eq!(dd.count(), 3);
-    let (lo, hi) = dd.accurate_range();
-    let (q0, q50, q100) = (dd.quantile(0.0), dd.quantile(0.5), dd.quantile(1.0));
-    // the top bin covers (γ^(i−1), γ^i] with γ^i = hi, and its representative
-    // is 2γ^i/(γ + 1) — the point whose relative distance to both edges is α
-    let top = top_edge_representative(0.01, hi);
-    assert!(
-        (q100 / top - 1.0).abs() < 1e-9,
-        "+inf must be filed in the top edge bin (representative {top:e}), got {q100:e}"
+    assert_eq!(dd.non_finite(), 3);
+    assert_eq!(dd.sum(), 6.0);
+    assert_eq!(
+        dd.min(),
+        1.0,
+        "an infinity must not widen the observed range"
     );
-    assert!(
-        (q0 / -top - 1.0).abs() < 1e-9,
-        "-inf must be filed in the bottom edge bin (representative {:e}), got {q0:e}; \
-         a wrapped bucket index would instead report about {lo:e} and shift every later rank",
-        -top
-    );
-    // the middle rank is the finite value, within the published bound
-    assert!((q50 - 1.0).abs() <= 0.01, "q50 {q50}");
+    assert_eq!(dd.max(), 3.0);
+    for (q, want) in [(0.0f64, 1.0f64), (0.5, 2.0), (1.0, 3.0)] {
+        let got = dd.quantile(q);
+        assert!(
+            (got - want).abs() <= 0.01 * want,
+            "quantile({q}) = {got}, expected {want} within alpha"
+        );
+    }
+
+    // merging adds the counter, clearing resets it
+    let mut a = DDSketch::new(0.01);
+    let mut b = DDSketch::new(0.01);
+    a.insert(f64::NAN);
+    a.insert(1.0);
+    b.insert(f64::INFINITY);
+    b.insert(2.0);
+    a.merge(&b);
+    assert_eq!((a.count(), a.non_finite()), (2, 2));
+    a.clear();
+    assert_eq!((a.count(), a.non_finite()), (0, 0));
 }
 
 /// Representative of the top bin of a `DDSketch`: the bin covers
@@ -798,31 +824,45 @@ fn nan_observations_do_not_panic_the_estimators() {
     assert_eq!(med.count(), 2);
 }
 
-/// How `DDSketch` classifies a `NaN`, pinned exactly as it behaves today.
+/// The bucket index saturates instead of overflowing, on a **finite** input.
 ///
-/// ⚠️ This is the current behaviour, not a considered design, and it is
-/// expected to change: `NaN` fails both `value > 0.0` and `value < 0.0`, so
-/// it is filed with the exact zeros and a stream of nothing but `NaN`
-/// reports a median of `0.0`. The same crate's `law::ResidualSummary`
-/// already counts a non-finite residual separately as `non_finite`, and the
-/// two will be reconciled together rather than one at a time. Until then
-/// this test exists so that a change to the classification is a deliberate
-/// edit of a stated contract rather than a silent one — a reader who comes
-/// to fix the behaviour should expect to rewrite this test, not to work
-/// around it.
+/// Non-finite samples no longer reach `bucket_index`, so this is the oracle
+/// that keeps the `saturating_add` there honest. The cast overflows whenever
+/// `ln(value) / ln(γ)` exceeds `i32::MAX`, and `1/ln(γ)` grows without bound
+/// as `alpha` approaches 0 — a small relative accuracy is enough on its own.
+///
+/// What the two behaviours produce is different in *value*, not only in
+/// whether a debug build panics: saturating files the huge value in the top
+/// bin, so it is still the largest; wrapping sends the index negative, the
+/// `max(0)` files it in **bin 0**, and it becomes the smallest. The top
+/// order statistic is therefore the discriminator, and it works in a release
+/// build where the addition does not panic.
 #[test]
-fn ddsketch_currently_files_nan_with_the_exact_zeros() {
-    let mut dd = DDSketch::new(0.01);
-    for _ in 0..5 {
-        dd.insert(f64::NAN);
-    }
-    assert_eq!(dd.count(), 5, "NaN is counted");
-    assert!(dd.mean().is_nan(), "NaN poisons the running sum");
-    // filed as an exact zero: every reported order statistic is 0.0
-    for q in [0.0f64, 0.5, 1.0] {
-        assert_eq!(dd.quantile(q), 0.0, "quantile({q}) of an all-NaN stream");
-    }
-    // min / max never move, because every comparison against NaN is false
-    assert_eq!(dd.min(), f64::INFINITY);
-    assert_eq!(dd.max(), f64::NEG_INFINITY);
+fn an_extreme_finite_magnitude_saturates_the_bucket_index() {
+    let alpha = 1e-9;
+    let mut dd = DDSketch::new(alpha);
+    dd.insert(1.0);
+    dd.insert(1e300);
+    assert_eq!(dd.count(), 2);
+    assert_eq!(dd.non_finite(), 0, "1e300 is finite");
+
+    let (_, hi) = dd.accurate_range();
+    let top = top_edge_representative(alpha, hi);
+    let q_top = dd.quantile(1.0);
+    assert!(
+        q_top > 1.0,
+        "the largest sample must stay the largest: a wrapped index files it \
+         in bin 0 and reports {q_top} (= the smallest observed value)"
+    );
+    assert!(
+        (q_top / top - 1.0).abs() < 1e-9,
+        "expected the top edge-bin representative {top:e}, got {q_top:e}"
+    );
+
+    // alpha = 0 drives `1/ln(gamma)` to infinity, so even an ordinary
+    // magnitude saturates the cast
+    let mut dd = DDSketch::new(0.0);
+    dd.insert(2.0);
+    assert_eq!(dd.count(), 1);
+    assert!(dd.quantile(0.5).is_finite());
 }

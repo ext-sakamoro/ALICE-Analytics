@@ -369,6 +369,7 @@ macro_rules! impl_ddsketch {
             negative_bins: [u64; $bins],
             zero_count: u64,
             count: u64,
+            non_finite: u64,
             min: f64,
             max: f64,
             sum: f64,
@@ -395,6 +396,7 @@ macro_rules! impl_ddsketch {
                     negative_bins: [0u64; $bins],
                     zero_count: 0,
                     count: 0,
+                    non_finite: 0,
                     min: f64::INFINITY,
                     max: f64::NEG_INFINITY,
                     sum: 0.0,
@@ -410,23 +412,33 @@ macro_rules! impl_ddsketch {
             ///
             /// Contract for inputs outside the usual range:
             ///
-            /// * a magnitude outside [`accurate_range`](Self::accurate_range)
-            ///   (including `±inf`) is counted and filed in the nearest edge
-            ///   bin, so later ranks do not shift; the `α` bound does not hold
-            ///   for it;
-            /// * `0.0` is counted exactly and needs no bin;
-            /// * **`NaN` is counted in `count`, poisons `sum` (and therefore
-            ///   `mean`), and is filed with the exact zeros** — it fails both
-            ///   `value > 0.0` and `value < 0.0`. A stream of nothing but
-            ///   `NaN` therefore reports `quantile(q) == 0.0`. This is the
-            ///   current behaviour, not a considered design: how a
-            ///   non-finite sample should be classified is shared with
-            ///   `law::ResidualSummary` (feature `law`), which counts it
-            ///   separately as `non_finite`, and the two will be decided
-            ///   together. `tests/panic_contract.rs` pins it so that a change
-            ///   is deliberate.
+            /// * **a non-finite sample (`NaN`, `+inf`, `-inf`) is not a
+            ///   magnitude**: it is counted in
+            ///   [`non_finite`](Self::non_finite) and nothing else is touched
+            ///   — not [`count`](Self::count), not [`sum`](Self::sum), not
+            ///   [`min`](Self::min) / [`max`](Self::max), and no bin. The
+            ///   classification follows `law::PointClass::NonFinite`
+            ///   (feature `law`), which groups "NaN or infinite" and keeps
+            ///   such points out of the summary;
+            /// * a **finite** magnitude outside
+            ///   [`accurate_range`](Self::accurate_range) is counted and filed
+            ///   in the nearest edge bin, so later ranks do not shift; the `α`
+            ///   bound does not hold for it;
+            /// * `0.0` is counted exactly and needs no bin.
+            ///
+            /// Until 2026-10-07 a `NaN` was counted in `count`, poisoned `sum`
+            /// (and therefore `mean`), and was filed **with the exact zeros**,
+            /// because it fails both `value > 0.0` and `value < 0.0`: a stream
+            /// of nothing but `NaN` reported `quantile(q) == 0.0`. Counting a
+            /// `NaN` sample as a zero sample is a misclassification, not a
+            /// rounding question.
             #[inline]
             pub fn insert(&mut self, value: f64) {
+                if !value.is_finite() {
+                    self.non_finite += 1;
+                    return;
+                }
+
                 self.count += 1;
                 self.sum += value;
 
@@ -455,11 +467,14 @@ macro_rules! impl_ddsketch {
             /// Bucket index calculation
             /// Uses standard `ln()` for quantile accuracy (`DDSketch` requires precise buckets)
             ///
-            /// `saturating_add` rather than `+`: a non-finite or extreme
-            /// magnitude (an upstream division by zero reaching a telemetry
-            /// stream, or `alpha = 0`, which makes `inv_ln_gamma` infinite)
-            /// saturates the `as i32` cast at `i32::MAX`, and adding the
-            /// offset to that overflows. Before 2026-10-07 that panicked in a
+            /// `saturating_add` rather than `+`: an extreme **finite**
+            /// magnitude reaches this cast with a product large enough to
+            /// saturate `as i32` at `i32::MAX`, and adding the offset to that
+            /// overflows. A small `alpha` is enough on its own, because
+            /// `inv_ln_gamma` grows without bound as `alpha` approaches 0
+            /// (`alpha = 0` makes it infinite); non-finite samples no longer
+            /// reach here at all, they are counted in `non_finite`.
+            /// Before 2026-10-07 the overflow panicked in a
             /// debug build and wrapped to a negative index in a release one,
             /// where `max(0)` then filed the value in bin 0 — the same
             /// rank shift that the 2026-09-17 edge-bin fix removed, in the
@@ -531,16 +546,37 @@ macro_rules! impl_ddsketch {
                 }
                 self.max
             }
+            /// Samples summarised: finite values only. A non-finite sample
+            /// is in [`non_finite`](Self::non_finite) instead, so the ranks
+            /// `quantile` computes from this count are the ranks of the
+            /// values that actually reached a bin.
             #[inline]
             pub const fn count(&self) -> u64 {
                 self.count
             }
 
+            /// Samples rejected as non-finite (`NaN`, `+inf`, `-inf`)
+            ///
+            /// Named after `law::ResidualSummary::non_finite` (feature `law`),
+            /// which counts the same class the same way. A non-zero value
+            /// means the stream carried something that is not a magnitude —
+            /// an upstream division by zero, a missing sample encoded as
+            /// `NaN` — and that those samples are in no other figure here.
+            #[inline]
+            pub const fn non_finite(&self) -> u64 {
+                self.non_finite
+            }
+
+            /// Exact sum of the summarised (finite) samples
+            ///
+            /// Finite in, finite out: a `NaN` sample can no longer poison it.
             #[inline]
             pub const fn sum(&self) -> f64 {
                 self.sum
             }
 
+            /// Mean of the summarised (finite) samples, `0.0` when there are
+            /// none
             #[inline(always)]
             pub fn mean(&self) -> f64 {
                 if self.count == 0 {
@@ -550,11 +586,15 @@ macro_rules! impl_ddsketch {
                 }
             }
 
+            /// Smallest summarised (finite) sample, `f64::INFINITY` when there
+            /// are none
             #[inline]
             pub const fn min(&self) -> f64 {
                 self.min
             }
 
+            /// Largest summarised (finite) sample, `f64::NEG_INFINITY` when
+            /// there are none
             #[inline]
             pub const fn max(&self) -> f64 {
                 self.max
@@ -584,6 +624,7 @@ macro_rules! impl_ddsketch {
                 self.negative_bins = [0u64; $bins];
                 self.zero_count = 0;
                 self.count = 0;
+                self.non_finite = 0;
                 self.min = f64::INFINITY;
                 self.max = f64::NEG_INFINITY;
                 self.sum = 0.0;
@@ -608,6 +649,7 @@ macro_rules! impl_ddsketch {
                 }
                 self.zero_count += other.zero_count;
                 self.count += other.count;
+                self.non_finite += other.non_finite;
                 self.sum += other.sum;
 
                 if other.min < self.min {

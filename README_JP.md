@@ -135,6 +135,13 @@ inherent method と同じ bit を返す 超越関数は `std` の有無に関わ
 これらの test の期待値は test ファイル内に書いた閉形式または 2-pass の参照計算で、
 検査対象の関数の出力ではない
 
+**非有限の sample** (`NaN` / `±inf`) は大きさではない `DDSketch::insert` はこれを
+`non_finite()` に数え、`count` / `sum` / `min` / `max` と bin には触れない
+したがって quantile の裏にある rank は、実際に bin に入った値の rank である
+`law` モジュールが非有限の残差に対して行う分類と同じ **有限**の大きさが
+`accurate_range()` の外にある場合は、数えて最も近い端の bin に入れる
+rank は保たれるが `α` の上限は成り立たない
+
 ## 決定論
 
 同じ入力は、サポートする全ターゲットで **同じ bit** を返す sketch は複数のマシンで

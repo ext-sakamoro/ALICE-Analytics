@@ -139,6 +139,14 @@ methods. The transcendentals go through `alice-det-math` in both builds, so a
 The expected values in these tests are closed forms or two-pass references
 written in the test files, not outputs of the functions under test.
 
+A **non-finite sample** (`NaN`, `±inf`) is not a magnitude: `DDSketch::insert`
+counts it in `non_finite()` and leaves `count`, `sum`, `min`, `max` and every
+bin alone, so the ranks behind a quantile are the ranks of the values that
+reached a bin. This is the same classification the `law` module applies to a
+non-finite residual. A **finite** magnitude outside `accurate_range()` is
+counted and filed in the nearest edge bin: it keeps its rank, but not the `α`
+bound.
+
 ## Determinism
 
 The same inputs produce the **same bits** on every supported target. This

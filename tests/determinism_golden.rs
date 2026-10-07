@@ -127,10 +127,11 @@ fn assert_golden(scenario: &str, sink: Sink, min_bytes: usize, expected: &str) {
 }
 
 // ---------------------------------------------------------------------------
-// 1. sketch — HyperLogLog (ln), DDSketch (ln + integer powers), Count-Min (exp)
+// 1. sketch — HyperLogLog (ln), DDSketch (ln + integer powers, non-finite
+//    counter), Count-Min (exp)
 // ---------------------------------------------------------------------------
 
-const GOLDEN_SKETCH: &str = "eb01d5daeafd2bc58d4f5f62f9e06cdd769f4fae7aa1543286f2dd0b07d632ff";
+const GOLDEN_SKETCH: &str = "49078f4c720eedc79aab35ba79d55f18f6f923fca3069fa3fdb08b264e3719b4";
 
 #[test]
 fn golden_sketch() {
@@ -170,6 +171,11 @@ fn golden_sketch() {
             dd.insert(-v);
         }
         dd.insert(0.0);
+        // non-finite samples are counted on their own and must not perturb
+        // anything below (law::PointClass::NonFinite classification)
+        dd.insert(f64::NAN);
+        dd.insert(f64::INFINITY);
+        dd.insert(f64::NEG_INFINITY);
         for q in [0.0f64, 0.01, 0.25, 0.5, 0.75, 0.9, 0.99, 1.0] {
             s.f64(dd.quantile(q));
         }
@@ -178,6 +184,10 @@ fn golden_sketch() {
         s.f64(hi);
         s.f64(dd.alpha());
         s.u64(dd.count());
+        s.u64(dd.non_finite());
+        s.f64(dd.sum());
+        s.f64(dd.min());
+        s.f64(dd.max());
     }
     // the 256-bin alias has a different offset, so its range is a separate law
     let dd = DDSketch256::new(0.05);
