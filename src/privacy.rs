@@ -198,12 +198,35 @@ impl RandomizedResponse {
     /// Higher epsilon = more accuracy, less privacy
     ///
     /// `std` only (system entropy); `no_std` は [`Self::with_probability`]
+    ///
+    /// # Panics
+    ///
+    /// `epsilon` が有限でない、または負の場合 検査するのは入力の `epsilon` で、
+    /// `p_true` はそこからの導出値 負の ε は `p_true < 0.5` を作り、
+    /// [`Self::estimate_proportion`] の推定値の符号が反転する
+    /// (実測: `epsilon = -5.0` で `p_true = 6.69e-3`) ⚠️ 2026-10-07 までは
+    /// [`Self::with_probability`] だけが定義域を検査していたので、`new` 経由だと
+    /// 同じ不変条件を破れる状態だった
+    ///
+    /// `epsilon = 0.0` は許す (`p_true = 0.5` = 常に無作為に答える、
+    /// `with_probability(0.5)` と同じ意味のある端)
+    ///
+    /// 上端は切らない: `p = 1/(1 + e^(−ε))` (logistic の数値安定形) で計算するので
+    /// `ε → ∞` の極限 `1.0` をそのまま返す ⚠️ 旧式の `e^ε/(1 + e^ε)` は
+    /// `e^ε` が `ε ≳ 709.79` で `inf` になり `inf/inf = NaN` を返していた (実測)
+    /// NaN は**代数的な書き方の副産物で定義域の問題ではない**ので、ε の上限を
+    /// assert で切るのでなく式を直した (ε = 0 / 0.5 / 1 / 50 / 709 では旧式と
+    /// bit 一致、ε = 3 で 1 ulp 異なる)
     #[cfg(feature = "std")]
     #[must_use]
     pub fn new(epsilon: f64) -> Self {
-        // p = e^ε / (1 + e^ε)
-        let exp_eps = exp64(epsilon);
-        let p_true = exp_eps / (1.0 + exp_eps);
+        assert!(
+            epsilon.is_finite() && epsilon >= 0.0,
+            "epsilon must be finite and non-negative"
+        );
+        // p = e^ε / (1 + e^ε) = 1 / (1 + e^(−ε)): for ε ≥ 0 the exponential
+        // cannot overflow in this form, so the whole domain is representable
+        let p_true = 1.0 / (1.0 + exp64(-epsilon));
         Self {
             p_true,
             rng: XorShift64::from_entropy(),

@@ -420,12 +420,31 @@ impl EwmaDetector {
     /// Create a new EWMA detector
     ///
     /// # Arguments
-    /// * `alpha` - Smoothing factor (0.0-1.0, higher = more reactive)
+    /// * `alpha` - Smoothing factor in `(0.0, 1.0]`, higher = more reactive
     /// * `threshold_k` - Number of standard deviations for anomaly threshold
+    ///
+    /// # Panics
+    ///
+    /// `alpha` が `(0.0, 1.0]` の外 (`NaN` / 無限大を含む、どちらも比較が偽に
+    /// なるので同じ assert で弾かれる) の場合
+    ///
+    /// 定義域の扱いは同 crate の
+    /// [`ExponentialMovingAverage::new`](crate::streaming_ops::ExponentialMovingAverage::new)
+    /// に合わせた (範囲外は黙って丸めず panic する) 2026-10-07 までは
+    /// `alpha.clamp(0.001, 1.0)` だったので、`0.0` と負値が黙って `0.001` になり
+    /// (⚠️ `-1.0` と `0.0` が同一結果になっていた)、**`NaN` は `clamp` が `NaN` を
+    /// 返すので丸められずに残り**、以後 `ewma` / `std_dev` / `anomaly_score` が
+    /// すべて `NaN` になって **`is_anomaly` が常に `false`** を返していた
+    /// = 検出器が黙って無効化される 無限大の score は「異常」と読めるが、
+    /// `false` は「正常」と読めるので、こちらの方が害が大きい
     #[must_use]
     pub const fn new(alpha: f64, threshold_k: f64) -> Self {
+        assert!(
+            alpha > 0.0 && alpha <= 1.0,
+            "EwmaDetector alpha must be in (0.0, 1.0]"
+        );
         Self {
-            alpha: alpha.clamp(0.001, 1.0),
+            alpha,
             ewma: 0.0,
             ewma_var: 0.0,
             threshold_k,
@@ -471,6 +490,13 @@ impl EwmaDetector {
     }
 
     /// Get anomaly score (number of standard deviations)
+    ///
+    /// 分散推定が 0 のとき (定数 stream、または `alpha = 1.0` で平滑化しない場合)
+    /// は、`ewma` と一致する値に `0.0`、それ以外に `f64::INFINITY` を返す
+    /// ⚠️ **これは `alpha = 1.0` の境界固有の挙動ではない**: `alpha = 0.3` でも
+    /// 同じ値を 50 回入れれば `std_dev` は 0 になり、以後 `ewma` 以外は `inf` に
+    /// なる (実測) 「散らばりが 0 の系列に対する逸脱は無限に異常」が契約で、
+    /// `tests/panic_contract.rs` が値で固定する
     #[must_use]
     pub fn anomaly_score(&self, value: f64) -> f64 {
         if !self.initialized {
@@ -512,9 +538,18 @@ impl EwmaDetector {
     }
 
     /// Set smoothing factor
+    ///
+    /// # Panics
+    ///
+    /// [`Self::new`] と同じ条件 (`alpha` が `(0.0, 1.0]` の外) setter が丸めたままだと
+    /// 構築時の assert を後から回避できるので、同じ検査を置く
     #[inline]
     pub const fn set_alpha(&mut self, alpha: f64) {
-        self.alpha = alpha.clamp(0.001, 1.0);
+        assert!(
+            alpha > 0.0 && alpha <= 1.0,
+            "EwmaDetector alpha must be in (0.0, 1.0]"
+        );
+        self.alpha = alpha;
     }
 
     /// Get threshold multiplier
@@ -717,6 +752,10 @@ impl CompositeDetector {
     }
 
     /// Create with custom thresholds
+    ///
+    /// # Panics
+    ///
+    /// `ewma_alpha` が `(0.0, 1.0]` の外の場合 ([`EwmaDetector::new`] にそのまま渡す)
     #[must_use]
     pub const fn with_thresholds(mad_k: f64, ewma_alpha: f64, ewma_k: f64, zscore_k: f64) -> Self {
         Self {

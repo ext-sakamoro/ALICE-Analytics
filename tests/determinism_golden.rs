@@ -397,7 +397,7 @@ fn golden_anomaly() {
 // 5. privacy — Laplace inverse transform (ln), randomized response (exp)
 // ---------------------------------------------------------------------------
 
-const GOLDEN_PRIVACY: &str = "ab8aee4844199d1ada0b9ef12d1823dc4cff1bc0d2dc1666622164c792a95c2b";
+const GOLDEN_PRIVACY: &str = "50f95bbc492118d85de552a3a950673e3c762b9005d1217c81c042cab9494ca5";
 
 #[test]
 fn golden_privacy() {
@@ -434,7 +434,9 @@ fn golden_privacy() {
         }
     }
 
-    // Randomized response: p = e^ε/(1 + e^ε) via the std constructor
+    // Randomized response: p = 1/(1 + e^(−ε)) via the std constructor
+    // (the hash changed on 2026-10-07 when the algebraically equivalent but
+    // overflow-free form replaced e^ε/(1 + e^ε); it differs by 1 ulp at ε = 3)
     for epsilon in [0.5f64, 1.0, 3.0] {
         let rr = RandomizedResponse::new(epsilon);
         s.f64(rr.p_true());

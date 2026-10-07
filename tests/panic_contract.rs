@@ -33,7 +33,9 @@
 
 #![allow(clippy::float_cmp)]
 
-use alice_analytics::anomaly::{EwmaDetector, MadDetector, StreamingMedian, ZScoreDetector};
+use alice_analytics::anomaly::{
+    CompositeDetector, EwmaDetector, MadDetector, StreamingMedian, ZScoreDetector,
+};
 use alice_analytics::pipeline::RingBuffer;
 use alice_analytics::privacy::{
     LaplaceNoise, PrivacyBudget, PrivateAggregator, RandomizedResponse,
@@ -590,23 +592,85 @@ fn a_well_formed_spend_is_monotone_and_bounded() {
     assert_eq!(none.query_count(), 0);
 }
 
-/// `EwmaDetector` takes its smoothing factor without an assertion (unlike
-/// `ExponentialMovingAverage`), so both ends of the interval must stay
-/// defined rather than producing `NaN`.
+/// `EwmaDetector` enforces the same smoothing-factor domain as
+/// `ExponentialMovingAverage::new`, and the value it stores is the one that
+/// was passed.
 #[test]
-fn ewma_detector_boundary_factors_stay_defined() {
-    // alpha = 0: the warm-up seeds the estimate, so both the level and the
-    // spread stay finite
-    let mut slow = EwmaDetector::new(0.0, 3.0);
-    for i in 0..10 {
-        slow.observe(f64::from(i));
+fn ewma_detector_accepts_its_whole_domain_and_only_that() {
+    // the closed upper end is inside the domain, and so is anything above 0
+    for alpha in [f64::MIN_POSITIVE, 1e-9, 0.0005, 0.3, 1.0] {
+        let d = EwmaDetector::new(alpha, 3.0);
+        assert_eq!(
+            d.alpha(),
+            alpha,
+            "the factor must be stored as given, not corrected"
+        );
     }
-    assert!(slow.ewma().is_finite(), "ewma {}", slow.ewma());
-    assert!(slow.std_dev().is_finite() && slow.std_dev() >= 0.0);
-    assert!(slow.anomaly_score(100.0).is_finite());
+    // the setter carries the same invariant, or the constructor's check would
+    // be defeatable after the fact
+    let mut d = EwmaDetector::new(0.3, 3.0);
+    d.set_alpha(1.0);
+    assert_eq!(d.alpha(), 1.0);
+}
 
-    // alpha = 1: no smoothing at all, so the variance estimate collapses to 0
-    // and the standardised distance is infinite — defined, and never NaN
+/// ⚠️ Until 2026-10-07 `alpha.clamp(0.001, 1.0)` turned both of these into
+/// `0.001`, which is why `-1.0` and `0.0` produced byte-identical detectors.
+#[test]
+#[should_panic(expected = "EwmaDetector alpha must be in (0.0, 1.0]")]
+fn ewma_detector_rejects_a_zero_smoothing_factor() {
+    let _ = EwmaDetector::new(0.0, 3.0);
+}
+
+#[test]
+#[should_panic(expected = "EwmaDetector alpha must be in (0.0, 1.0]")]
+fn ewma_detector_rejects_a_negative_smoothing_factor() {
+    let _ = EwmaDetector::new(-1.0, 3.0);
+}
+
+#[test]
+#[should_panic(expected = "EwmaDetector alpha must be in (0.0, 1.0]")]
+fn ewma_detector_rejects_a_smoothing_factor_above_one() {
+    let _ = EwmaDetector::new(2.0, 3.0);
+}
+
+/// ⚠️ The input the old clamp let through, and the worst of the set: `NaN`
+/// propagated into `ewma` / `std_dev` / `anomaly_score`, and because every
+/// comparison against `NaN` is false, `is_anomaly` then answered **`false`**
+/// for every value — the detector was silently switched off. An infinite
+/// score reads as "anomalous"; `false` reads as "normal".
+#[test]
+#[should_panic(expected = "EwmaDetector alpha must be in (0.0, 1.0]")]
+fn ewma_detector_rejects_a_nan_smoothing_factor() {
+    let _ = EwmaDetector::new(f64::NAN, 3.0);
+}
+
+#[test]
+#[should_panic(expected = "EwmaDetector alpha must be in (0.0, 1.0]")]
+fn ewma_detector_setter_rejects_a_nan_smoothing_factor() {
+    let mut d = EwmaDetector::new(0.3, 3.0);
+    d.set_alpha(f64::NAN);
+}
+
+/// `CompositeDetector::with_thresholds` forwards the factor, so it inherits
+/// the same contract rather than having a second, looser one.
+#[test]
+#[should_panic(expected = "EwmaDetector alpha must be in (0.0, 1.0]")]
+fn composite_detector_inherits_the_smoothing_factor_domain() {
+    let _ = CompositeDetector::with_thresholds(3.0, f64::NAN, 2.5, 3.0);
+}
+
+/// A series with no spread scores every deviation as infinitely anomalous,
+/// and the value equal to the level as `0.0`.
+///
+/// ⚠️ This is **not** specific to `alpha = 1.0`: a constant stream collapses
+/// the variance estimate at any factor. Both cases are asserted so that the
+/// contract is read as "zero spread ⇒ infinite score" rather than as an
+/// artefact of the boundary — which is why the boundary is kept legal (the
+/// crate's own `ExponentialMovingAverage::new` accepts `1.0`) instead of
+/// being asserted away.
+#[test]
+fn a_series_with_no_spread_scores_any_deviation_as_infinite() {
+    // alpha = 1.0: no smoothing, so the level is the latest value
     let mut fast = EwmaDetector::new(1.0, 3.0);
     for i in 0..10 {
         fast.observe(f64::from(i));
@@ -618,7 +682,105 @@ fn ewma_detector_boundary_factors_stay_defined() {
     );
     assert_eq!(fast.std_dev(), 0.0);
     assert_eq!(fast.anomaly_score(100.0), f64::INFINITY);
+    assert_eq!(
+        fast.anomaly_score(9.0),
+        0.0,
+        "the level itself is not a deviation"
+    );
     assert!(fast.is_anomaly(100.0));
+    assert!(!fast.is_anomaly(9.0));
+
+    // alpha = 0.3 on a constant stream: an ordinary configuration reaching the
+    // same state
+    let mut slow = EwmaDetector::new(0.3, 3.0);
+    for _ in 0..50 {
+        slow.observe(7.0);
+    }
+    assert_eq!(slow.ewma(), 7.0);
+    assert_eq!(slow.std_dev(), 0.0);
+    assert_eq!(slow.anomaly_score(8.0), f64::INFINITY);
+    assert_eq!(slow.anomaly_score(7.0), 0.0);
+
+    // an ordinary spread keeps the score finite, so the infinity above is the
+    // zero-spread case and not the general answer
+    let mut varied = EwmaDetector::new(0.3, 3.0);
+    for i in 0..50 {
+        varied.observe(f64::from(i % 7));
+    }
+    assert!(varied.std_dev() > 0.0);
+    assert!(varied.anomaly_score(100.0).is_finite());
+}
+
+// ---------------------------------------------------------------------------
+// The privacy parameter of a randomized response
+// ---------------------------------------------------------------------------
+
+/// `RandomizedResponse::new` validates the `epsilon` it is given, and derives
+/// `p_true` over the whole of `[0, ∞)` without ever producing `NaN`.
+///
+/// The checked quantity is the input: `p_true` is derived from it. The upper
+/// end is not cut off, because the old overflow was a property of the
+/// algebraic form rather than of the domain — `p = e^ε/(1 + e^ε)` returned
+/// `NaN` for `ε ≳ 709.79` (`inf/inf`), while the equivalent
+/// `p = 1/(1 + e^(−ε))` returns the limit `1.0`.
+#[test]
+fn a_randomized_response_epsilon_maps_onto_its_whole_domain() {
+    // ε = 0 is "always answer at random", the same meaningful end that
+    // `with_probability(0.5)` accepts
+    assert_eq!(RandomizedResponse::new(0.0).p_true(), 0.5);
+    assert_eq!(RandomizedResponse::new(-0.0).p_true(), 0.5);
+    // the textbook values
+    assert!((RandomizedResponse::new(1.0).p_true() - 0.731_058_578_630_004_9).abs() < 1e-15);
+
+    // monotone in ε, and inside the domain that `with_probability` enforces
+    let mut previous = 0.5;
+    for e in [
+        0.0f64, 0.25, 0.5, 1.0, 3.0, 10.0, 50.0, 100.0, 709.0, 710.0, 1e3, 1e300,
+    ] {
+        let p = RandomizedResponse::new(e).p_true();
+        assert!(!p.is_nan(), "epsilon {e:e} produced NaN");
+        assert!(
+            (0.5..=1.0).contains(&p),
+            "epsilon {e:e} produced p_true {p}, outside the domain              with_probability accepts"
+        );
+        assert!(
+            p >= previous,
+            "p_true must not decrease: {e:e} gave {p} after {previous}"
+        );
+        previous = p;
+        // the same value must be constructible through the other path
+        let _ = RandomizedResponse::with_probability(p, 1);
+    }
+    // ⚠️ the limit, where the old form returned NaN
+    assert_eq!(RandomizedResponse::new(710.0).p_true(), 1.0);
+    assert_eq!(RandomizedResponse::new(f64::MAX).p_true(), 1.0);
+}
+
+/// ⚠️ A negative ε used to return a detector whose `p_true` was below 0.5
+/// (measured: `new(-5.0)` gave `6.69e-3`), which inverts the sign of every
+/// proportion `estimate_proportion` reports.
+#[test]
+#[should_panic(expected = "epsilon must be finite and non-negative")]
+fn a_randomized_response_rejects_a_negative_epsilon() {
+    let _ = RandomizedResponse::new(-5.0);
+}
+
+#[test]
+#[should_panic(expected = "epsilon must be finite and non-negative")]
+fn a_randomized_response_rejects_a_nan_epsilon() {
+    let _ = RandomizedResponse::new(f64::NAN);
+}
+
+#[test]
+#[should_panic(expected = "epsilon must be finite and non-negative")]
+fn a_randomized_response_rejects_an_infinite_epsilon() {
+    let _ = RandomizedResponse::new(f64::INFINITY);
+}
+
+#[test]
+#[should_panic(expected = "epsilon must be finite and non-negative")]
+fn a_randomized_response_rejects_a_negative_infinite_epsilon() {
+    let _ = RandomizedResponse::new(f64::NEG_INFINITY);
 }
 
 /// `NaN` observations are total (no panic) and keep their place in the count.
