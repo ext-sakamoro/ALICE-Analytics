@@ -143,14 +143,10 @@ jobs:
           retention-days: 30
 
   semver-checks:
-    name: cargo-semver-checks (API compatibility, informational)
+    name: cargo-semver-checks (API compatibility)
     runs-on: ubuntu-latest
-    # informational: a planned API change is not blocked here
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0  # the baseline revision needs the history
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       # pinned: newer releases raise their own required rustc version
@@ -158,9 +154,35 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-semver-checks@0.50.0
-      - name: Run cargo semver-checks (against HEAD~1)
+      # The baseline is the released version on crates.io, which is what
+      # consumers actually resolve. A revision baseline (`--baseline-rev
+      # HEAD~1`) points at whatever happened to precede this commit, which is
+      # only a release boundary by accident.
+      #
+      # This step checks that the version bump declared in Cargo.toml is large
+      # enough for the API changes made. It cannot be the whole gate: the lints
+      # are selected by what the declared bump still requires, so once the bump
+      # is the largest one possible every lint is skipped and the command exits
+      # 0 after comparing nothing ("0 checks: 0 pass, N skip" /
+      # "no semver update required").
+      - name: Declared version bump covers the API changes
         run: |
+          cargo semver-checks check-release --package alice-analytics
+      # Second pass with the lints forced on, so that something is always
+      # compared. Breaking changes are expected here whenever the release is a
+      # breaking one, so the pass/fail of the lints is not the gate -- the gate
+      # is that the number of checks actually run is not zero. A release that
+      # breaks the API on purpose is covered by the step above, and the list
+      # printed here is what belongs in CHANGELOG.
+      - name: Enumerate API changes (fails only if nothing was compared)
+        run: |
+          set -o pipefail
           cargo semver-checks check-release \
             --package alice-analytics \
-            --baseline-rev "HEAD~1" \
-            || true
+            --release-type patch 2>&1 | tee semver.log || true
+          checks=$(grep -oE '[0-9]+ checks:' semver.log | grep -oE '[0-9]+' | tail -1)
+          echo "checks run: ${checks:-<none>}"
+          if [ -z "$checks" ] || [ "$checks" -eq 0 ]; then
+            echo "::error::cargo-semver-checks compared 0 items, so it proves nothing about the API"
+            exit 1
+          fi

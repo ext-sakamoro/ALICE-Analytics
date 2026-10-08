@@ -175,6 +175,27 @@ Enforcement is mechanical, in two layers:
   fails instead of passing on the hash of an empty buffer. CI runs the file on
   macOS `aarch64`, Linux `x86_64`, Linux `aarch64` and Windows `x86_64`.
 
+### Naming the arithmetic
+
+Bit-exactness across machines is only half of what a stored estimate needs.
+The other half is being able to say *which* arithmetic produced it, because a
+quantile computed under one implementation of `ln` and one computed under
+another are two numbers, however close they look.
+
+`alice_analytics::SEMANTICS_ID` is that name: the 32-byte identifier
+`alice-det-math` publishes for its own numeric behaviour, re-exported here.
+Record it next to any estimate that is stored, transmitted or merged; two
+results are comparable as numbers only if the identifier agrees. It is pinned
+as hex by `golden_semantics_id`, so an arithmetic change cannot reach a release
+unnoticed.
+
+With the `law` feature, `law::ResidualSummary::law_id` goes one step further
+and names both halves at once: it is the summarised law's own identifier taken
+under `SEMANTICS_ID`, so it changes when `f(x)` changes *and* when the
+arithmetic changes. It covers what `f(x)` reads (the domain and the
+coefficients) and not how the law was obtained, so two laws fitted from
+different measurements that evaluate identically share one identifier.
+
 <!-- claim-test: golden_sketch -->
 <!-- claim-test: golden_stats -->
 <!-- claim-test: golden_window -->
@@ -182,6 +203,8 @@ Enforcement is mechanical, in two layers:
 <!-- claim-test: golden_privacy -->
 <!-- claim-test: golden_streaming_ops -->
 <!-- claim-test: golden_law -->
+<!-- claim-test: golden_semantics_id -->
+<!-- claim-test: golden_law_id -->
 
 **Determinism is not correctness.** A golden hash pins whatever the code does
 today, including a mistake; the error bounds above are checked separately
@@ -191,7 +214,9 @@ against closed forms. The two are independent and both are required.
 basic operations (32-bit x86 built for x87 without SSE2), any build with
 fast-math style flags, and the entropy-seeded privacy constructors. Results
 across a *version* change of this crate or of `alice-det-math` are also not
-pinned — only results across platforms at a given version.
+pinned — only results across platforms at a given version. What `SEMANTICS_ID`
+adds is not a promise that the arithmetic never changes, but the ability to
+tell that it did.
 
 ## Minimum supported Rust version
 

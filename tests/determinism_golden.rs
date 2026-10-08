@@ -625,3 +625,107 @@ fn golden_law() {
 
     assert_golden("law", s, 150, GOLDEN_LAW);
 }
+
+// ---------------------------------------------------------------------------
+// 8. semantics_id — the identifier of the arithmetic the scenarios above are
+//    computed with, and the law identifier that mixes it in
+// ---------------------------------------------------------------------------
+
+/// `alice_analytics::SEMANTICS_ID` as hex
+///
+/// Unlike the scenarios above, this is not a hash of this crate's output: it
+/// is the constant `alice-det-math` publishes to name its own numeric
+/// behaviour, re-exported here. The value is transcribed from the dependency's
+/// released source, so it pins *which* arithmetic this crate is built against.
+///
+/// A mismatch means the resolved `alice-det-math` is not the one this crate
+/// was pinned to. That is not automatically wrong — the upstream re-records
+/// the constant when it changes a function's output on purpose — but it must
+/// not pass unnoticed, because every quantile, cardinality and noise sample in
+/// this crate is only reproducible under one arithmetic. On a deliberate
+/// upgrade: verify the golden hashes above are unchanged (they are the actual
+/// outputs), then update this constant and record both in CHANGELOG.
+const GOLDEN_SEMANTICS_ID: &str =
+    "d2209b30f6f1f45baa1b638bcdfee34ac64773b2e63b9c083b2e77afc691398e";
+
+#[test]
+fn golden_semantics_id() {
+    let mut s = Sink::default();
+    for b in alice_analytics::SEMANTICS_ID {
+        s.byte(b);
+    }
+    let bytes = s.len();
+    assert_eq!(bytes, 32, "the identifier is 32 bytes, got {bytes}");
+
+    let mut hex = String::with_capacity(64);
+    for b in alice_analytics::SEMANTICS_ID {
+        write!(hex, "{b:02x}").expect("writing to a String cannot fail");
+    }
+    assert_eq!(
+        hex, GOLDEN_SEMANTICS_ID,
+        "\n\nThe arithmetic this crate computes with changed.\n\
+         actual:   {hex}\n\
+         expected: {GOLDEN_SEMANTICS_ID}\n\n\
+         Check which alice-det-math version resolved, confirm the golden\n\
+         scenario hashes above are unchanged, then update GOLDEN_SEMANTICS_ID\n\
+         and record the change in CHANGELOG.\n"
+    );
+}
+
+/// The law identifier a residual summary reports mixes the arithmetic in, so
+/// pinning it pins both halves at once
+///
+/// The closed-form properties of that identifier (what it covers, what it
+/// ignores) are checked in `tests/law_identity.rs` against an independent
+/// SHA-256 of the published encoding; this is the change detector.
+///
+/// The value below was computed outside this toolchain from the published
+/// encoding (`SHA-256` over the length-prefixed tags, the arithmetic
+/// identifier, the domain bits and the coefficient bits of the law built in
+/// the test) and matches what the implementation returns, so it pins a
+/// verified value rather than whatever happened to come out.
+#[cfg(feature = "law")]
+const GOLDEN_LAW_ID: &str = "bd2c0c2407fcf7ad8f424a25d71c33a68b2223e4bcb95c3601b2dbc7c7ddd549";
+
+#[cfg(feature = "law")]
+#[test]
+fn golden_law_id() {
+    use alice_analytics::law::residual_summary;
+    use alice_zip::law::{Provenance, ResidualStats, SignalLaw, SignalLawParts, ValidRange};
+
+    let law = SignalLaw::from_parts(SignalLawParts {
+        coefficients: vec![1.0, 2.0, -0.5],
+        domain: ValidRange { lo: 0.0, hi: 8.0 },
+        evidence: vec![(0.0, 1.0), (4.0, 1.75), (8.0, 2.5)],
+        residual: ResidualStats {
+            n: 0,
+            rms: 0.0,
+            max_abs: 0.0,
+        },
+        provenance: Provenance::new("golden", "closed form"),
+        oracles: Vec::new(),
+    })
+    .expect("valid parts");
+
+    let summary = residual_summary(&law, &[(0.0, 1.5), (4.0, 1.75), (8.0, 3.0)]);
+    assert!(
+        summary.count > 0,
+        "the summary must have summarised something, or the identifier below \
+         is the only thing this test measures"
+    );
+
+    let mut hex = String::with_capacity(64);
+    for b in summary.law_id {
+        write!(hex, "{b:02x}").expect("writing to a String cannot fail");
+    }
+    assert_eq!(hex.len(), 64, "a law identifier is 32 bytes of hex");
+    assert_eq!(
+        hex, GOLDEN_LAW_ID,
+        "\n\nThe identifier reported for a fixed law changed.\n\
+         actual:   {hex}\n\
+         expected: {GOLDEN_LAW_ID}\n\n\
+         Either the arithmetic changed (see golden_semantics_id) or the\n\
+         encoding in alice-zip did. Both change what a stored summary means:\n\
+         confirm which, then update GOLDEN_LAW_ID and record it in CHANGELOG.\n"
+    );
+}

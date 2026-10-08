@@ -167,6 +167,23 @@ merge され、テレメトリは再生され、監査は生イベントから�
   実行しなくなったシナリオは空バッファのハッシュで通るのではなく fail する CI は
   macOS `aarch64`、Linux `x86_64`、Linux `aarch64`、Windows `x86_64` で実行する
 
+### 算術に名前を付ける
+
+マシン間の bit 一致は、保存した推定値に必要なものの半分でしかない 残りの半分は
+**どの算術で出た数かを言えること** — ある `ln` の実装で計算した分位点と、別の実装で
+計算した分位点は、どれだけ近く見えても 2 つの数である
+
+`alice_analytics::SEMANTICS_ID` がその名前で、`alice-det-math` が自身の数値的な
+振る舞いに付ける 32 byte の識別子を再 export したもの 保存・転送・merge される
+推定値の隣に記録する 2 つの結果が数として比較可能なのは、この識別子が一致する時
+だけ `golden_semantics_id` が hex で固定するので、算術の変更がリリースまで
+気付かれずに届くことはない
+
+`law` feature では `law::ResidualSummary::law_id` が両方の半分を一度に名指す
+要約した法則自身の識別子を `SEMANTICS_ID` の下で取った値で、`f(x)` が変わった時も
+算術が変わった時も変化する 覆うのは `f(x)` が読むもの (定義域と係数) だけで、
+法則の得られ方は覆わない ⇒ 別の測定から fit した同じ `f(x)` は同じ識別子を共有する
+
 <!-- claim-test: golden_sketch -->
 <!-- claim-test: golden_stats -->
 <!-- claim-test: golden_window -->
@@ -174,6 +191,8 @@ merge され、テレメトリは再生され、監査は生イベントから�
 <!-- claim-test: golden_privacy -->
 <!-- claim-test: golden_streaming_ops -->
 <!-- claim-test: golden_law -->
+<!-- claim-test: golden_semantics_id -->
+<!-- claim-test: golden_law_id -->
 
 **決定論は正しさではない** golden ハッシュは今日の挙動を — 誤りを含めて — 固定する
 だけで、上の誤差の上限は閉形式との突合で別に検査している 2 つは独立で、両方が必要
@@ -182,6 +201,8 @@ merge され、テレメトリは再生され、監査は生イベントから�
 32-bit x86)、fast-math 系のフラグを付けたビルド、エントロピー由来のプライバシー
 機構のコンストラクタ 本 crate や `alice-det-math` の **バージョンを跨いだ** 一致も
 保証しない (保証するのは、あるバージョンにおけるプラットフォーム間の一致)
+`SEMANTICS_ID` が足すのは「算術が変わらない」という約束ではなく、**変わったことを
+言える**ようにすることである
 
 ## 最小サポート Rust バージョン
 

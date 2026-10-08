@@ -5,13 +5,13 @@
 # remotely, so a step added to a workflow is added here in the same commit.
 #
 # Not reproduced here: the four-OS test matrix (this runs the host only), the
-# packaged-crate build, the informational coverage / semver jobs, and the
-# fuzz runs (fuzz.yml; the targets are built when nightly + cargo-fuzz exist).
+# packaged-crate build, the informational coverage job, and the fuzz runs
+# (fuzz.yml; the targets are built when nightly + cargo-fuzz exist).
 #
 # usage: scripts/preflight.sh [--quick]
 #   (none)   every gate: static checks, clippy, no_std builds, feature
 #            powerset, docs, the full test suites (including the no_std lib
-#            unit tests), the example, MSRV, and the security jobs (cargo audit / deny / machete)
+#            unit tests), the example, MSRV, and the security jobs (cargo audit / deny / machete / semver-checks)
 #   --quick  static checks, clippy, no_std builds, docs and `cargo test --lib`;
 #            skips the full suites, the example, the feature powerset, MSRV
 #            and the security jobs
@@ -110,5 +110,23 @@ need cargo-machete "cargo install cargo-machete --locked"
 cargo audit --db "${CARGO_TARGET_DIR:-target}/advisory-db" --deny yanked
 cargo deny --all-features check all
 cargo machete
+
+# Same two passes, and the same arguments, as the semver-checks job: the
+# declared bump has to cover the changes, and the forced pass has to compare a
+# non-zero number of items (with the largest possible bump declared, every
+# lint is skipped and the command exits 0 after comparing nothing).
+step "security-audit.yml / semver-checks: declared bump + non-zero comparison"
+need cargo-semver-checks "cargo install cargo-semver-checks --locked"
+cargo semver-checks check-release --package alice-analytics
+semver_log="${CARGO_TARGET_DIR:-target}/semver.log"
+cargo semver-checks check-release \
+  --package alice-analytics \
+  --release-type patch 2>&1 | tee "$semver_log" || true
+checks=$(grep -oE '[0-9]+ checks:' "$semver_log" | grep -oE '[0-9]+' | tail -1)
+echo "checks run: ${checks:-<none>}"
+if [ -z "$checks" ] || [ "$checks" -eq 0 ]; then
+  echo "cargo-semver-checks compared 0 items, so it proves nothing about the API" >&2
+  exit 1
+fi
 
 echo; echo "preflight OK"

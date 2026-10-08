@@ -53,3 +53,28 @@ pub mod window;
 
 #[cfg(feature = "law")]
 pub mod law;
+
+/// Identifier of the arithmetic every estimate in this crate is computed with
+///
+/// Quantiles, cardinalities, anomaly scores and privacy noise all read
+/// transcendentals (`ln` / `exp` / `powf`), and a transcendental is only
+/// reproducible if its implementation is pinned too: the platform `libm`
+/// differs in the last ulp between macOS, glibc, MSVC and wasm, and one ulp of
+/// `ln` moves a `DDSketch` bin boundary, which moves the reported quantile.
+/// This crate therefore routes every transcendental through
+/// [`alice_det_math`], and re-exports that crate's identifier of its own
+/// numeric behaviour here.
+///
+/// Record it next to any estimate that is stored, transmitted or merged. Two
+/// results are comparable as numbers only if they were produced under the same
+/// identifier; when it differs, the two were computed by different arithmetic
+/// and agreement between them is not guaranteed at the bit level, however
+/// close the values look.
+///
+/// Pinned as hex by `tests/determinism_golden.rs`, so a change in the
+/// arithmetic cannot reach a release unnoticed. With the `law` feature,
+/// `law::ResidualSummary::law_id` mixes this identifier with the law it
+/// summarises, giving a single value that names both (not linked here: the
+/// module is behind that feature, so the link would not resolve in a build
+/// without it).
+pub use alice_det_math::SEMANTICS_ID;

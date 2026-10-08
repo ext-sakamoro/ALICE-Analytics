@@ -1,6 +1,6 @@
 [package]
 name = "alice-analytics"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 rust-version = "1.87"
 authors = ["Moroya Sakamoto <sakamoro@alicelaw.net>"]
@@ -26,10 +26,15 @@ path = "src/lib.rs"
 # `libm` differs in the last ulp between macOS / glibc / MSVC / wasm, so every
 # transcendental goes through this crate on std and no_std alike. Enforced by
 # clippy.toml `disallowed-methods`, pinned by tests/determinism_golden.rs.
-alice-det-math = { version = "0.3", default-features = false }
+#
+# 0.4 以降は算術の識別子 `SEMANTICS_ID` を持つ (crate root から再 export、
+# `law::ResidualSummary::law_id` が法則の識別子と混ぜる) 0.3 には無いので、
+# 0.3 を解決する消費者と同じ graph に入ると「どの算術で出た数か」を言えない
+# version (`alice-zip` 0.7 / `alice-db` / `alice-physics` と同じ 0.4 系統に揃える)
+alice-det-math = { version = "0.4", default-features = false }
 # no_std build の float 丸め / sqrt (src/math.rs、std build では未使用)
 libm = "0.2"
-alice-zip = { version = "0.5.1", default-features = false, optional = true }
+alice-zip = { version = "0.7", default-features = false, optional = true }
 
 # The float lints that suggest re-fusing arithmetic are off as a property of
 # the crate, not case by case: every transcendental goes through

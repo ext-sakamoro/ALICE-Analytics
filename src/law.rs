@@ -15,6 +15,7 @@
 //! | `outside_accuracy` | non-zero residuals whose magnitude lies outside `accurate_range` |
 //! | `out_of_range` | points whose `x` lies outside the law's valid range (or is not finite) |
 //! | `non_finite` | points inside the range whose `y − f(x)` is NaN or infinite |
+//! | `law_id` | [`alice_zip::law::SignalLaw::law_id`] of the law under [`crate::SEMANTICS_ID`]: which `f(x)`, under which arithmetic |
 //!
 //! Points outside the valid range are counted and **not** summarised: the law
 //! is never evaluated there, so nothing is extrapolated. Points with a
@@ -121,8 +122,29 @@ pub struct ResidualDistribution {
 }
 
 /// Summary of the residuals of a set of points about a law
+///
+/// The numbers describe a distribution; [`Self::law_id`] says what they are a
+/// distribution *of*, so a stored or forwarded summary stays interpretable.
+///
+/// Produced by [`ResidualSketch::summary`] and [`residual_summary`]; there is
+/// no way to build one outside this crate, because a summary that did not come
+/// from a sketch could carry an identifier that does not match its numbers.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct ResidualSummary {
+    /// Identity of the law these residuals were measured against, taken under
+    /// the arithmetic this crate computes with
+    ///
+    /// [`alice_zip::law::SignalLaw::law_id`] of the summarised law, mixed with
+    /// [`crate::SEMANTICS_ID`]. It covers exactly what `f(x)` reads — the
+    /// domain and the coefficients — plus the arithmetic, and deliberately not
+    /// the law's evidence, residual or provenance: two laws fitted from
+    /// different measurements that evaluate identically share one identifier.
+    ///
+    /// Two summaries describe the same `f(x)`, computed the same way, only if
+    /// this value agrees. It does not depend on the points pushed, so a summary
+    /// of nothing still names the law it would have summarised.
+    pub law_id: [u8; 32],
     /// Points summarised (in range, finite residual)
     pub count: u64,
     /// Points not summarised because `x` is outside the valid range or not finite
@@ -263,6 +285,15 @@ impl<'a> ResidualSketch<'a> {
         (self.range.0 * self.scale, self.range.1 * self.scale)
     }
 
+    /// Identity of the law being summarised, under this crate's arithmetic
+    ///
+    /// The value [`ResidualSummary::law_id`] reports; see it for what the
+    /// identifier covers.
+    #[must_use]
+    pub fn law_id(&self) -> [u8; 32] {
+        self.law.law_id(&crate::SEMANTICS_ID)
+    }
+
     /// The summary of everything pushed so far
     #[must_use]
     pub fn summary(&self) -> ResidualSummary {
@@ -282,6 +313,7 @@ impl<'a> ResidualSketch<'a> {
             }
         });
         ResidualSummary {
+            law_id: self.law_id(),
             count,
             out_of_range: self.out_of_range,
             non_finite: self.non_finite,

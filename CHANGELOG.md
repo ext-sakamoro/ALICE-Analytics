@@ -4,6 +4,17 @@ All notable changes to ALICE-Analytics will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-10-08
+
+### Added
+- `alice_analytics::SEMANTICS_ID`: この crate の推定値が計算される算術の識別子 (`alice-det-math` が自身の数値的な振る舞いに付ける 32 byte の定数を crate root から再 export) 保存・転送・merge される推定値の隣に記録すると、2 つの結果が数として比較可能かを後から言える
+- `law::ResidualSummary::law_id` / `law::ResidualSketch::law_id`: 要約がどの `f(x)` のものか、どの算術で計算されたかを表す識別子 (`alice_zip::law::SignalLaw::law_id` を `SEMANTICS_ID` の下で取ったもの) 法則の定義域と係数と算術を覆い、法則の根拠・残差・出所は覆わないので、別の測定から得た同じ `f(x)` は同じ識別子を共有する
+
+### Changed
+- **Breaking:** `law::ResidualSummary` に `law_id` field が増え、`#[non_exhaustive]` が付いた crate 外から struct literal で構築できなくなる (本型は要約の生成側が作って読み手が受け取る型で、構築経路は `ResidualSketch::summary` / `residual_summary` のみ)
+- `alice-det-math` を 0.3 から 0.4 に、`alice-zip` を 0.5.1 から 0.7 に上げた 0.4 以降の `alice-det-math` は算術の識別子を持つ (0.3 には無く、0.3 を解決する消費者と同じ依存グラフでは「どの算術で出た数か」を言えない) `ln` / `exp` / `powf` の出力と `SignalLaw` の fit / evaluate は版の間で bit 不変で、既存の決定論ハッシュ 7 本は変わっていない
+- semver-checks の CI job を informational から gate にした 宣言した版の上げ幅が API の変更を覆うことを確認する pass と、lint を強制して比較件数が 0 でないことを確認する pass の 2 本 (上げ幅が最大の時は全 lint が skip され、何も比較しないまま exit 0 になるため) `scripts/preflight.sh` にも同じ 2 本を追加
+
 ## [0.2.0] - 2026-10-07
 
 ### Added
