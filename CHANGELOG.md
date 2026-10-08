@@ -4,6 +4,11 @@ All notable changes to ALICE-Analytics will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Removed
+- `src/db_bridge.rs` / `src/queue_bridge.rs` / `src/python.rs` / `pyproject.toml`: `lib.rs` から参照されず、要求する依存 (`alice-db` / `alice-queue` / `pyo3` / `numpy`) も `Cargo.toml` に無いためコンパイルされない 4 file 公開パッケージには同梱されていたが機能はしていなかった `pyproject.toml` は存在しない `pyo3` feature を指定しており、`pyproject.toml` と `queue_bridge.rs` の license 表記 (AGPL-3.0) は crate 本体 (`MIT OR Apache-2.0`) と矛盾していた Python バインディングと各ブリッジを再開する場合は、依存と feature と license 表記を揃えた上で改めて追加する (内容は履歴に残る)
+
 ## [0.3.0] - 2026-10-08
 
 ### Added
