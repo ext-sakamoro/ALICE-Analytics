@@ -66,6 +66,7 @@ impl Sink {
     fn u64(&mut self, v: u64) {
         self.0.extend_from_slice(&v.to_le_bytes());
     }
+    #[cfg(feature = "std")] // used by golden_privacy only
     fn i64(&mut self, v: i64) {
         self.0.extend_from_slice(&v.to_le_bytes());
     }
@@ -408,8 +409,10 @@ fn golden_anomaly() {
 // 5. privacy — Laplace inverse transform (ln), randomized response (exp)
 // ---------------------------------------------------------------------------
 
+#[cfg(feature = "std")] // golden_privacy needs std
 const GOLDEN_PRIVACY: &str = "50f95bbc492118d85de552a3a950673e3c762b9005d1217c81c042cab9494ca5";
 
+#[cfg(feature = "std")] // the digest includes `RandomizedResponse::new`, a std constructor
 #[test]
 fn golden_privacy() {
     use alice_analytics::privacy::{

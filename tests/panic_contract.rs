@@ -750,6 +750,7 @@ fn a_series_with_no_spread_scores_any_deviation_as_infinite() {
 /// algebraic form rather than of the domain — `p = e^ε/(1 + e^ε)` returned
 /// `NaN` for `ε ≳ 709.79` (`inf/inf`), while the equivalent
 /// `p = 1/(1 + e^(−ε))` returns the limit `1.0`.
+#[cfg(feature = "std")] // `RandomizedResponse::new` is std-only
 #[test]
 fn a_randomized_response_epsilon_maps_onto_its_whole_domain() {
     // ε = 0 is "always answer at random", the same meaningful end that
@@ -786,24 +787,28 @@ fn a_randomized_response_epsilon_maps_onto_its_whole_domain() {
 /// ⚠️ A negative ε used to return a detector whose `p_true` was below 0.5
 /// (measured: `new(-5.0)` gave `6.69e-3`), which inverts the sign of every
 /// proportion `estimate_proportion` reports.
+#[cfg(feature = "std")] // `RandomizedResponse::new` is std-only
 #[test]
 #[should_panic(expected = "epsilon must be finite and non-negative")]
 fn a_randomized_response_rejects_a_negative_epsilon() {
     let _ = RandomizedResponse::new(-5.0);
 }
 
+#[cfg(feature = "std")] // `RandomizedResponse::new` is std-only
 #[test]
 #[should_panic(expected = "epsilon must be finite and non-negative")]
 fn a_randomized_response_rejects_a_nan_epsilon() {
     let _ = RandomizedResponse::new(f64::NAN);
 }
 
+#[cfg(feature = "std")] // `RandomizedResponse::new` is std-only
 #[test]
 #[should_panic(expected = "epsilon must be finite and non-negative")]
 fn a_randomized_response_rejects_an_infinite_epsilon() {
     let _ = RandomizedResponse::new(f64::INFINITY);
 }
 
+#[cfg(feature = "std")] // `RandomizedResponse::new` is std-only
 #[test]
 #[should_panic(expected = "epsilon must be finite and non-negative")]
 fn a_randomized_response_rejects_a_negative_infinite_epsilon() {

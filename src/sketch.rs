@@ -4,7 +4,9 @@
 //! - `DDSketch`: Relative-error quantile estimation
 //! - Count-Min Sketch: Frequency estimation for heavy hitters
 
-#[cfg(not(feature = "std"))]
+// a no_std unit-test build links std (libtest), whose inherent methods win;
+// FloatExt only covers correctly rounded operations, so the bits are the same
+#[cfg(not(any(feature = "std", test)))]
 use crate::math::FloatExt;
 use crate::math::{f64_i32, f64_u64, hash_index, i64_f64, ipow64, u64_f64, usize_f64};
 use alice_det_math::{exp64, ln64};

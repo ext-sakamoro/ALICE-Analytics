@@ -39,7 +39,8 @@ pub(crate) fn ipow64(x: f64, n: i32) -> f64 {
     }
 }
 
-#[cfg(not(feature = "std"))]
+// unused in a no_std unit-test build, where libtest links std (see the imports)
+#[cfg(not(any(feature = "std", test)))]
 pub trait FloatExt: Sized {
     fn mul_add(self, a: Self, b: Self) -> Self;
     fn sqrt(self) -> Self;
@@ -48,7 +49,7 @@ pub trait FloatExt: Sized {
     fn round(self) -> Self;
 }
 
-#[cfg(not(feature = "std"))]
+#[cfg(not(any(feature = "std", test)))]
 impl FloatExt for f64 {
     #[inline]
     fn mul_add(self, a: Self, b: Self) -> Self {

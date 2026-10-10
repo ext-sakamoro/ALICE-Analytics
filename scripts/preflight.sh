@@ -54,11 +54,13 @@ python3 scripts/deprecation_pin.py
 step "security-audit.yml / stub-guard"
 scripts/stub_guard.sh
 
-step "ci.yml / clippy: default features, all features (pedantic)"
+step "ci.yml / clippy: default features, all features, no default features (pedantic)"
 relint
 cargo clippy --all-targets -- "${PEDANTIC[@]}"
 relint
 cargo clippy --all-targets --all-features -- "${PEDANTIC[@]}"
+relint
+cargo clippy --all-targets --no-default-features -- "${PEDANTIC[@]}"
 
 step "ci.yml / no-std: host checks, thumbv7em-none-eabihf build + clippy"
 cargo check --lib --no-default-features

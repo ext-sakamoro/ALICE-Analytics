@@ -5,7 +5,9 @@
 //!
 //! Author: Moroya Sakamoto
 
-#[cfg(not(feature = "std"))]
+// a no_std unit-test build links std (libtest), whose inherent methods win;
+// FloatExt only covers correctly rounded operations, so the bits are the same
+#[cfg(not(any(feature = "std", test)))]
 use crate::math::FloatExt;
 use crate::math::{u64_f64, usize_f64};
 
