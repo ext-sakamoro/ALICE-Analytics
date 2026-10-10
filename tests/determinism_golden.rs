@@ -39,7 +39,7 @@
 //! change in CHANGELOG under `[Unreleased] / Changed`. A mismatch that is
 //! *not* explained by a deliberate change in this repository is a defect:
 //! find the operation that left the list above instead of re-recording.
-// `privacy` is deprecated (not differentially private) and still pinned here until 0.4.0 removes it
+// `privacy` is deprecated (not differentially private) and still pinned here until 0.5.0 removes it
 #![allow(deprecated)]
 #![allow(
     clippy::cast_precision_loss,

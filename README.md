@@ -121,7 +121,7 @@ methods. The transcendentals go through `alice-det-math` in both builds, so a
 | `window` | `TumblingWindow`, `SlidingWindow`, `HierarchicalRollup` |
 | `streaming_ops` | `SimpleMovingAverage`, `ExponentialMovingAverage`, `ChangeRate`, `LinearRegression`, `LinearRegressionFull` |
 | `anomaly` | `StreamingMedian`, `MadDetector`, `ZScoreDetector`, `EwmaDetector`, `CompositeDetector` |
-| `privacy` | **deprecated, not differentially private** (predictable noise source; removed in 0.4.0): use `alice_crypto::dp` |
+| `privacy` | **deprecated, not differentially private** (predictable noise source; removed in 0.5.0): use `alice_crypto::dp` |
 | `pipeline` | `MetricPipeline`, `MetricRegistry`, `MetricSnapshot`, `RingBuffer` |
 | `export` | JSON and Prometheus text for `MetricSnapshot` (`std`) |
 | `law` | `residual_summary`, `ResidualSketch`, `ResidualSummary` (feature `law`) |
