@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- Fuzz の workflow が crash を見つけても成功していた (run の step が `continue-on-error`) crash で job を失敗させ、各 target が 1 件以上の入力を実行したことを確かめ (0 件は失敗)、target ごとの実行数と coverage を job summary に出す `fuzz/regressions/<target>` の入力を毎回 corpus として再生する
+- `fuzz_metric_aggregate` が試験の側で panic していた (crate の欠陥ではない): sorted を前提とする API に渡す配列を `partial_cmp().unwrap_or(Equal)` で並べており、NaN を含むと全順序にならず標準の sort が「total order を実装していない」で panic する `f64::total_cmp` に替え、crash の入力を `fuzz/regressions/fuzz_metric_aggregate/` に置いた (修正後 846 万件で crash 無し) crate の `src/` に同じ比較は無い
+
 ### Changed
 - `alice-zip` を 0.7 から 0.8 に上げた (`law` feature) 本 crate が使う `law::SignalLaw` / `law_id` に変更は無く、0.8 の追加は残差 container の codec の選択だけ `law_id` と推定値の digest は `tests/determinism_golden.rs` / `tests/law_identity.rs` の記録値のまま通る
 

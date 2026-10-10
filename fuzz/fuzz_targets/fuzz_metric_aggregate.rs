@@ -65,8 +65,11 @@ fuzz_target!(|input: Input| {
 
     // 4. percentile_rank / IQR / quantile (sorted 前提 API)
     let mut sorted = values.clone();
-    // NaN 混入時の sort_by 定義域外 panic 予防で partial_cmp fallback
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(core::cmp::Ordering::Equal));
+    // total_cmp is a total order on f64 including NaN (negative NaN first,
+    // positive NaN last). `partial_cmp().unwrap_or(Equal)` is not: with NaN it
+    // is not transitive, and the standard sort panics on such a comparator
+    // ("does not correctly implement a total order")
+    sorted.sort_by(f64::total_cmp);
     let _ = percentile_rank(&sorted, probe);
     let _ = iqr(&sorted);
     let _ = quantile_sorted(&sorted, q);
