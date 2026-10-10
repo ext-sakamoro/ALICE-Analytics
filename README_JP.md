@@ -231,5 +231,9 @@ scripts/preflight.sh --quick  # static checks, clippy, builds, docs, cargo test 
 
 ## ライセンス
 
-[Apache License, Version 2.0](LICENSE-APACHE) または [MIT license](LICENSE-MIT)
-のいずれかを選択して利用できる
+- [Apache License, Version 2.0](LICENSE-APACHE) (0.4.0 から)
+- 再配布 (source でも binary でも) には [LICENSE-APACHE](LICENSE-APACHE) と
+  [NOTICE](NOTICE) を添える (Apache-2.0 第 4 条) application の画面に表示する必要は無い
+- それより前の版は出した時のライセンスのまま: crates.io の `alice-analytics` 0.3.0 までは
+  MIT OR Apache-2.0
+- 「ALICE」の名前はライセンスによらず [TRADEMARK_NOTICE](TRADEMARK_NOTICE) の対象

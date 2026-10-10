@@ -245,5 +245,11 @@ scripts/preflight.sh --quick  # static checks, clippy, builds, docs, cargo test 
 
 ## License
 
-Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or
-[MIT license](LICENSE-MIT) at your option.
+- [Apache License, Version 2.0](LICENSE-APACHE), from 0.4.0
+- Redistributions, in source or binary form, carry [LICENSE-APACHE](LICENSE-APACHE)
+  and [NOTICE](NOTICE) (Apache-2.0 §4); the notice need not appear in an
+  application's user interface
+- Earlier versions keep the licence they were released under: `alice-analytics`
+  up to 0.3.0 on crates.io is MIT OR Apache-2.0
+- The "ALICE" names are covered by [TRADEMARK_NOTICE](TRADEMARK_NOTICE), whatever
+  the licence

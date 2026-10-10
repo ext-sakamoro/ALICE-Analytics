@@ -51,6 +51,12 @@ step "ci.yml / docs-lint: deprecation pin of the privacy module"
 python3 scripts/test_deprecation_pin.py
 python3 scripts/deprecation_pin.py
 
+step "ci.yml / docs-lint + doc: licence agrees and its files are packaged"
+python3 scripts/test_license_check.py
+python3 scripts/license_check.py
+list=$(cargo package --list --allow-dirty)
+for f in LICENSE-APACHE NOTICE; do printf '%s\n' "$list" | grep -qx "$f" || { echo "the package lacks $f"; exit 1; }; done
+
 step "security-audit.yml / stub-guard"
 scripts/stub_guard.sh
 

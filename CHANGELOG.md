@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `fuzz_metric_aggregate` が試験の側で panic していた (crate の欠陥ではない): sorted を前提とする API に渡す配列を `partial_cmp().unwrap_or(Equal)` で並べており、NaN を含むと全順序にならず標準の sort が「total order を実装していない」で panic する `f64::total_cmp` に替え、crash の入力を `fuzz/regressions/fuzz_metric_aggregate/` に置いた (修正後 846 万件で crash 無し) crate の `src/` に同じ比較は無い
 
 ### Changed
+- **license:** 0.4.0 から Apache-2.0 だけにする (`Cargo.toml` の `license = "Apache-2.0"`、`LICENSE-MIT` を削除、`NOTICE` を追加) 0.3.0 までの公開済の版は MIT OR Apache-2.0 のまま 再配布には `LICENSE-APACHE` と `NOTICE` を添える `scripts/license_check.py` (CI の全 OS と preflight) が manifest・file・README・`NOTICE` の文言が揃っていることを確かめ (比較 0 件は失敗)、CI は package に `LICENSE-APACHE` と `NOTICE` が入ることを確かめる この crate に依存する `alice-physics` / `alice-db` (どちらも AGPL-3.0-or-later OR 商用) と `alice-edge` (MIT OR Apache-2.0) は、いずれも Apache-2.0 の crate に依存できる (permissive な依存のまま)
 - **破壊的変更 (`law` feature):** `alice-zip` を 0.7 から 0.9 に上げた `law::ResidualSummary` / `ResidualSketch` / `residual_summary` が受け渡す `alice_zip::law::SignalLaw` は依存先の版ごとに別の型なので、`law` を使う利用者が自分で `alice-zip` 0.7 / 0.8 の `SignalLaw` を作って渡している場合は compile できなくなる (利用者も `alice-zip` 0.9 に上げる) 値の意味は変わらない: `law_id` と推定値の digest は `tests/determinism_golden.rs` (9 件) / `tests/law_identity.rs` (8 件) の記録値のまま 0.9.0 で通る 0.8 / 0.9 の変更 (残差 container の codec の選択、container 形式) はこの crate が使う `SignalLaw` の評価と `law_id` に触れない `cargo semver-checks` はこの型の変化を検出しない (0.3.0 との比較を minor として判定させても 196 件すべて通る) ので、版は公開 API の型から決めた
 
 ### Removed

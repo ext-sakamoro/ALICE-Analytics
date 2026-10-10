@@ -135,6 +135,14 @@ jobs:
         run: cargo doc --lib --no-deps --all-features
         env:
           RUSTDOCFLAGS: "-Dwarnings"
+      # Apache-2.0 §4: the published package carries LICENSE-APACHE and NOTICE
+      - name: Licence files are packaged
+        run: |
+          list=$(cargo package --list --allow-dirty)
+          for f in LICENSE-APACHE NOTICE; do
+            printf '%s\n' "$list" | grep -qx "$f" || { echo "::error::the package lacks $f"; exit 1; }
+          done
+          echo "LICENSE-APACHE and NOTICE packaged"
 
   docs-lint:
     # run on every OS so a locale or path difference in the checker itself
@@ -158,6 +166,12 @@ jobs:
         run: python scripts/test_deprecation_pin.py
       - name: Deprecation pin (privacy module)
         run: python scripts/deprecation_pin.py
+      # Apache-2.0 everywhere it is stated (manifest, files, READMEs, NOTICE);
+      # 0 comparisons fail
+      - name: Licence agrees (tests)
+        run: python scripts/test_license_check.py
+      - name: Licence agrees
+        run: python scripts/license_check.py
 
   fmt:
     name: Format
