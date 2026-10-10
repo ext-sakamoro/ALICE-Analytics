@@ -150,6 +150,10 @@ jobs:
         run: python scripts/test_docs_lint.py
       - name: Docs lint (public documents, CHANGELOG structure)
         run: python scripts/docs_lint.py --check
+      - name: Deprecation pin (tests)
+        run: python scripts/test_deprecation_pin.py
+      - name: Deprecation pin (privacy module)
+        run: python scripts/deprecation_pin.py
 
   fmt:
     name: Format

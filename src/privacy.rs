@@ -5,8 +5,11 @@
 //! This module does **not** provide differential privacy and is deprecated
 //! for that reason (removed in 0.5.0):
 //!
-//! - the noise comes from `XorShift64`, whose output is its internal state, so
-//!   one observed draw determines every later one;
+//! - the noise comes from `XorShift64`, whose output is its internal state:
+//!   a raw `next_u64` output gives the state at once, and a noise sample
+//!   exposes its top 53 bits, leaving at most 2^11 candidates for the low bits
+//!   that a second draw resolves, so one or two observed draws determine every
+//!   later draw;
 //! - `from_entropy` seeds it from the system clock, which an observer can guess;
 //! - `LaplaceNoise::sample` uses the floating-point inverse transform, whose low
 //!   bits leak the uniform draw (Mironov 2012), so ε does not hold even with a

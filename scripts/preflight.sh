@@ -47,6 +47,10 @@ step "ci.yml / docs-lint: tests + public documents / CHANGELOG structure"
 python3 scripts/test_docs_lint.py
 python3 scripts/docs_lint.py --check
 
+step "ci.yml / docs-lint: deprecation pin of the privacy module"
+python3 scripts/test_deprecation_pin.py
+python3 scripts/deprecation_pin.py
+
 step "security-audit.yml / stub-guard"
 scripts/stub_guard.sh
 
