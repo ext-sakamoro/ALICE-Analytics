@@ -13,7 +13,7 @@ heavy hitter、ストリーミングのモーメント / 共分散 / 回帰、�
 持つだけで、保存と転送は呼び出し側に任せる sketch の答えは近似であり、厳密な分位点や
 厳密な異なり数が必要なら生の値を保持する
 
-License: MIT OR Apache-2.0
+License: Apache-2.0 (0.3.0 以前は MIT OR Apache-2.0)
 
 ## 目次
 

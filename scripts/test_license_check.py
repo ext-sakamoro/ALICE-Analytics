@@ -37,7 +37,7 @@ class LicenseCheck(unittest.TestCase):
     def test_the_repository_agrees(self):
         *p, compared = lc.check(ROOT)
         self.assertEqual(p, [])
-        self.assertGreaterEqual(compared, 12)
+        self.assertGreaterEqual(compared, 16)
 
     def test_a_copy_agrees(self):
         self.assertEqual(problems(copy_tree()), [])
@@ -72,6 +72,25 @@ class LicenseCheck(unittest.TestCase):
         text = (d / "README.md").read_text(encoding="utf-8").replace("[NOTICE](NOTICE)", "NOTICE")
         (d / "README.md").write_text(text, encoding="utf-8")
         self.assertIn("README.md: the licence section does not link NOTICE", problems(d))
+
+    def test_a_stale_licence_line_outside_the_section(self):
+        # the line under the introduction, before the contents, as it read before 0.4.0
+        d = copy_tree()
+        edit(d / "README.md", "License: Apache-2.0 (0.3.0 and earlier: MIT OR Apache-2.0)",
+             "License: MIT OR Apache-2.0")
+        self.assertTrue(any("README.md:" in x and "licence line" in x for x in problems(d)), problems(d))
+
+    def test_a_stale_licence_line_in_the_japanese_readme(self):
+        d = copy_tree()
+        edit(d / "README_JP.md", "License: Apache-2.0 (0.3.0 以前は MIT OR Apache-2.0)",
+             "License: MIT OR Apache-2.0")
+        self.assertTrue(any("README_JP.md:" in x and "licence line" in x for x in problems(d)), problems(d))
+
+    def test_a_dual_licence_badge(self):
+        d = copy_tree()
+        edit(d / "README.md", "License: Apache-2.0",
+             "[![license](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE-APACHE)\n\nLicense: Apache-2.0")
+        self.assertTrue(any("licence badge" in x for x in problems(d)), problems(d))
 
     def test_a_deny_comment_calling_the_crate_mit(self):
         d = copy_tree()

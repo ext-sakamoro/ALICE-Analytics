@@ -7,7 +7,8 @@ From 0.4.0 ALICE-Analytics is Apache-2.0 only. This checks that:
 - `LICENSE-APACHE` and `NOTICE` exist and no `LICENSE-MIT` is left;
 - `NOTICE` carries the attribution sentence;
 - both READMEs link `LICENSE-APACHE` and `NOTICE` in their licence section and
-  link no `LICENSE-MIT`;
+  link no `LICENSE-MIT`, and every `License:` line and licence badge anywhere in
+  them states Apache-2.0 first;
 - no comment in `deny.toml` describes this crate as MIT (the `MIT` entry in
   its allow list is for dependencies and stays).
 
@@ -23,6 +24,10 @@ ROOT = Path(__file__).resolve().parents[1]
 SPDX = "Apache-2.0"
 ATTRIBUTION = "This product includes ALICE-Analytics, Copyright 2025-2026 Moroya Sakamoto"
 READMES = {"README.md": "## License", "README_JP.md": "## ライセンス"}
+# a line stating the licence, e.g. `License: Apache-2.0 (...)`
+LICENSE_LINE = re.compile(r"^\s*(?:\*\*)?(?:License|Licence|ライセンス)(?:\*\*)?\s*[:：]")
+# a shields.io licence badge, e.g. `img.shields.io/badge/license-Apache--2.0-green`
+LICENSE_BADGE = re.compile(r"img\.shields\.io/badge/licen[cs]e-([^)\s\"]+)", re.I)
 
 
 def table(text: str, name: str) -> str:
@@ -82,6 +87,14 @@ def check(root: Path) -> list:
         expect("(LICENSE-APACHE)" in lic, f"{rel}: the licence section does not link LICENSE-APACHE")
         expect("(NOTICE)" in lic, f"{rel}: the licence section does not link NOTICE")
         expect("LICENSE-MIT" not in text, f"{rel}: links LICENSE-MIT")
+        # every licence line and badge in the whole file, not only the section
+        for n, line in enumerate(text.splitlines(), 1):
+            if LICENSE_LINE.match(line):
+                expect(line.strip().startswith(f"License: {SPDX}"),
+                       f"{rel}:{n}: the licence line does not start with `License: {SPDX}`: {line.strip()!r}")
+            for badge in LICENSE_BADGE.findall(line):
+                expect(badge.startswith("Apache--2.0") and "MIT" not in badge,
+                       f"{rel}:{n}: licence badge says {badge!r}")
 
     deny = root / "deny.toml"
     if deny.is_file():

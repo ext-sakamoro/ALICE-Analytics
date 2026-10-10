@@ -14,7 +14,7 @@ summaries in memory and leaves storage and transport to the caller. Sketches
 answer approximate queries; when exact quantiles or exact distinct counts are
 needed, keep the raw values.
 
-License: MIT OR Apache-2.0
+License: Apache-2.0 (0.3.0 and earlier: MIT OR Apache-2.0)
 
 ## Contents
 
