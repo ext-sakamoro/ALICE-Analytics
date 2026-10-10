@@ -4,8 +4,8 @@
 
 誤差の上限が明示された確率的データ構造とストリーミング統計の crate HyperLogLog
 による異なり数推定、相対誤差を保証する DDSketch の分位点、Count-Min による頻度と
-heavy hitter、ストリーミングのモーメント / 共分散 / 回帰、ウィンドウ集計、異常検知、
-局所差分プライバシーを含む コアは `no_std` で、sketch は固定長でスタックに置かれる
+heavy hitter、ストリーミングのモーメント / 共分散 / 回帰、ウィンドウ集計、異常検知を
+含む コアは `no_std` で、sketch は固定長でスタックに置かれる
 `law` feature を有効にすると、点の集合が `alice_zip::law::SignalLaw` からどれだけ
 ずれているかの分布も要約できる
 
@@ -118,7 +118,7 @@ inherent method と同じ bit を返す 超越関数は `std` の有無に関わ
 | `window` | `TumblingWindow`、`SlidingWindow`、`HierarchicalRollup` |
 | `streaming_ops` | `SimpleMovingAverage`、`ExponentialMovingAverage`、`ChangeRate`、`LinearRegression`、`LinearRegressionFull` |
 | `anomaly` | `StreamingMedian`、`MadDetector`、`ZScoreDetector`、`EwmaDetector`、`CompositeDetector` |
-| `privacy` | `LaplaceNoise`、`RandomizedResponse`、`Rappor`、`PrivacyBudget`、`PrivateAggregator`、`XorShift64` |
+| `privacy` | **deprecated、差分プライバシーになっていない** (noise 源が予測できる、0.4.0 で削除) 代わりは `alice_crypto::dp` |
 | `pipeline` | `MetricPipeline`、`MetricRegistry`、`MetricSnapshot`、`RingBuffer` |
 | `export` | `MetricSnapshot` の JSON / Prometheus テキスト出力 (`std`) |
 | `law` | `residual_summary`、`ResidualSketch`、`ResidualSummary` (feature `law`) |

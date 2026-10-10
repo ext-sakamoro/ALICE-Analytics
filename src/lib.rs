@@ -9,7 +9,7 @@
 //! - [`stats`]: Percentile rank, IQR, covariance, Welford streaming stats
 //! - [`window`]: Tumbling / sliding / hierarchical window aggregates
 //! - [`anomaly`]: MAD / Z-Score / EWMA / composite anomaly detectors
-//! - [`privacy`]: Laplace noise / Randomized Response / RAPPOR / privacy budget
+//! - [`privacy`]: **deprecated, not private** (see its Security section); use `alice_crypto::dp`
 //! - [`pipeline`]: Lock-free metric aggregation pipeline
 //! - [`export`]: JSON / Prometheus export of metric snapshots
 //! - [`streaming_ops`]: Streaming aggregation operators

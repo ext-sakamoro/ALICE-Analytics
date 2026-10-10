@@ -5,8 +5,7 @@
 Probabilistic data structures and streaming statistics with stated error
 bounds: HyperLogLog cardinality, DDSketch quantiles with a relative-error
 guarantee, Count-Min frequencies and heavy hitters, streaming moments /
-covariance / regression, windowed aggregates, anomaly detectors and local
-differential privacy. The core is `no_std` with fixed-size, stack-allocated
+covariance / regression, windowed aggregates and anomaly detectors. The core is `no_std` with fixed-size, stack-allocated
 sketches. With the `law` feature it also summarises how a set of points deviates
 from a fitted `alice_zip::law::SignalLaw`.
 
@@ -122,7 +121,7 @@ methods. The transcendentals go through `alice-det-math` in both builds, so a
 | `window` | `TumblingWindow`, `SlidingWindow`, `HierarchicalRollup` |
 | `streaming_ops` | `SimpleMovingAverage`, `ExponentialMovingAverage`, `ChangeRate`, `LinearRegression`, `LinearRegressionFull` |
 | `anomaly` | `StreamingMedian`, `MadDetector`, `ZScoreDetector`, `EwmaDetector`, `CompositeDetector` |
-| `privacy` | `LaplaceNoise`, `RandomizedResponse`, `Rappor`, `PrivacyBudget`, `PrivateAggregator`, `XorShift64` |
+| `privacy` | **deprecated, not differentially private** (predictable noise source; removed in 0.4.0): use `alice_crypto::dp` |
 | `pipeline` | `MetricPipeline`, `MetricRegistry`, `MetricSnapshot`, `RingBuffer` |
 | `export` | JSON and Prometheus text for `MetricSnapshot` (`std`) |
 | `law` | `residual_summary`, `ResidualSketch`, `ResidualSummary` (feature `law`) |

@@ -30,7 +30,8 @@
 //! `bucket_index` or in `TumblingWindow::insert`, or making the zero-width
 //! `push` return early instead of panicking, turns the corresponding test
 //! red.
-
+// `privacy` is deprecated (not differentially private) and still pinned here until 0.4.0 removes it
+#![allow(deprecated)]
 #![allow(clippy::float_cmp)]
 
 use alice_analytics::anomaly::{

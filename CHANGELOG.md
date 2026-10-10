@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Deprecated
+- `privacy` の全ての公開 item (`XorShift64` / `LaplaceNoise` / `RandomizedResponse` / `Rappor` / `RAPPOR_BITS` / `PrivacyBudget` / `PrivateAggregator`) を deprecated にした (0.4.0 で削除) **差分プライバシーになっていない**ため: noise 源の `XorShift64` は出力がそのまま内部状態で 1 回の出力から以降が全て決まる / `from_entropy` は時刻から seed を作る / `LaplaceNoise::sample` の浮動小数点の逆関数法は下位 bit から一様乱数が漏れる (Mironov 2012) 代わりは `alice_crypto::dp` (鍵つき ChaCha20、離散 Laplace、定数時間の標本化、`dp_int` / `dp_sum` / `randomized_response` / `bernoulli_ratio`、0.4.0) この crate は差分プライバシーの機構を持たない方針で、写しも依存もしない module の doc に Security の節を置いた ALICE-* の他 repo に利用者は無い (手元の全 clone と GitHub の code search で確認)
+
 ### Fixed
 - Fuzz の workflow が crash を見つけても成功していた (run の step が `continue-on-error`) crash で job を失敗させ、各 target が 1 件以上の入力を実行したことを確かめ (0 件は失敗)、target ごとの実行数と coverage を job summary に出す `fuzz/regressions/<target>` の入力を毎回 corpus として再生する
 - `fuzz_metric_aggregate` が試験の側で panic していた (crate の欠陥ではない): sorted を前提とする API に渡す配列を `partial_cmp().unwrap_or(Equal)` で並べており、NaN を含むと全順序にならず標準の sort が「total order を実装していない」で panic する `f64::total_cmp` に替え、crash の入力を `fuzz/regressions/fuzz_metric_aggregate/` に置いた (修正後 846 万件で crash 無し) crate の `src/` に同じ比較は無い

@@ -1,7 +1,26 @@
-//! Local Differential Privacy (LDP) Mechanisms
+//! Local Differential Privacy (LDP) Mechanisms — **deprecated, not private**
+//!
+//! # Security
+//!
+//! This module does **not** provide differential privacy and is deprecated
+//! for that reason (removed in 0.4.0):
+//!
+//! - the noise comes from `XorShift64`, whose output is its internal state, so
+//!   one observed draw determines every later one;
+//! - `from_entropy` seeds it from the system clock, which an observer can guess;
+//! - `LaplaceNoise::sample` uses the floating-point inverse transform, whose low
+//!   bits leak the uniform draw (Mironov 2012), so ε does not hold even with a
+//!   perfect random source.
+//!
+//! Use `alice_crypto::dp` (keyed `ChaCha20`, discrete Laplace, constant-time
+//! sampling, `dp_int` / `dp_sum` / `randomized_response` /
+//! `bernoulli_ratio`). This crate keeps no privacy mechanisms of its own.
 //!
 //! Privacy-preserving data collection where noise is added at the source.
 //! Individual data points are deniable, but aggregate statistics emerge.
+
+// the module's own items refer to each other; the deprecation is for callers
+#![allow(deprecated)]
 
 #[cfg(not(feature = "std"))]
 use crate::math::FloatExt;
@@ -19,6 +38,10 @@ use alice_det_math::exp64;
 ///
 /// Not cryptographically secure, but fast and sufficient for noise injection.
 #[derive(Clone, Debug)]
+#[deprecated(
+    since = "0.3.1",
+    note = "not differentially private (predictable xorshift64 state, time-derived seed, floating-point inverse transform); use alice_crypto::dp instead. Removed in 0.4.0"
+)]
 pub struct XorShift64 {
     state: u64,
 }
@@ -109,6 +132,10 @@ impl Default for XorShift64 {
 /// Used for ε-differential privacy with sensitivity Δf:
 /// noise scale b = Δf / ε
 #[derive(Clone, Debug)]
+#[deprecated(
+    since = "0.3.1",
+    note = "not differentially private (predictable xorshift64 state, time-derived seed, floating-point inverse transform); use alice_crypto::dp instead. Removed in 0.4.0"
+)]
 pub struct LaplaceNoise {
     /// Scale parameter b
     scale: f64,
@@ -185,6 +212,10 @@ impl LaplaceNoise {
 ///
 /// This provides ε-differential privacy where ε = ln((p + 0.5(1-p)) / (0.5(1-p)))
 #[derive(Clone, Debug)]
+#[deprecated(
+    since = "0.3.1",
+    note = "not differentially private (predictable xorshift64 state, time-derived seed, floating-point inverse transform); use alice_crypto::dp instead. Removed in 0.4.0"
+)]
 pub struct RandomizedResponse {
     /// Probability of truthful response
     p_true: f64,
@@ -322,6 +353,10 @@ impl RandomizedResponse {
 // ============================================================================
 
 /// Default RAPPOR bit size
+#[deprecated(
+    since = "0.3.1",
+    note = "not differentially private (predictable xorshift64 state, time-derived seed, floating-point inverse transform); use alice_crypto::dp instead. Removed in 0.4.0"
+)]
 pub const RAPPOR_BITS: usize = 64;
 
 /// RAPPOR for categorical data with multiple bits
@@ -329,6 +364,10 @@ pub const RAPPOR_BITS: usize = 64;
 /// Encodes categorical values into a Bloom filter, then applies
 /// randomized response to each bit.
 #[derive(Clone, Debug)]
+#[deprecated(
+    since = "0.3.1",
+    note = "not differentially private (predictable xorshift64 state, time-derived seed, floating-point inverse transform); use alice_crypto::dp instead. Removed in 0.4.0"
+)]
 pub struct Rappor {
     /// Permanent randomized response (for longitudinal studies)
     f: f64,
@@ -445,6 +484,10 @@ impl Rappor {
 /// Under sequential composition, ε values add up.
 /// Under parallel composition over disjoint data, use max.
 #[derive(Clone, Debug)]
+#[deprecated(
+    since = "0.3.1",
+    note = "not differentially private (predictable xorshift64 state, time-derived seed, floating-point inverse transform); use alice_crypto::dp instead. Removed in 0.4.0"
+)]
 pub struct PrivacyBudget {
     /// Total epsilon spent
     total_epsilon: f64,
@@ -541,6 +584,10 @@ impl PrivacyBudget {
 
 /// Aggregates noisy reports and estimates true statistics
 #[derive(Clone, Debug)]
+#[deprecated(
+    since = "0.3.1",
+    note = "not differentially private (predictable xorshift64 state, time-derived seed, floating-point inverse transform); use alice_crypto::dp instead. Removed in 0.4.0"
+)]
 pub struct PrivateAggregator {
     /// Sum of noisy values
     noisy_sum: f64,

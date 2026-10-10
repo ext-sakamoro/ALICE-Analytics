@@ -21,7 +21,8 @@
 //!   EWMA / EWMV recursions in f64
 //! - privacy: xorshift64 determinism, Laplace(b) sample mean 0 / variance 2b²,
 //!   randomized response unbiasing P(1) = p·t + (1−p)/2
-
+// `privacy` is deprecated (not differentially private) and still pinned here until 0.4.0 removes it
+#![allow(deprecated)]
 // statistical oracles cast freely and use short algebraic names; the
 // crate's pedantic gate is about API code, not the reference arithmetic here
 #![allow(
