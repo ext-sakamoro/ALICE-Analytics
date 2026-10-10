@@ -6,16 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-11
+
 ### Deprecated
 - `privacy` の全ての公開 item (`XorShift64` / `LaplaceNoise` / `RandomizedResponse` / `Rappor` / `RAPPOR_BITS` / `PrivacyBudget` / `PrivateAggregator`) を deprecated にした (0.5.0 で削除) **差分プライバシーになっていない**ため: noise 源の `XorShift64` は出力がそのまま内部状態で、生の `next_u64` なら 1 回、noise の標本 (上位 53 bit が出る) なら 1〜2 回の観測で以降が全て決まる / `from_entropy` は時刻から seed を作る / `LaplaceNoise::sample` の浮動小数点の逆関数法は下位 bit から一様乱数が漏れる (Mironov 2012) 代わりは `alice_crypto::dp` (鍵つき ChaCha20、離散 Laplace、定数時間の標本化、`dp_int` / `dp_sum` / `randomized_response` / `bernoulli_ratio`、0.4.0) この crate は差分プライバシーの機構を持たない方針で、写しも依存もしない module の doc に Security の節を置いた ALICE-* の他 repo に利用者は無い (手元の全 clone と GitHub の code search で確認) 削除までの間は `scripts/deprecation_pin.py` (CI の全 OS と preflight) が固定する: module の公開 item に `#[deprecated]` が付いていること (比較 0 件は失敗) / `allow(deprecated)` は module 自身と値を固定している 3 つの test file だけに、理由の comment を直前に置いて許す
 
 ### Fixed
+- `scripts/docs_lint.py` が空の `[Unreleased]` (release を切った直後の状態) を「比較 0 件」として失敗にしていた 空の `[Unreleased]` (中身の無い分類見出しだけの場合を含む) は `Cargo.toml` の版にその版の節がある時だけ通し、版を上げたのに節が無い時は失敗にする 本文があるのに分類見出しが無い時は従来どおり失敗
 - `cargo clippy --all-targets --no-default-features` が試験の compile で失敗していた (CI はこの組み合わせを走らせていなかった) std 専用の `RandomizedResponse::new` を呼ぶ試験 (`golden_privacy` と `panic_contract` の 5 本) に `#[cfg(feature = "std")]` を付けた no_std の単体試験の build では libtest が std を link し inherent method が優先されるので、`FloatExt` (libm への委譲) は `not(any(feature = "std", test))` に限った 委譲するのは正確丸めの演算 (`mul_add` / `sqrt` / `ceil` / `floor` / `round`) だけなので結果の bit は変わらない CI の clippy job と preflight にこの組み合わせを足した
 - Fuzz の workflow が crash を見つけても成功していた (run の step が `continue-on-error`) crash で job を失敗させ、各 target が 1 件以上の入力を実行したことを確かめ (0 件は失敗)、target ごとの実行数と coverage を job summary に出す `fuzz/regressions/<target>` の入力を毎回 corpus として再生する
 - `fuzz_metric_aggregate` が試験の側で panic していた (crate の欠陥ではない): sorted を前提とする API に渡す配列を `partial_cmp().unwrap_or(Equal)` で並べており、NaN を含むと全順序にならず標準の sort が「total order を実装していない」で panic する `f64::total_cmp` に替え、crash の入力を `fuzz/regressions/fuzz_metric_aggregate/` に置いた (修正後 846 万件で crash 無し) crate の `src/` に同じ比較は無い
 
 ### Changed
-- **破壊的変更 (`law` feature):** `alice-zip` を 0.7 から 0.8 に上げた `law::ResidualSummary` / `ResidualSketch` が受け渡す `alice_zip::law::SignalLaw` は依存先の版ごとに別の型なので、`law` を使う利用者が自分で `alice-zip` 0.7 の `SignalLaw` を作って渡している場合は compile できなくなる (利用者も `alice-zip` 0.8 に上げる) 値の意味は変わらない: `law_id` と推定値の digest は `tests/determinism_golden.rs` / `tests/law_identity.rs` の記録値のまま通り、0.8 の追加は残差 container の codec の選択だけ この変更のため次の版は 0.4.0 (0.x の minor) になり、`privacy` の非推奨もその版に入る
+- **破壊的変更 (`law` feature):** `alice-zip` を 0.7 から 0.9 に上げた `law::ResidualSummary` / `ResidualSketch` / `residual_summary` が受け渡す `alice_zip::law::SignalLaw` は依存先の版ごとに別の型なので、`law` を使う利用者が自分で `alice-zip` 0.7 / 0.8 の `SignalLaw` を作って渡している場合は compile できなくなる (利用者も `alice-zip` 0.9 に上げる) 値の意味は変わらない: `law_id` と推定値の digest は `tests/determinism_golden.rs` (9 件) / `tests/law_identity.rs` (8 件) の記録値のまま 0.9.0 で通る 0.8 / 0.9 の変更 (残差 container の codec の選択、container 形式) はこの crate が使う `SignalLaw` の評価と `law_id` に触れない `cargo semver-checks` はこの型の変化を検出しない (0.3.0 との比較を minor として判定させても 196 件すべて通る) ので、版は公開 API の型から決めた
 
 ### Removed
 - `src/db_bridge.rs` / `src/queue_bridge.rs` / `src/python.rs` / `pyproject.toml`: `lib.rs` から参照されず、要求する依存 (`alice-db` / `alice-queue` / `pyo3` / `numpy`) も `Cargo.toml` に無いためコンパイルされない 4 file 公開パッケージには同梱されていたが機能はしていなかった `pyproject.toml` は存在しない `pyo3` feature を指定しており、`pyproject.toml` と `queue_bridge.rs` の license 表記 (AGPL-3.0) は crate 本体 (`MIT OR Apache-2.0`) と矛盾していた Python バインディングと各ブリッジを再開する場合は、依存と feature と license 表記を揃えた上で改めて追加する (内容は履歴に残る)

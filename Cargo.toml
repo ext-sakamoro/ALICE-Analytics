@@ -1,6 +1,6 @@
 [package]
 name = "alice-analytics"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 rust-version = "1.87"
 authors = ["Moroya Sakamoto <sakamoro@alicelaw.net>"]
@@ -34,7 +34,7 @@ path = "src/lib.rs"
 alice-det-math = { version = "0.4", default-features = false }
 # no_std build の float 丸め / sqrt (src/math.rs、std build では未使用)
 libm = "0.2"
-alice-zip = { version = "0.8", default-features = false, optional = true }
+alice-zip = { version = "0.9", default-features = false, optional = true }
 
 # The float lints that suggest re-fusing arithmetic are off as a property of
 # the crate, not case by case: every transcendental goes through
