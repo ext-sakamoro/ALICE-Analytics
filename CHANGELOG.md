@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **Behavior change:** `alice-det-math` を 0.4 から 0.5 に上げた (`law` feature では `alice-zip` を 0.9 から 0.10 に) `alice_analytics::SEMANTICS_ID` (再 export) の値が `d2209b30…` から `135c407d…` に変わる 推定値・分位点・cardinality・noise の出力は変わらない (determinism golden の 6 場面 privacy / stats / streaming_ops / anomaly / window / sketch が 0.5 の上で bit 一致) `law` feature の `ResidualSummary::law_id` / `ResidualSketch::law_id` は識別子を混ぜるので値が変わる (固定の法則で `bd2c0c24…` から `c8bc7356…`、同じ法則を旧識別子で計算すると `bd2c0c24…` に戻るので、変わったのは識別子だけ) 0.4.0 以前に保存した `law_id` は 0.5.0 の値と一致しない `law` feature の公開型は `alice-zip` 0.10 の型になる
+
 ## [0.4.0] - 2026-10-11
 
 ### Deprecated

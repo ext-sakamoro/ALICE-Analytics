@@ -650,7 +650,7 @@ fn golden_law() {
 /// upgrade: verify the golden hashes above are unchanged (they are the actual
 /// outputs), then update this constant and record both in CHANGELOG.
 const GOLDEN_SEMANTICS_ID: &str =
-    "d2209b30f6f1f45baa1b638bcdfee34ac64773b2e63b9c083b2e77afc691398e";
+    "135c407d4249c1c200e4d1be79a12e848ce5c355fc3a918da965849e697ef000";
 
 #[test]
 fn golden_semantics_id() {
@@ -688,8 +688,12 @@ fn golden_semantics_id() {
 /// identifier, the domain bits and the coefficient bits of the law built in
 /// the test) and matches what the implementation returns, so it pins a
 /// verified value rather than whatever happened to come out.
+///
+/// Re-recorded for `alice-det-math` 0.5 (`alice-zip` 0.10): the same law under
+/// the 0.4 identifier (`d2209b30…`) still gives the previous value
+/// `bd2c0c24…`, so only the arithmetic identifier moved, not the encoding.
 #[cfg(feature = "law")]
-const GOLDEN_LAW_ID: &str = "bd2c0c2407fcf7ad8f424a25d71c33a68b2223e4bcb95c3601b2dbc7c7ddd549";
+const GOLDEN_LAW_ID: &str = "c8bc735668ff86f4e43c487e2f89fd8bfc1fc046033d426d537c3a46456bd0a4";
 
 #[cfg(feature = "law")]
 #[test]
