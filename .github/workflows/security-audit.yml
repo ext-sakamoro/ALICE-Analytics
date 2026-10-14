@@ -49,6 +49,7 @@ jobs:
   audit:
     name: cargo audit (RustSec advisories)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
@@ -66,6 +67,7 @@ jobs:
   deny:
     name: cargo-deny (licenses + advisories + bans + sources)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
@@ -79,6 +81,7 @@ jobs:
   unused-deps:
     name: cargo-machete (unused dependencies)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       - name: Install cargo-machete
@@ -91,6 +94,7 @@ jobs:
   stub-guard:
     name: Stub / dbg guard (grep)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - name: Detect todo! / unimplemented! / panic!(STUB) / dbg! in src/**
@@ -99,6 +103,7 @@ jobs:
   package-integrity:
     name: Package integrity (the published .crate builds on its own)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
@@ -123,6 +128,7 @@ jobs:
   coverage:
     name: Coverage (cargo-llvm-cov, informational)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     continue-on-error: true
     steps:
       - uses: actions/checkout@v5
@@ -146,6 +152,7 @@ jobs:
   semver-checks:
     name: cargo-semver-checks (API compatibility)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
