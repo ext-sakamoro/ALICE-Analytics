@@ -1,0 +1,77 @@
+# ALICE-Law conformance manifest for this crate (alice-analytics). One entry per
+# gate defined in ALICE-Law's conformance/gates.toml; the schema (status /
+# evidence / mutant / since / note / reference_repo) is the "Manifest" section
+# of docs/CONFORMANCE.md in that repository.
+#
+# Every entry is written from what this repository's tree at the commit below
+# shows, checked directly. `pass` is claimed only where the named mutant was
+# carried out and turned the evidence red. `fail-known` says where the
+# requirement is unmet. `unverified` says why the cell could not be decided.
+#
+# Checked at: 06cfa76 (origin/main, 2026-10-15).
+
+[G1]
+status = "fail-known"
+note = "clippy.toml bans 24 of the 25 methods the gate lists as banned, through type-resolved disallowed-methods on f32 and f64 (CI: ci.yml clippy job, cargo clippy --all-targets -D warnings); f32::sin_cos and f64::sin_cos are not listed, and a call of x.sin_cos() in src/math.rs passed `cargo clippy --all-targets -- -W clippy::pedantic -D warnings` while x.sin() beside it failed with disallowed-methods (measured 2026-10-15). The crate has no call of sin_cos today (grep over src, tests, examples, fuzz). There is also no canary that injects a banned call into a crate to confirm the lint still fires (the gate's second evidence kind; see G11). powi is banned, with the reason given in the comment above the list in clippy.toml (use crate::math::ipow64)."
+reference_repo = "ALICE-SDF"
+
+[G2]
+status = "fail-known"
+note = "no Law helper for max/min and no default-deny manifest of raw_* exceptions exist. The library calls f64::max / f64::min / clamp directly at src/anomaly.rs:799, src/math.rs:98, src/law.rs:309, src/privacy.rs:352,408-410,555, src/sketch.rs:527, src/stats.rs:96,181 and src/streaming_ops.rs:450; the integer max/min elsewhere in src are not float. Whether the std f64 max/min equal IEEE 754 maximumNumber on every target was not measured here; the gate requires the helper and the manifest regardless. This crate is scalar f64 only (the simd feature is a no-op, Cargo.toml: simd = [])."
+reference_repo = "ALICE-SDF"
+
+[G3]
+status = "fail-known"
+note = "no checker for an outer negation of an fma result exists in this repository. mul_add is used in src/stats.rs, src/privacy.rs, src/anomaly.rs and src/streaming_ops.rs (and declared in the src/math.rs trait); a read of each call site found negation only on operands (src/stats.rs:80,81,263-267; src/privacy.rs:185 negates `sign` and `u.abs()` inside the arguments), none on a whole fma result. That is an audit of today's tree, not a gate: a later outer negation would not turn anything red."
+reference_repo = "ALICE-LOL"
+
+[G4]
+status = "fail-known"
+note = "the cross-platform golden file is tests/determinism_golden.rs (golden_sketch, golden_stats, golden_window, golden_anomaly, golden_privacy, golden_streaming_ops, golden_law, golden_semantics_id, golden_law_id: SHA-256 of bit patterns recorded on macOS aarch64), run on macos-latest (aarch64), ubuntu-24.04-arm (aarch64), ubuntu-latest (x86_64) and windows-latest (x86_64), .github/workflows/ci.yml:32. Two parts are unmet: (1) every test step is the debug profile (ci.yml:40,43,50,52 have no --release), so the {debug, release} half of the matrix is not run; (2) the goldens are driven by pseudo-random streams, and no case is built to hit a signed zero or an exact cancellation with a fixed expected bit pattern (the only -0.0 inputs are in tests/panic_contract.rs:587 and tests/law_identity.rs:168, which assert behaviour, not golden bits)."
+reference_repo = "ALICE-LOL"
+
+[G5]
+status = "fail-known"
+note = "no CI step runs the test suite under the release profile: ci.yml:40,43,50,52 are `cargo test` without --release, and the aarch64 legs (macos-latest, ubuntu-24.04-arm, ci.yml:32) therefore never compile the arithmetic with release codegen (where an fma instruction is contracted differently). A text search for `--release` over the workflows matches only `--release-type patch` in security-audit.yml:190 (semver-checks), which is not a test leg."
+reference_repo = "ALICE-LOL"
+
+[G6]
+status = "fail-known"
+note = "src/lib.rs:80 is `pub use alice_det_math::SEMANTICS_ID;`: the crate re-exports its arithmetic crate's identifier and folds none of its own pins. Its own Law-bearing value is law::ResidualSummary::law_id (src/law.rs:147,294), which is alice-zip's SignalLaw::law_id taken under that identifier, i.e. a per-law identifier, not a crate identifier. The identifier is pinned as hex by tests/determinism_golden.rs:652 (GOLDEN_SEMANTICS_ID, golden_semantics_id) and golden_law_id; there is no test that changing a pin of this crate changes the identifier (it has no pin of its own), and no tie to the crate version or toolchain that makes a stale identifier visible."
+reference_repo = "ALICE-Zip"
+
+[G7]
+status = "unverified"
+note = "audit: the crate has no decode / read / from_bytes / open entry point, no extern \"C\" or no_mangle item, no pyo3 or wasm-bindgen export, no dyn Any or name-keyed registry, and no build.rs or procedural macro (grep over src and Cargo.toml and a file listing at 06cfa76 found none); the one cross-crate Law value it takes, alice_zip::law::SignalLaw (src/law.rs, `law` feature), is passed as a concrete Rust type. By the gate's own rule the list of type-erasing boundaries is therefore empty. It is not claimed as n/a because that status needs a scanner that finds zero such sites with the mutant of adding one, and this repository has none; a one-off grep is not that."
+
+[G8]
+status = "unverified"
+note = "undecided: the crate writes no file or database row, but src/export.rs:24 snapshot_to_json, :58 snapshots_to_json, :86 snapshot_to_prometheus and :146 snapshots_to_prometheus format det-math-derived floats (p50 / p95 / p99 / mean / cardinality of a MetricSnapshot) as text with no identifier, and whether that text counts as a durable form meant to be read back (G8) or a monitoring output is a decision about the crate's intent, not something the tree answers. ResidualSummary::law_id (src/law.rs:147) is carried in the in-memory struct, which has no writer in this crate. The decision is needed before the cell can be pass, fail-known or n/a."
+
+[G9]
+status = "unverified"
+note = "depends on G8 (the persisted identifier whose history G9 audits), which is undecided. For the in-process identifier the history is: SEMANTICS_ID first appears with the 0.3.0 release (git log -S SEMANTICS_ID -- src/lib.rs: d234a2d), and CHANGELOG.md [Unreleased] names its move d2209b30 to 135c407d with alice-det-math 0.4 to 0.5 (a breaking 0.x bump); the audit of every commit that changed the definition is not done."
+
+[G10]
+status = "fail-known"
+note = "no lint or scan step bans clock, uuid or unseeded-RNG reads in the library (clippy.toml lists only float methods). A lexical search of src, tests, examples and fuzz targets for SystemTime::now, Instant::now, Utc::now, Local::now, Uuid::new_v4, Uuid::now_v7, thread_rng, rand::random, from_entropy, from_os_rng, OsRng, getrandom, fastrand:: and RandomState gives 7 hits, all in src/privacy.rs and all before its `#[cfg(test)]` at line 673, so none is test-only: line 13 is a doc comment; line 77 is the definition of XorShift64::from_entropy; line 79 is the one real read, `SystemTime::now()` seeding the generator (std feature only); lines 125 (impl Default for XorShift64), 165 (LaplaceNoise::new), 268 (RandomizedResponse::new) and 401 (Rappor::new) call it. Output of those constructors varies per run by design. The module is deprecated and slated for removal (src/privacy.rs:1-3, scripts/deprecation_pin.py); tests and the determinism golden use the seeded constructors. The other modules (sketch, stats, window, anomaly, streaming_ops, pipeline, law, export) have no hit."
+
+[G11]
+status = "fail-known"
+note = "the Law gates that are implemented here have no self-test: the G1 clippy lint has no canary that injects a banned call and confirms the lint still fires (a mutant was measured by hand for this manifest, see G1, but is not a committed test), and no run-nothing check. The other checkers in this repository do carry tests (scripts/test_docs_lint.py, test_license_check.py, test_deprecation_pin.py, test_workflow_timeouts.py, test_public_text.py), and scripts/public_text.sh exits 2 when it compared nothing, but those are not the gates G11 enumerates. No checker or helper is shared byte-for-byte with another repository here, so clause (c) has no site."
+
+[G12]
+status = "pass"
+evidence = [".github/workflows/public-text.yml", "scripts/public_text.sh", ".github/public-text-pin", "scripts/test_public_text.py"]
+mutant = "adding an internal word to a tracked document (a line in CONTRIBUTING.md) makes `scripts/public_text.sh` exit 1 naming the file and line; measured 2026-10-15, restored"
+since = "a3ceb09"
+note = "the CI job fetches ALICE-Law's own scripts/public_text_check.py at the revision named in .github/public-text-pin and refuses it unless its SHA-256 is the one in that file (so it is the file, not a copy that can drift); it checks the tree at HEAD and each pushed commit's message, added lines and paths, and exits 2 when it compared nothing or the pin or base is malformed (scripts/test_public_text.py covers the two exit-2 cases). Same step in scripts/preflight.sh."
+reference_repo = "ALICE-Law"
+
+[G13]
+status = "unverified"
+note = "audit: no HashMap or HashSet in src (the only one in the repository is tests/analytic_oracle.rs:434, in a test), no rayon, no thread spawn and no par_iter in src, tests, examples or fuzz targets, so no Law-bearing output reads an unspecified order today. It is not pass because there is no lint banning HashMap / HashSet iteration or reasoned allowlist, and not n/a because that status needs a scanner finding zero sites with the mutant of adding one; a one-off grep is neither."
+
+[G14]
+status = "fail-known"
+note = "the build configuration sets no fast-math-style flag and no target-cpu=native: there is no .cargo directory and no build.rs, no RUSTFLAGS in any workflow, no [profile] section in Cargo.toml or fuzz/Cargo.toml (searched at 06cfa76). Unmet: no scan step in CI keeps that true, and no test asserts round-to-nearest-even or that subnormals are not flushed to zero (the gate names two tests; the repository has neither)."
