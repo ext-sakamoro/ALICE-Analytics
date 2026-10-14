@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- 試験: `tests/float_edge_golden.rs` (21 件) が符号付きゼロ・近い大きな値の桁落ち (1e8 + {0, 1, 2} 等)・逆符号の和・平均 x の大きい共線点・分散 0 の入力に対する `StreamingStats` / `LinearRegression` / `ExponentialMovingAverage` / `EwmaDetector` / `SlidingWindow` / `quantile_sorted` / `iqr` の出力を `to_bits()` で bit 一致として固定する (許容誤差なし、各値は閉形式と照合してから記録) CI に `Release profile` workflow (ubuntu / macOS) を追加し、`determinism_golden` と `float_edge_golden` を `cargo test --release` で走らせる `scripts/run_tests.sh` (ALICE-DB と byte 一致) が試験 0 件、または指定した file で 0 件の時に失敗させる preflight (full) でも走る
+
 ### Changed
 - CI: 全 workflow に concurrency group があり、branch の run は新しい更新で打ち切られ main の run は打ち切られないことを `scripts/workflow_concurrency.py` (試験 `scripts/test_workflow_concurrency.py`、ALICE-LOL / ALICE-SDF / ALICE-DetMath と byte 一致) が検査する workflow を 1 つも読めなければ失敗する CI (actionlint job) と preflight で走る
 - CI: 上限の無かった 16 job に `timeout-minutes` を付けた (止まった step は共有 runner を GitHub の上限の 6 時間まで占有しうる) 値は直近の成功した run 10 本の所要時間の最大の 2 倍・中央値の 4 倍の大きい方を 5 分単位に切り上げ、cargo を使う job は最低 15 分 (cache が外れた build のため)、他は最低 10 分 既に上限のある job (fuzz) は変えていない `scripts/workflow_timeouts.py` (試験 `scripts/test_workflow_timeouts.py`、ALICE-LOL と byte 一致) が全 job の上限を検査し、job を 1 つも読めなければ失敗する CI (actionlint job) と preflight で走る

@@ -114,6 +114,9 @@ cargo test --lib --no-default-features
 cargo test --lib --no-default-features --features law
 cargo run --example residual_summary --features law
 
+step "release-profile.yml: golden tests under the release profile (each file must run tests)"
+scripts/run_tests.sh determinism_golden,float_edge_golden -- cargo test --release --test determinism_golden --test float_edge_golden
+
 step "ci.yml / feature-powerset: cargo hack (depth 2)"
 need cargo-hack "cargo install cargo-hack --locked"
 cargo hack check --lib --feature-powerset --depth 2
