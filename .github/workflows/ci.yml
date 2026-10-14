@@ -38,11 +38,16 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
+      # scripts/run_tests.sh fails the step when no test ran or when a named
+      # golden file ran none (a feature or target mismatch would otherwise pass
+      # as an empty run); the full suite still runs
       - name: Test (unit + integration + doc, every feature)
-        run: cargo test --all-features
+        shell: bash
+        run: scripts/run_tests.sh determinism_golden,float_edge_golden -- cargo test --all-features
 
       - name: Test (unit + integration + doc, default features)
-        run: cargo test
+        shell: bash
+        run: scripts/run_tests.sh determinism_golden,float_edge_golden -- cargo test
 
       # The library is no_std, so its unit tests must also compile and run
       # without the `std` feature: that is the only lane that executes the
@@ -111,6 +116,13 @@ jobs:
       # used only under std) and tests that need std declare it
       - name: Clippy (no default features, all targets)
         run: cargo clippy --all-targets --no-default-features -- -W clippy::pedantic -D warnings
+      # the lists in clippy.toml only gate anything if clippy flags a call to
+      # them: a throwaway crate with the same clippy.toml plants one banned call
+      # per row of scripts/clippy_canary_calls.tsv (0 rows fail)
+      - name: Clippy canary (tests)
+        run: python3 scripts/test_clippy_canary.py
+      - name: Clippy canary (every planted banned call is flagged)
+        run: python3 scripts/clippy_canary.py
 
   # The declared `rust-version` compiled with exactly that toolchain. Bump
   # `rust-version` in Cargo.toml and the version below in the same commit.
@@ -175,6 +187,9 @@ jobs:
         run: python scripts/test_deprecation_pin.py
       - name: Deprecation pin (privacy module)
         run: python scripts/deprecation_pin.py
+      # the zero-test guard shared with ALICE-DB, on each OS's own bash
+      - name: run_tests.sh (tests)
+        run: python scripts/test_run_tests.py
       - name: Entropy guard (tests)
         run: python scripts/test_entropy_guard.py
       - name: Entropy guard (no OS entropy / wall clock in production code)

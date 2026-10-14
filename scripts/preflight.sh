@@ -67,6 +67,12 @@ step "ci.yml / docs-lint: no built binary is tracked"
 python3 scripts/test_tracked_binaries.py
 python3 scripts/tracked_binaries.py
 
+step "ci.yml / docs-lint: run_tests.sh (zero-test guard) tests"
+python3 scripts/test_run_tests.py
+
+step "ci.yml / clippy: clippy canary tests (parser and zero logic, no cargo)"
+python3 scripts/test_clippy_canary.py
+
 step "ci.yml / docs-lint + doc: licence agrees and its files are packaged"
 python3 scripts/test_license_check.py
 python3 scripts/license_check.py
@@ -114,9 +120,12 @@ if [[ $quick -eq 1 ]]; then
   echo; echo "preflight --quick OK (full test suites, example, feature powerset, MSRV and security jobs skipped)"; exit 0
 fi
 
-step "ci.yml / test: every feature, default features, no_std lib, example"
-cargo test --all-features
-cargo test
+step "ci.yml / clippy: clippy canary (every planted banned call is flagged)"
+python3 scripts/clippy_canary.py
+
+step "ci.yml / test: every feature, default features, no_std lib, example (golden files must run tests)"
+scripts/run_tests.sh determinism_golden,float_edge_golden -- cargo test --all-features
+scripts/run_tests.sh determinism_golden,float_edge_golden -- cargo test
 # the no_std lane: the only one that runs the libm rounding path on a host
 cargo test --lib --no-default-features
 cargo test --lib --no-default-features --features law
