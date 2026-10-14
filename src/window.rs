@@ -218,9 +218,7 @@ impl<const N: usize> SlidingWindow<N> {
         }
         let mut m = f64::INFINITY;
         for i in 0..self.count {
-            if self.buffer[i] < m {
-                m = self.buffer[i];
-            }
+            m = alice_det_math::min64(m, self.buffer[i]);
         }
         m
     }
@@ -233,9 +231,7 @@ impl<const N: usize> SlidingWindow<N> {
         }
         let mut m = f64::NEG_INFINITY;
         for i in 0..self.count {
-            if self.buffer[i] > m {
-                m = self.buffer[i];
-            }
+            m = alice_det_math::max64(m, self.buffer[i]);
         }
         m
     }

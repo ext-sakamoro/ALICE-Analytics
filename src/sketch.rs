@@ -444,12 +444,8 @@ macro_rules! impl_ddsketch {
                 self.count += 1;
                 self.sum += value;
 
-                if value < self.min {
-                    self.min = value;
-                }
-                if value > self.max {
-                    self.max = value;
-                }
+                self.min = alice_det_math::min64(self.min, value);
+                self.max = alice_det_math::max64(self.max, value);
 
                 // Out-of-range magnitudes collapse into the edge bins (the
                 // α guarantee holds inside `accurate_range()`);
@@ -654,12 +650,8 @@ macro_rules! impl_ddsketch {
                 self.non_finite += other.non_finite;
                 self.sum += other.sum;
 
-                if other.min < self.min {
-                    self.min = other.min;
-                }
-                if other.max > self.max {
-                    self.max = other.max;
-                }
+                self.min = alice_det_math::min64(self.min, other.min);
+                self.max = alice_det_math::max64(self.max, other.max);
             }
         }
     };

@@ -267,12 +267,8 @@ impl StreamingStats {
         self.m3 += (term1 * delta_n).mul_add(n - 2.0, -(3.0 * delta_n * self.m2));
         self.m2 += term1;
 
-        if value < self.min {
-            self.min = value;
-        }
-        if value > self.max {
-            self.max = value;
-        }
+        self.min = alice_det_math::min64(self.min, value);
+        self.max = alice_det_math::max64(self.max, value);
     }
 
     /// 観測数。

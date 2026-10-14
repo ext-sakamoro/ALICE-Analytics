@@ -31,7 +31,7 @@ path = "src/lib.rs"
 # `law::ResidualSummary::law_id` が法則の識別子と混ぜる) 0.3 には無いので、
 # 0.3 を解決する消費者と同じ graph に入ると「どの算術で出た数か」を言えない
 # version (`alice-zip` 0.8 / `alice-db` / `alice-physics` と同じ 0.4 系統に揃える)
-alice-det-math = { version = "0.5", default-features = false }
+alice-det-math = { version = "0.5.1", default-features = false }
 # no_std build の float 丸め / sqrt (src/math.rs、std build では未使用)
 libm = "0.2"
 alice-zip = { version = "0.10", default-features = false, optional = true }

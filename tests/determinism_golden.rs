@@ -649,8 +649,14 @@ fn golden_law() {
 /// this crate is only reproducible under one arithmetic. On a deliberate
 /// upgrade: verify the golden hashes above are unchanged (they are the actual
 /// outputs), then update this constant and record both in CHANGELOG.
+///
+/// Re-recorded for `alice-det-math` 0.5.1 (`135c407d…` → `85e08846…`): 0.5.1
+/// adds sign-defined `min` / `max` / `min64` / `max64`, which moves the
+/// identifier without changing the bits of any function 0.5.0 had, and keeps
+/// `135c407d…` in `PREVIOUS_SEMANTICS_IDS`. Every scenario hash above is
+/// unchanged under 0.5.1.
 const GOLDEN_SEMANTICS_ID: &str =
-    "135c407d4249c1c200e4d1be79a12e848ce5c355fc3a918da965849e697ef000";
+    "85e0884623b154a3b2b264374907b6cbac09307ca3f9a08339e48c567d3cb315";
 
 #[test]
 fn golden_semantics_id() {
@@ -692,16 +698,24 @@ fn golden_semantics_id() {
 /// Re-recorded for `alice-det-math` 0.5 (`alice-zip` 0.10): the same law under
 /// the 0.4 identifier (`d2209b30…`) still gives the previous value
 /// `bd2c0c24…`, so only the arithmetic identifier moved, not the encoding.
+///
+/// Re-recorded again for `alice-det-math` 0.5.1 (`c8bc7356…` → `c32f77f9…`):
+/// the same law under the 0.5.0 identifier (`135c407d…`, kept in
+/// `PREVIOUS_SEMANTICS_IDS`) still gives `c8bc7356…`
+/// (`law_id_under_the_previous_identifier_is_unchanged` below).
 #[cfg(feature = "law")]
-const GOLDEN_LAW_ID: &str = "c8bc735668ff86f4e43c487e2f89fd8bfc1fc046033d426d537c3a46456bd0a4";
+const GOLDEN_LAW_ID: &str = "c32f77f9376baddaf827059b1efd9cf7f38933f217aae64b070e748e758679d4";
+
+/// The law identifier recorded before `alice-det-math` 0.5.1
+#[cfg(feature = "law")]
+const PREVIOUS_GOLDEN_LAW_ID: &str =
+    "c8bc735668ff86f4e43c487e2f89fd8bfc1fc046033d426d537c3a46456bd0a4";
 
 #[cfg(feature = "law")]
-#[test]
-fn golden_law_id() {
-    use alice_analytics::law::residual_summary;
+fn law_fixture() -> alice_zip::law::SignalLaw {
     use alice_zip::law::{Provenance, ResidualStats, SignalLaw, SignalLawParts, ValidRange};
 
-    let law = SignalLaw::from_parts(SignalLawParts {
+    SignalLaw::from_parts(SignalLawParts {
         coefficients: vec![1.0, 2.0, -0.5],
         domain: ValidRange { lo: 0.0, hi: 8.0 },
         evidence: vec![(0.0, 1.0), (4.0, 1.75), (8.0, 2.5)],
@@ -713,7 +727,15 @@ fn golden_law_id() {
         provenance: Provenance::new("golden", "closed form"),
         oracles: Vec::new(),
     })
-    .expect("valid parts");
+    .expect("valid parts")
+}
+
+#[cfg(feature = "law")]
+#[test]
+fn golden_law_id() {
+    use alice_analytics::law::residual_summary;
+
+    let law = law_fixture();
 
     let summary = residual_summary(&law, &[(0.0, 1.5), (4.0, 1.75), (8.0, 3.0)]);
     assert!(
@@ -736,4 +758,35 @@ fn golden_law_id() {
          encoding in alice-zip did. Both change what a stored summary means:\n\
          confirm which, then update GOLDEN_LAW_ID and record it in CHANGELOG.\n"
     );
+}
+
+/// Re-recording `GOLDEN_LAW_ID` for `alice-det-math` 0.5.1 moved the
+/// identifier input only: the same law under the 0.5.0 identifier gives the
+/// value recorded before, and the summary reports the law under the current
+/// identifier
+#[cfg(feature = "law")]
+#[test]
+fn law_id_under_the_previous_identifier_is_unchanged() {
+    use alice_analytics::law::residual_summary;
+
+    let law = law_fixture();
+    let previous = alice_det_math::PREVIOUS_SEMANTICS_IDS
+        .iter()
+        .find(|id| {
+            let mut hex = String::with_capacity(64);
+            for b in *id {
+                write!(hex, "{b:02x}").expect("writing to a String cannot fail");
+            }
+            hex == "135c407d4249c1c200e4d1be79a12e848ce5c355fc3a918da965849e697ef000"
+        })
+        .expect("alice-det-math keeps the identifier of 0.5.0 as a previous one");
+
+    let mut hex = String::with_capacity(64);
+    for b in law.law_id(previous) {
+        write!(hex, "{b:02x}").expect("writing to a String cannot fail");
+    }
+    assert_eq!(hex, PREVIOUS_GOLDEN_LAW_ID);
+
+    let summary = residual_summary(&law, &[(0.0, 1.5), (4.0, 1.75), (8.0, 3.0)]);
+    assert_eq!(summary.law_id, law.law_id(&alice_analytics::SEMANTICS_ID));
 }
