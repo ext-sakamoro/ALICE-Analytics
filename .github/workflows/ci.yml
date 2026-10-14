@@ -185,6 +185,12 @@ jobs:
         run: python scripts/test_license_check.py
       - name: Licence agrees
         run: python scripts/license_check.py
+      # no built library or executable is tracked (by name or header); waivers only in
+      # .github/tracked-binaries.txt with a reason; an unreadable file or 0 files read fails
+      - name: Tracked binaries (tests)
+        run: python scripts/test_tracked_binaries.py
+      - name: Tracked binaries
+        run: python scripts/tracked_binaries.py
 
   fmt:
     name: Format

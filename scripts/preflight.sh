@@ -63,6 +63,10 @@ step "ci.yml / docs-lint: entropy guard (no OS entropy / wall clock in productio
 python3 scripts/test_entropy_guard.py
 python3 scripts/entropy_guard.py
 
+step "ci.yml / docs-lint: no built binary is tracked"
+python3 scripts/test_tracked_binaries.py
+python3 scripts/tracked_binaries.py
+
 step "ci.yml / docs-lint + doc: licence agrees and its files are packaged"
 python3 scripts/test_license_check.py
 python3 scripts/license_check.py
