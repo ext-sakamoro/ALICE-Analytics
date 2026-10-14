@@ -65,4 +65,11 @@ disallowed-methods = [
     { path = "f64::cbrt", reason = "platform libm is not cross-platform bit-exact; use alice_det_math" },
     { path = "f64::hypot", reason = "platform libm is not cross-platform bit-exact; use alice_det_math" },
     { path = "f64::powi", reason = "lowers to a multiplication tree of unspecified association order; use crate::math::ipow64" },
+    # Determinism gate (G10): no OS entropy and no wall clock in the crate's
+    # production code. An estimate computed here is meant to compare equal
+    # given the same input regardless of when or on what machine it ran; a
+    # path that reads the clock or draws OS randomness breaks that.
+    { path = "std::time::Instant::now", reason = "the wall clock makes results depend on timing; pass time in or use a step count" },
+    { path = "std::time::SystemTime::now", reason = "the wall clock makes results depend on timing; pass time in or use a step count" },
+    { path = "std::collections::hash_map::RandomState::new", reason = "seeds from OS randomness and would make HashMap iteration order non-deterministic" },
 ]

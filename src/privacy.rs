@@ -76,6 +76,10 @@ impl XorShift64 {
     #[must_use]
     pub fn from_entropy() -> Self {
         use std::time::{SystemTime, UNIX_EPOCH};
+        #[allow(
+            clippy::disallowed_methods,
+            reason = "deprecated XorShift64::from_entropy seeds from the clock; documented in this module's Security section as not private, removed in 0.5.0"
+        )]
         let seed = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             // 下位 64 bit で十分 (seed 用途、u128 → u64 の切り捨ては意図)
