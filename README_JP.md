@@ -229,6 +229,47 @@ scripts/preflight.sh --quick  # static checks, clippy, builds, docs, cargo test 
   残差統計、出典、oracle ケースを伴う fit 済みの law `law` feature はその残差分布を
   要約する
 
+<!-- law-integration:begin law=6a0a5587c15205c25647a16a842e1c3b30bb6abc -->
+## ALICE-Law との統合
+
+ALICE-Law の `scripts/gen-law-readme-block.py` が ALICE-Law `6a0a5587c152` とこの repository の `alice-law-conformance.toml` から生成する 手で編集しない
+
+| | |
+|---|---|
+| release train | alice-analytics 0.5.0 (published)、Law への依存: あり |
+| 算術 | train の alice-det-math 0.5.0、算術の識別子 `135c407d4249c1c200e4d1be79a12e848ce5c355fc3a918da965849e697ef000` この crate の要求は `alice-det-math = "0.5"` |
+| end to end 検査 | 対象 (`alice-analytics = "0.5"`)、digest `966a78784bb4e3341ac6627d519db896f398176b71c2402b188294db6c8e3728`、aarch64 と x86_64 で同じ |
+
+### 適合 (G1-G14)
+
+この repository には `alice-law-conformance.toml` が無い すべての gate は未申告
+
+| gate | 状態 | 注記 |
+|---|---|---|
+| G1 no-libm-direct | 未申告 |  |
+| G2 ieee-max-min | 未申告 |  |
+| G3 no-outer-fneg-of-fma | 未申告 |  |
+| G4 debug-release-arch-goldens | 未申告 |  |
+| G5 release-profile-test-leg | 未申告 |  |
+| G6 semantics-id | 未申告 |  |
+| G7 handshake-carries-id | 未申告 |  |
+| G8 persisted-semantics-id | 未申告 |  |
+| G9 persisted-meaning-change-is-major | 未申告 |  |
+| G10 no-run-varying-artifacts | 未申告 |  |
+| G11 gate-self-tests | 未申告 |  |
+| G12 public-repo-text-rules | 未申告 |  |
+| G13 no-unspecified-order | 未申告 |  |
+| G14 float-environment-invariants | 未申告 |  |
+
+### feature と保証の範囲
+
+| feature | 保証 | 注記 |
+|---|---|---|
+| `law` | 未申告 |  |
+| `simd` | 未申告 |  |
+| `std` | 未申告 |  |
+<!-- law-integration:end -->
+
 ## ライセンス
 
 - [Apache License, Version 2.0](LICENSE-APACHE) (0.4.0 から)
