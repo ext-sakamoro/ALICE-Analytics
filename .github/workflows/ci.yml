@@ -211,3 +211,9 @@ jobs:
         run: |
           python3 scripts/test_workflow_timeouts.py
           python3 scripts/workflow_timeouts.py
+      # every branch-push workflow has a concurrency group that cancels a superseded
+      # branch run but never a run on main; the checker's own tests run first
+      - name: workflow-concurrency
+        run: |
+          python3 scripts/test_workflow_concurrency.py
+          python3 scripts/workflow_concurrency.py

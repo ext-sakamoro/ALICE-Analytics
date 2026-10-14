@@ -44,6 +44,10 @@ step "ci.yml / actionlint: workflow-timeouts (every job has timeout-minutes)"
 python3 scripts/test_workflow_timeouts.py
 python3 scripts/workflow_timeouts.py
 
+step "ci.yml / actionlint: workflow-concurrency (branch runs cancel, main never)"
+python3 scripts/test_workflow_concurrency.py
+python3 scripts/workflow_concurrency.py
+
 step "ci.yml / fmt: cargo fmt --check"
 cargo fmt --all -- --check
 
