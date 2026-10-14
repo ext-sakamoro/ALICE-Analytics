@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - CI: 公開する文面の検査 (`Public text` workflow、`scripts/public_text.sh`) を追加 ALICE-Law の `scripts/public_text_check.py` を `.github/public-text-pin` の revision で取得し、SHA-256 が一致した時だけ使って、HEAD の全 tracked file (path と本文) と送った commit (message・追加行・追加 path) を読む 何も比較できなければ失敗する preflight でも走る `.public-text.toml` は文書の linter とその試験が意図して持つ語を、種類ごとの行数で許可する (行数が変われば失敗)
 - CI: `ci.yml` / `fuzz.yml` / `security-audit.yml` の `concurrency` を、main では commit ごとの独立した group にして (`cancel-in-progress` を main では false にして) main の run が後続の push で打ち切られないようにした main 以外の branch では従来どおり同じ branch の新しい push が古い run を打ち切る
 
+### Fixed
+- CI (`scripts/entropy_guard.py`、G10): 2 つの穴を修正 (1) `RandomState::new` だけを検査しており `RandomState::default()` (同じ OS 乱数シードのハッシャーに届く) を素通りさせていた `RandomState` の裸の語を検査する形に変更 (clippy 側の `disallowed-methods` は `Default::default` をトレイトメソッドとして実装型だけでは指せないため、この script が唯一の検査層だったので `disallowed-types` で型そのものを ban する層も追加、`HashMap::new` 内部の無名使用は非該当のまま確認済) (2) `#[cfg(test)]` module 判定のブレース深さ計算が文字列しか除去しておらず、`'{'` のような char literal がブレース深さを狂わせて test module 判定が早期終了し、直後の production code を見逃す経路があった 文字列・raw string・char literal・ブロックコメントを 1 pass で正しく除去する sanitizer に置換 (3) `<std::time::Instant>::now()` のような qualified-self 呼び出しが `Instant::now` のパターンに `>` を挟むため素通りしていた (`as Trait` を挟む形も含む) 型名と `::method` の間に `>` / `as Trait` を許容するよう正規表現を拡張 canary test 6 本追加 (元の script に対して赤を確認) 比較件数は変わらず 11 file / 10 pattern / 0 problems
+
 ## [0.4.0] - 2026-10-11
 
 ### Deprecated
