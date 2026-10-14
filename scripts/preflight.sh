@@ -59,6 +59,10 @@ step "ci.yml / docs-lint: deprecation pin of the privacy module"
 python3 scripts/test_deprecation_pin.py
 python3 scripts/deprecation_pin.py
 
+step "ci.yml / docs-lint: no built binary is tracked"
+python3 scripts/test_tracked_binaries.py
+python3 scripts/tracked_binaries.py
+
 step "ci.yml / docs-lint + doc: licence agrees and its files are packaged"
 python3 scripts/test_license_check.py
 python3 scripts/license_check.py
