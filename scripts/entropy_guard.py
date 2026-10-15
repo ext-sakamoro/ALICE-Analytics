@@ -73,16 +73,8 @@ ALIASABLE = {
     "SystemTime": ("SystemTime::now", r"\b{}\b" + _QUALIFIED_SELF + r"::\s*now\b"),
 }
 ALIAS_RE = re.compile(r"\b(Instant|SystemTime)\s+as\s+(\w+)")
-# (file, pattern) -> (count, reason)
-ALLOWED: dict[tuple[str, str], tuple[int, str]] = {
-    ("src/privacy.rs", "SystemTime::now"): (
-        1, "deprecated XorShift64::from_entropy seeds from the clock; documented as not private, removed in 0.5.0",
-    ),
-    ("src/privacy.rs", "UNIX_EPOCH"): (2, "the same deprecated clock seed (the `use` line and the `duration_since` call)"),
-    ("src/privacy.rs", "from_entropy("): (
-        4, "deprecated XorShift64::Default / LaplaceNoise::new / RandomizedResponse::new / Rappor::new call that clock seed",
-    ),
-}
+# (file, pattern) -> (count, reason); empty: no call site in src/ is allowed
+ALLOWED: dict[tuple[str, str], tuple[int, str]] = {}
 # A char literal ('{', '\n', '\u{1F600}', also after a `b` prefix) but not a
 # lifetime ('a, 'static: those have no closing quote, so they never match.
 CHAR_RE = re.compile(r"'(?:\\u\{[0-9a-fA-F_]+\}|\\x[0-9a-fA-F]{2}|\\.|[^'\\\n])'")

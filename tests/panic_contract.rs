@@ -750,22 +750,21 @@ fn a_series_with_no_spread_scores_any_deviation_as_infinite() {
 /// algebraic form rather than of the domain — `p = e^ε/(1 + e^ε)` returned
 /// `NaN` for `ε ≳ 709.79` (`inf/inf`), while the equivalent
 /// `p = 1/(1 + e^(−ε))` returns the limit `1.0`.
-#[cfg(feature = "std")] // `RandomizedResponse::new` is std-only
 #[test]
 fn a_randomized_response_epsilon_maps_onto_its_whole_domain() {
     // ε = 0 is "always answer at random", the same meaningful end that
     // `with_probability(0.5)` accepts
-    assert_eq!(RandomizedResponse::new(0.0).p_true(), 0.5);
-    assert_eq!(RandomizedResponse::new(-0.0).p_true(), 0.5);
+    assert_eq!(RandomizedResponse::new(0.0, 7).p_true(), 0.5);
+    assert_eq!(RandomizedResponse::new(-0.0, 7).p_true(), 0.5);
     // the textbook values
-    assert!((RandomizedResponse::new(1.0).p_true() - 0.731_058_578_630_004_9).abs() < 1e-15);
+    assert!((RandomizedResponse::new(1.0, 7).p_true() - 0.731_058_578_630_004_9).abs() < 1e-15);
 
     // monotone in ε, and inside the domain that `with_probability` enforces
     let mut previous = 0.5;
     for e in [
         0.0f64, 0.25, 0.5, 1.0, 3.0, 10.0, 50.0, 100.0, 709.0, 710.0, 1e3, 1e300,
     ] {
-        let p = RandomizedResponse::new(e).p_true();
+        let p = RandomizedResponse::new(e, 7).p_true();
         assert!(!p.is_nan(), "epsilon {e:e} produced NaN");
         assert!(
             (0.5..=1.0).contains(&p),
@@ -780,39 +779,35 @@ fn a_randomized_response_epsilon_maps_onto_its_whole_domain() {
         let _ = RandomizedResponse::with_probability(p, 1);
     }
     // ⚠️ the limit, where the old form returned NaN
-    assert_eq!(RandomizedResponse::new(710.0).p_true(), 1.0);
-    assert_eq!(RandomizedResponse::new(f64::MAX).p_true(), 1.0);
+    assert_eq!(RandomizedResponse::new(710.0, 7).p_true(), 1.0);
+    assert_eq!(RandomizedResponse::new(f64::MAX, 7).p_true(), 1.0);
 }
 
 /// ⚠️ A negative ε used to return a detector whose `p_true` was below 0.5
 /// (measured: `new(-5.0)` gave `6.69e-3`), which inverts the sign of every
 /// proportion `estimate_proportion` reports.
-#[cfg(feature = "std")] // `RandomizedResponse::new` is std-only
 #[test]
 #[should_panic(expected = "epsilon must be finite and non-negative")]
 fn a_randomized_response_rejects_a_negative_epsilon() {
-    let _ = RandomizedResponse::new(-5.0);
+    let _ = RandomizedResponse::new(-5.0, 7);
 }
 
-#[cfg(feature = "std")] // `RandomizedResponse::new` is std-only
 #[test]
 #[should_panic(expected = "epsilon must be finite and non-negative")]
 fn a_randomized_response_rejects_a_nan_epsilon() {
-    let _ = RandomizedResponse::new(f64::NAN);
+    let _ = RandomizedResponse::new(f64::NAN, 7);
 }
 
-#[cfg(feature = "std")] // `RandomizedResponse::new` is std-only
 #[test]
 #[should_panic(expected = "epsilon must be finite and non-negative")]
 fn a_randomized_response_rejects_an_infinite_epsilon() {
-    let _ = RandomizedResponse::new(f64::INFINITY);
+    let _ = RandomizedResponse::new(f64::INFINITY, 7);
 }
 
-#[cfg(feature = "std")] // `RandomizedResponse::new` is std-only
 #[test]
 #[should_panic(expected = "epsilon must be finite and non-negative")]
 fn a_randomized_response_rejects_a_negative_infinite_epsilon() {
-    let _ = RandomizedResponse::new(f64::NEG_INFINITY);
+    let _ = RandomizedResponse::new(f64::NEG_INFINITY, 7);
 }
 
 /// `NaN` observations are total (no panic) and keep their place in the count.

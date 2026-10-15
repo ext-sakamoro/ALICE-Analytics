@@ -10,7 +10,9 @@
 //!   exposes its top 53 bits, leaving at most 2^11 candidates for the low bits
 //!   that a second draw resolves, so one or two observed draws determine every
 //!   later draw;
-//! - `from_entropy` seeds it from the system clock, which an observer can guess;
+//! - every constructor takes its seed as an explicit argument; the module
+//!   reads no clock and no OS randomness, so whatever unpredictability the
+//!   noise has is exactly what the caller's seed supplies;
 //! - `LaplaceNoise::sample` uses the floating-point inverse transform, whose low
 //!   bits leak the uniform draw (Mironov 2012), so ε does not hold even with a
 //!   perfect random source.
@@ -30,10 +32,7 @@
 #[cfg(not(any(feature = "std", test)))]
 use crate::math::FloatExt;
 use crate::math::{f64_i64, hash_index, i64_f64, u64_f64};
-use alice_det_math::ln64;
-// the only caller (`RandomizedResponse::new`) needs system entropy
-#[cfg(feature = "std")]
-use alice_det_math::exp64;
+use alice_det_math::{exp64, ln64};
 
 // ============================================================================
 // Random Number Generation (ChaCha20-based for determinism)
@@ -45,7 +44,7 @@ use alice_det_math::exp64;
 #[derive(Clone, Debug)]
 #[deprecated(
     since = "0.4.0",
-    note = "not differentially private (predictable xorshift64 state, time-derived seed, floating-point inverse transform); use alice_crypto::dp instead. Removed in 0.5.0"
+    note = "not differentially private (predictable xorshift64 state, floating-point inverse transform); use alice_crypto::dp instead. Removed in 0.5.0"
 )]
 pub struct XorShift64 {
     state: u64,
@@ -64,31 +63,6 @@ impl XorShift64 {
                 seed
             },
         }
-    }
-
-    /// Create from system entropy (`std` only: `SystemTime`)
-    ///
-    /// `no_std` には entropy source が無いので存在しない (2026-09-15 まで固定 seed を返す
-    /// stub があり、差分プライバシーの noise が決定論になっていた) — `no_std` では
-    /// `XorShift64::new(seed)` / `*::with_seed` / `with_probability` / `with_seed_params` に
-    /// caller が entropy を渡す
-    #[cfg(feature = "std")]
-    #[must_use]
-    pub fn from_entropy() -> Self {
-        use std::time::{SystemTime, UNIX_EPOCH};
-        #[allow(
-            clippy::disallowed_methods,
-            reason = "deprecated XorShift64::from_entropy seeds from the clock; documented in this module's Security section as not private, removed in 0.5.0"
-        )]
-        let seed = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            // 下位 64 bit で十分 (seed 用途、u128 → u64 の切り捨ては意図)
-            .map_or(0x853c_49e6_748f_ea9b, |d| {
-                #[allow(clippy::cast_possible_truncation)]
-                let low = d.as_nanos() as u64;
-                low
-            });
-        Self::new(seed)
     }
 
     /// Generate next u64
@@ -123,13 +97,6 @@ impl XorShift64 {
     }
 }
 
-#[cfg(feature = "std")]
-impl Default for XorShift64 {
-    fn default() -> Self {
-        Self::from_entropy()
-    }
-}
-
 // ============================================================================
 // Laplace Distribution
 // ============================================================================
@@ -143,7 +110,7 @@ impl Default for XorShift64 {
 #[derive(Clone, Debug)]
 #[deprecated(
     since = "0.4.0",
-    note = "not differentially private (predictable xorshift64 state, time-derived seed, floating-point inverse transform); use alice_crypto::dp instead. Removed in 0.5.0"
+    note = "not differentially private (predictable xorshift64 state, floating-point inverse transform); use alice_crypto::dp instead. Removed in 0.5.0"
 )]
 pub struct LaplaceNoise {
     /// Scale parameter b
@@ -153,24 +120,12 @@ pub struct LaplaceNoise {
 }
 
 impl LaplaceNoise {
-    /// Create a new Laplace noise generator
+    /// Create a Laplace noise generator with an explicit seed
     ///
     /// # Arguments
     /// * `sensitivity` - Maximum change in output for one input change (Δf)
     /// * `epsilon` - Privacy parameter ε (smaller = more privacy)
-    ///
-    /// `std` only (system entropy); `no_std` は [`Self::with_seed`]
-    #[cfg(feature = "std")]
-    #[must_use]
-    pub fn new(sensitivity: f64, epsilon: f64) -> Self {
-        let scale = sensitivity / epsilon;
-        Self {
-            scale,
-            rng: XorShift64::from_entropy(),
-        }
-    }
-
-    /// Create with explicit seed
+    /// * `seed` - seed of the generator (the module reads no clock or OS randomness)
     #[must_use]
     pub fn with_seed(sensitivity: f64, epsilon: f64, seed: u64) -> Self {
         let scale = sensitivity / epsilon;
@@ -223,7 +178,7 @@ impl LaplaceNoise {
 #[derive(Clone, Debug)]
 #[deprecated(
     since = "0.4.0",
-    note = "not differentially private (predictable xorshift64 state, time-derived seed, floating-point inverse transform); use alice_crypto::dp instead. Removed in 0.5.0"
+    note = "not differentially private (predictable xorshift64 state, floating-point inverse transform); use alice_crypto::dp instead. Removed in 0.5.0"
 )]
 pub struct RandomizedResponse {
     /// Probability of truthful response
@@ -237,7 +192,8 @@ impl RandomizedResponse {
     ///
     /// Higher epsilon = more accuracy, less privacy
     ///
-    /// `std` only (system entropy); `no_std` は [`Self::with_probability`]
+    /// `seed` seeds the generator (the module reads no clock or OS
+    /// randomness); `no_std` でも使える
     ///
     /// # Panics
     ///
@@ -257,9 +213,8 @@ impl RandomizedResponse {
     /// NaN は**代数的な書き方の副産物で定義域の問題ではない**ので、ε の上限を
     /// assert で切るのでなく式を直した (ε = 0 / 0.5 / 1 / 50 / 709 では旧式と
     /// bit 一致、ε = 3 で 1 ulp 異なる)
-    #[cfg(feature = "std")]
     #[must_use]
-    pub fn new(epsilon: f64) -> Self {
+    pub fn new(epsilon: f64, seed: u64) -> Self {
         assert!(
             epsilon.is_finite() && epsilon >= 0.0,
             "epsilon must be finite and non-negative"
@@ -269,7 +224,7 @@ impl RandomizedResponse {
         let p_true = 1.0 / (1.0 + exp64(-epsilon));
         Self {
             p_true,
-            rng: XorShift64::from_entropy(),
+            rng: XorShift64::new(seed),
         }
     }
 
@@ -364,7 +319,7 @@ impl RandomizedResponse {
 /// Default RAPPOR bit size
 #[deprecated(
     since = "0.4.0",
-    note = "not differentially private (predictable xorshift64 state, time-derived seed, floating-point inverse transform); use alice_crypto::dp instead. Removed in 0.5.0"
+    note = "not differentially private (predictable xorshift64 state, floating-point inverse transform); use alice_crypto::dp instead. Removed in 0.5.0"
 )]
 pub const RAPPOR_BITS: usize = 64;
 
@@ -375,7 +330,7 @@ pub const RAPPOR_BITS: usize = 64;
 #[derive(Clone, Debug)]
 #[deprecated(
     since = "0.4.0",
-    note = "not differentially private (predictable xorshift64 state, time-derived seed, floating-point inverse transform); use alice_crypto::dp instead. Removed in 0.5.0"
+    note = "not differentially private (predictable xorshift64 state, floating-point inverse transform); use alice_crypto::dp instead. Removed in 0.5.0"
 )]
 pub struct Rappor {
     /// Permanent randomized response (for longitudinal studies)
@@ -391,21 +346,15 @@ impl Rappor {
     /// Number of bits in the Bloom filter
     pub const BITS: usize = RAPPOR_BITS;
 
-    /// Create a new RAPPOR encoder
+    /// Create a RAPPOR encoder with explicit parameters and RNG seed
     ///
     /// # Arguments
     /// * `f` - Probability of flipping a bit in permanent response (0.0 to 0.5)
     /// * `p` - Probability of setting a 1 bit to 1 in instantaneous response
     /// * `q` - Probability of setting a 0 bit to 1 in instantaneous response
+    /// * `seed` - seed of the generator (the module reads no clock or OS randomness)
     ///
-    /// `std` only (system entropy); `no_std` は [`Self::with_seed_params`]
-    #[cfg(feature = "std")]
-    #[must_use]
-    pub fn new(f: f64, p: f64, q: f64) -> Self {
-        Self::with_seed_params(f, p, q, XorShift64::from_entropy().next_u64())
-    }
-
-    /// Create with explicit parameters and RNG seed (`no_std` 用、entropy は caller が供給)
+    /// `f = 0.5, p = 0.75, q = 0.25` are the typical parameters (about ε = 2)
     #[must_use]
     pub fn with_seed_params(f: f64, p: f64, q: f64, seed: u64) -> Self {
         Self {
@@ -414,15 +363,6 @@ impl Rappor {
             q: q.clamp(0.0, 1.0),
             rng: XorShift64::new(seed),
         }
-    }
-
-    /// Create with typical parameters for ε-differential privacy
-    ///
-    /// Uses f=0.5, p=0.75, q=0.25 for approximately ε=2 privacy
-    #[cfg(feature = "std")]
-    #[must_use]
-    pub fn default_params() -> Self {
-        Self::new(0.5, 0.75, 0.25)
     }
 
     /// Encode a value into a Bloom filter (simple hash-based)
@@ -495,7 +435,7 @@ impl Rappor {
 #[derive(Clone, Debug)]
 #[deprecated(
     since = "0.4.0",
-    note = "not differentially private (predictable xorshift64 state, time-derived seed, floating-point inverse transform); use alice_crypto::dp instead. Removed in 0.5.0"
+    note = "not differentially private (predictable xorshift64 state, floating-point inverse transform); use alice_crypto::dp instead. Removed in 0.5.0"
 )]
 pub struct PrivacyBudget {
     /// Total epsilon spent
@@ -595,7 +535,7 @@ impl PrivacyBudget {
 #[derive(Clone, Debug)]
 #[deprecated(
     since = "0.4.0",
-    note = "not differentially private (predictable xorshift64 state, time-derived seed, floating-point inverse transform); use alice_crypto::dp instead. Removed in 0.5.0"
+    note = "not differentially private (predictable xorshift64 state, floating-point inverse transform); use alice_crypto::dp instead. Removed in 0.5.0"
 )]
 pub struct PrivateAggregator {
     /// Sum of noisy values
@@ -786,12 +726,10 @@ mod tests {
         );
     }
 
-    // `format!` / `Vec` / the entropy-seeded constructors are `std`-only,
-    // so this case cannot run on the `no_std` build
-    #[cfg(feature = "std")]
     #[test]
     fn test_rappor() {
-        let mut rappor = Rappor::default_params();
+        // the typical parameters (about ε = 2)
+        let mut rappor = Rappor::with_seed_params(0.5, 0.75, 0.25, 0x5EED);
 
         let encoded1 = rappor.privatize(12345);
         let encoded2 = rappor.privatize(12345);
@@ -847,16 +785,6 @@ mod tests {
         }
         // Should be roughly 50%
         assert!(trues > 4000 && trues < 6000, "trues = {trues}");
-    }
-
-    // `format!` / `Vec` / the entropy-seeded constructors are `std`-only,
-    // so this case cannot run on the `no_std` build
-    #[cfg(feature = "std")]
-    #[test]
-    fn test_xorshift_default() {
-        let mut rng = XorShift64::default();
-        let v = rng.next_u64();
-        assert_ne!(v, 0);
     }
 
     #[test]
@@ -943,12 +871,9 @@ mod tests {
         assert!((agg.estimate_sum() - 30.0).abs() < f64::EPSILON);
     }
 
-    // `format!` / `Vec` / the entropy-seeded constructors are `std`-only,
-    // so this case cannot run on the `no_std` build
-    #[cfg(feature = "std")]
     #[test]
     fn test_rappor_params() {
-        let rappor = Rappor::new(0.3, 0.7, 0.2);
+        let rappor = Rappor::with_seed_params(0.3, 0.7, 0.2, 0x5EED);
         let (f, p, q) = rappor.params();
         assert!((f - 0.3).abs() < f64::EPSILON);
         assert!((p - 0.7).abs() < f64::EPSILON);

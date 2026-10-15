@@ -66,7 +66,6 @@ impl Sink {
     fn u64(&mut self, v: u64) {
         self.0.extend_from_slice(&v.to_le_bytes());
     }
-    #[cfg(feature = "std")] // used by golden_privacy only
     fn i64(&mut self, v: i64) {
         self.0.extend_from_slice(&v.to_le_bytes());
     }
@@ -409,10 +408,8 @@ fn golden_anomaly() {
 // 5. privacy — Laplace inverse transform (ln), randomized response (exp)
 // ---------------------------------------------------------------------------
 
-#[cfg(feature = "std")] // golden_privacy needs std
 const GOLDEN_PRIVACY: &str = "50f95bbc492118d85de552a3a950673e3c762b9005d1217c81c042cab9494ca5";
 
-#[cfg(feature = "std")] // the digest includes `RandomizedResponse::new`, a std constructor
 #[test]
 fn golden_privacy() {
     use alice_analytics::privacy::{
@@ -448,11 +445,11 @@ fn golden_privacy() {
         }
     }
 
-    // Randomized response: p = 1/(1 + e^(−ε)) via the std constructor
+    // Randomized response: p = 1/(1 + e^(−ε)) via the ε constructor
     // (the hash changed on 2026-10-07 when the algebraically equivalent but
     // overflow-free form replaced e^ε/(1 + e^ε); it differs by 1 ulp at ε = 3)
     for epsilon in [0.5f64, 1.0, 3.0] {
-        let rr = RandomizedResponse::new(epsilon);
+        let rr = RandomizedResponse::new(epsilon, 7);
         s.f64(rr.p_true());
     }
     let mut rr = RandomizedResponse::with_probability(0.75, 11);
