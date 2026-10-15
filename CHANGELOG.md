@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Changed
+- CI: 公開 API の互換性検査を、`security-audit.yml` の結果を問わない 2 段の job (`--release-type patch` で比較件数だけを見る) から、crates.io の最新の alice-analytics との比較で失敗させる `semver-checks.yml` に置き換えた `scripts/semver_gate.py` (ALICE-DB と同一) が consumer の feature の組 (既定 / 既定なし / 全 feature、ALICE-Law の release-train.toml は組を宣言しない) ごとに `cargo semver-checks --baseline-version <最新>` を走らせ、Cargo.toml の版との差 (0.x では minor が major) が許さない変更、tool が走らない、別の step を名乗る、比較 0 件のいずれでも失敗する Cargo.toml が公開済みの版と同じ時は次の最小の版 (0.6.0 なら 0.6.1) として検査する (`.github/semver-gate.toml` の `equal-version`) 走るのは `src/**` / `Cargo.toml` / `Cargo.lock` / `rust-toolchain.toml` / 検査器と workflow の変更時と週 1 回 preflight の full も同じ step に置き換えた
 - CI: 公開する文面の検査の pin を ALICE-Law 5de698e (checker sha256 4b3d9542…) に進めた 新しい版で HEAD の全 file に指摘 0 件
 
 ## [0.6.0] - 2026-10-15
