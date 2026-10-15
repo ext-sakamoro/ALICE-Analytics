@@ -6,6 +6,19 @@ rust-version = "1.87"
 authors = ["Moroya Sakamoto <sakamoro@alicelaw.net>"]
 description = "High-performance telemetry & probabilistic statistical estimation — HyperLogLog++, DDSketch, Count-Min Sketch, local differential privacy, streaming anomaly detection"
 license = "Apache-2.0"
+# the files of the crate; the repository's CI, scripts and notes are not packaged
+include = [
+    "/src/**",
+    "/tests/**",
+    "/examples/**",
+    "/Cargo.toml",
+    "/README.md",
+    "/README_JP.md",
+    "/CHANGELOG.md",
+    "/LICENSE-APACHE",
+    "/NOTICE",
+    "/TRADEMARK_NOTICE",
+]
 repository = "https://github.com/ext-sakamoro/ALICE-Analytics"
 keywords = ["telemetry", "hyperloglog", "sketch", "cardinality", "no_std"]
 categories = ["algorithms", "science", "no-std"]

@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - CI / `clippy.toml` (G1): 直接依存の libm の自由関数は f32 / f64 の禁止一覧が届かず `libm::sin` が clippy を通っていた 許可する ceil / floor / round / trunc / sqrt / fma (と f32 形) 以外の libm 0.2.16 の公開関数を path で、`libm::Libm` を型で禁止した `scripts/libm_ban_check.py` (試験 `scripts/test_libm_ban_check.py`、ALICE-Zip と byte 一致) が一覧と Cargo.lock の libm の公開関数の一致を確かめ (比較 0 件は失敗)、禁止呼び出しを 4 形で植えた使い捨て crate で clippy がそれぞれ 1 件止めることを確かめる CI の clippy job と preflight で走る `alice-law-conformance.toml` の G1 を pass にした
 
 ### Changed
+- `Cargo.toml`: `include` で公開する package を crate の file (src / tests / examples / README / CHANGELOG / license / NOTICE / TRADEMARK_NOTICE) に限った 以前は `.github/` と `scripts/` の 32 file も入っていた
 - CI: `scripts/clippy_canary.py` の説明を直した canary は repository の clippy job の flag に依らず決まった flag (`-W clippy::pedantic -D warnings`) で試す (以前は「CI の clippy job と同じ flag」と書いていたが、job によって flag は違う) 動作は変わらない (ALICE-Analytics / ALICE-DB / ALICE-Zip / ALICE-Edge と byte 一致)
 - CI: root の Cargo.lock を追跡するようにした golden の試験は解決した alice-det-math の識別子を固定するので、依存の新しい版が出るたびに main の CI が黙って落ちないよう、記録した版で build する 利用者と同じく lock 無しで解決した場合は、Security & Hygiene の package integrity が展開した .crate で lock 付きの check の後に lock を外して `cargo check --all-features` し、alice-det-math が解決されたことを確かめる
 - CI: 公開する文面の検査の pin を ALICE-Law f9b9000 (checker sha256 84226ec7…) に進めた 新しい版で HEAD の全 file に指摘 0 件
