@@ -125,7 +125,12 @@ jobs:
           cd "$tmp"/*/
           # build as a standalone package, not as a member of this repository
           printf '\n[workspace]\n' >> Cargo.toml
+          cargo check --all-features --locked
+          # a consumer resolves dependencies afresh, not from this repository's lock:
+          # drop the shipped lock and check that the newest compatible versions build
+          rm -f Cargo.lock
           cargo check --all-features
+          grep -q '^name = "alice-det-math"$' Cargo.lock || { echo "::error::the lock-free check did not resolve alice-det-math"; exit 1; }
 
   coverage:
     name: Coverage (cargo-llvm-cov, informational)

@@ -1,5 +1,9 @@
 /target/
+# the root Cargo.lock is tracked: the golden tests pin the arithmetic identifier
+# of the resolved alice-det-math, so CI must build with the recorded versions
+# (nested crates such as fuzz/ keep theirs untracked)
 Cargo.lock
+!/Cargo.lock
 .DS_Store
 *.swp
 *.swo
