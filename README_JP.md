@@ -118,7 +118,7 @@ inherent method と同じ bit を返す 超越関数は `std` の有無に関わ
 | `window` | `TumblingWindow`、`SlidingWindow`、`HierarchicalRollup` |
 | `streaming_ops` | `SimpleMovingAverage`、`ExponentialMovingAverage`、`ChangeRate`、`LinearRegression`、`LinearRegressionFull` |
 | `anomaly` | `StreamingMedian`、`MadDetector`、`ZScoreDetector`、`EwmaDetector`、`CompositeDetector` |
-| `privacy` | **deprecated、差分プライバシーになっていない** (noise 源が予測できる、0.5.0 で削除) 代わりは `alice_crypto::dp` |
+| `privacy` | **deprecated、差分プライバシーになっていない** (noise 源が予測できる、時刻で seed する constructor は 0.6.0 で削除、module は deprecated のまま) 代わりは `alice_crypto::dp` |
 | `pipeline` | `MetricPipeline`、`MetricRegistry`、`MetricSnapshot`、`RingBuffer` |
 | `export` | `MetricSnapshot` の JSON / Prometheus テキスト出力 (`std`) |
 | `law` | `residual_summary`、`ResidualSketch`、`ResidualSummary` (feature `law`) |
