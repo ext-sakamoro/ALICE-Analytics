@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-15
+
 ### Added
 - CI (G11、検査器自身の試験): clippy の禁止一覧 (G1 の超越関数、G10 の wall clock / OS 乱数) に canary を追加 `scripts/clippy_canary.py` が repo の `clippy.toml` / `rust-toolchain.toml` / `[lints]` をそのまま写した使い捨て crate に、`scripts/clippy_canary_calls.tsv` の 1 行ごとに禁止呼び出しを 1 つ置き (`f64::sin` / `f64::sin_cos` / `Instant::now` / `SystemTime::now` / `RandomState`)、CI の clippy job と同じ引数で clippy を走らせて、行ごとにその path を名指す `disallowed_*` 診断がちょうど 1 件出ること・禁止呼び出しの無い対照の関数には 1 件も出ないこと・各行の path が `clippy.toml` にあることを確かめる data file が 0 行、または `clippy.toml` が 0 件の時は「比較 0 件」で失敗する 試験 `scripts/test_clippy_canary.py` (cargo 無し) と共に CI の clippy job と preflight で走る `Instant::elapsed` / `SystemTime::elapsed` は現在の `clippy.toml` に無いので行に含めていない
 - CI (G11): `scripts/run_tests.sh` (ALICE-DB と byte 一致、変更なし) の試験 `scripts/test_run_tests.py` を追加 cargo の出力を模した log を流し、通常の成功・試験 0 件・指定した file が 0 件または build されていない・似た名前の file・command の失敗・Windows の出力 (backslash・CRLF・ANSI 色) で終了コードと message を確かめる docs-lint job (3 OS) と preflight で走る
