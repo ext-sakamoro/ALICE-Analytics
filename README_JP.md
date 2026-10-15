@@ -253,7 +253,7 @@ ALICE-Law の `scripts/gen-law-readme-block.py` が ALICE-Law `6a0a5587c152` と
 | G7 handshake-carries-id | 未確認 | audit: the crate has no decode / read / from_bytes / open entry point, no extern "C" or no_mangle item, no pyo3 or wasm-bindgen export, no dyn Any or … |
 | G8 persisted-semantics-id | 未確認 | undecided: the crate writes no file or database row, but src/export.rs:24 snapshot_to_json, :58 snapshots_to_json, :86 snapshot_to_prometheus and :146 … |
 | G9 persisted-meaning-change-is-major | 未確認 | depends on G8 (the persisted identifier whose history G9 audits), which is undecided. For the in-process identifier the history is: SEMANTICS_ID first appears … |
-| G10 no-run-varying-artifacts | 未達 | no lint or scan step bans clock, uuid or unseeded-RNG reads in the library (clippy.toml lists only float methods). A lexical search of src, tests, examples and … |
+| G10 no-run-varying-artifacts | 未達 | the checker side is in place: clippy.toml disallowed-methods bans std::time::Instant::now / ::elapsed, std::time::SystemTime::now / ::elapsed and … |
 | G11 gate-self-tests | 未達 | the Law gates that are implemented here have no self-test: the G1 clippy lint has no canary that injects a banned call and confirms the lint still fires (a … |
 | G12 public-repo-text-rules | 適合 | the CI job fetches ALICE-Law's own scripts/public_text_check.py at the revision named in .github/public-text-pin and refuses it unless its SHA-256 is the one … |
 | G13 no-unspecified-order | 未確認 | audit: no HashMap or HashSet in src (the only one in the repository is tests/analytic_oracle.rs:434, in a test), no rayon, no thread spawn and no par_iter in … |
