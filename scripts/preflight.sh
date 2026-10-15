@@ -73,6 +73,9 @@ python3 scripts/test_run_tests.py
 step "ci.yml / clippy: clippy canary tests (parser and zero logic, no cargo)"
 python3 scripts/test_clippy_canary.py
 
+step "ci.yml / clippy: libm ban list (tests)"
+python3 scripts/test_libm_ban_check.py
+
 step "ci.yml / docs-lint + doc: licence agrees and its files are packaged"
 python3 scripts/test_license_check.py
 python3 scripts/license_check.py
@@ -122,6 +125,9 @@ fi
 
 step "ci.yml / clippy: clippy canary (every planted banned call is flagged)"
 python3 scripts/clippy_canary.py
+
+step "ci.yml / clippy: libm ban list (complete for the resolved libm, and enforced)"
+python3 scripts/libm_ban_check.py
 
 step "ci.yml / test: every feature, default features, no_std lib, example (golden files must run tests)"
 scripts/run_tests.sh determinism_golden,float_edge_golden -- cargo test --all-features
