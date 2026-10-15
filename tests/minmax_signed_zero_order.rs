@@ -15,10 +15,18 @@
 //! Fixed by `alice_det_math::{min64, max64}`, which this crate already
 //! depends on, so both the min and the max resolve to the IEEE
 //! minimum/maximum (`-0`/`+0`) independent of arrival order.
+//!
+//! Every helper feeds its observations through `std::hint::black_box`. The
+//! inputs are literals, so without it a release build constant-folds the
+//! extremum update and never runs the comparison instruction at all; the
+//! `x86_64` `minsd`/`maxsd` path (which returns the second operand on a zero
+//! tie, unlike the arm64 `fminnm`/`fmaxnm` path) then goes unexercised and a
+//! revert to the std `f64::min`/`max` passes in release.
 
 use alice_analytics::sketch::{DDSketch, Mergeable};
 use alice_analytics::stats::StreamingStats;
 use alice_analytics::window::SlidingWindow;
+use std::hint::black_box;
 
 fn bits(v: f64) -> u64 {
     v.to_bits()
@@ -30,7 +38,7 @@ const POS_ZERO: u64 = 0x0000_0000_0000_0000;
 fn stats_minmax(values: &[f64]) -> (f64, f64) {
     let mut s = StreamingStats::new();
     for &v in values {
-        s.observe(v);
+        s.observe(black_box(v));
     }
     (s.min(), s.max())
 }
@@ -38,7 +46,7 @@ fn stats_minmax(values: &[f64]) -> (f64, f64) {
 fn window_minmax(values: &[f64]) -> (f64, f64) {
     let mut w: SlidingWindow<16> = SlidingWindow::new();
     for &v in values {
-        w.push(v);
+        w.push(black_box(v));
     }
     (w.min(), w.max())
 }
@@ -46,7 +54,7 @@ fn window_minmax(values: &[f64]) -> (f64, f64) {
 fn sketch_minmax(values: &[f64]) -> (f64, f64) {
     let mut d = DDSketch::new(0.01);
     for &v in values {
-        d.insert(v);
+        d.insert(black_box(v));
     }
     (d.min(), d.max())
 }
@@ -57,7 +65,7 @@ fn merged_sketch_minmax(values: &[f64]) -> (f64, f64) {
     let mut acc = DDSketch::new(0.01);
     for &v in values {
         let mut one = DDSketch::new(0.01);
-        one.insert(v);
+        one.insert(black_box(v));
         acc.merge(&one);
     }
     (acc.min(), acc.max())
