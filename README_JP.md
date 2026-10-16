@@ -248,13 +248,13 @@ ALICE-Law の `scripts/gen-law-readme-block.py` が ALICE-Law `6a0a5587c152` と
 | G2 ieee-max-min | 未達 | no Law helper for max/min and no default-deny manifest of raw_* exceptions exist. The library calls f64::max / f64::min / clamp directly at src/anomaly.rs:799, … |
 | G3 no-outer-fneg-of-fma | 未達 | no checker for an outer negation of an fma result exists in this repository. mul_add is used in src/stats.rs, src/privacy.rs, src/anomaly.rs and … |
 | G4 debug-release-arch-goldens | 未達 | the cross-platform golden file is tests/determinism_golden.rs (golden_sketch, golden_stats, golden_window, golden_anomaly, golden_privacy, … |
-| G5 release-profile-test-leg | 未達 | no CI step runs the test suite under the release profile: ci.yml:40,43,50,52 are `cargo test` without --release, and the aarch64 legs (macos-latest, … |
+| G5 release-profile-test-leg | 未達 | no CI step runs the test suite under the release profile: ci.yml:46,50,57,59 are `cargo test` without --release, and the aarch64 legs (macos-latest, … |
 | G6 semantics-id | 未達 | src/lib.rs:80 is `pub use alice_det_math::SEMANTICS_ID;`: the crate re-exports its arithmetic crate's identifier and folds none of its own pins. Its own … |
 | G7 handshake-carries-id | 未確認 | audit: the crate has no decode / read / from_bytes / open entry point, no extern "C" or no_mangle item, no pyo3 or wasm-bindgen export, no dyn Any or … |
 | G8 persisted-semantics-id | 未確認 | undecided: the crate writes no file or database row, but src/export.rs:24 snapshot_to_json, :58 snapshots_to_json, :86 snapshot_to_prometheus and :146 … |
 | G9 persisted-meaning-change-is-major | 未確認 | depends on G8 (the persisted identifier whose history G9 audits), which is undecided. For the in-process identifier the history is: SEMANTICS_ID first appears … |
 | G10 no-run-varying-artifacts | 適合 | the clock-seeded constructors of the deprecated privacy module (XorShift64::from_entropy, impl Default for XorShift64, LaplaceNoise::new, Rappor::new, … |
-| G11 gate-self-tests | 未達 | the Law gates that are implemented here have no self-test: the G1 clippy lint has no canary that injects a banned call and confirms the lint still fires (a … |
+| G11 gate-self-tests | 未達 | unmet: clause (c). scripts/clippy_canary.py, scripts/test_clippy_canary.py, scripts/gen_clippy_canary_calls.py, scripts/test_gen_clippy_canary_calls.py, … |
 | G12 public-repo-text-rules | 適合 | the CI job fetches ALICE-Law's own scripts/public_text_check.py at the revision named in .github/public-text-pin and refuses it unless its SHA-256 is the one … |
 | G13 no-unspecified-order | 未確認 | audit: no HashMap or HashSet in src (the only one in the repository is tests/analytic_oracle.rs:434, in a test), no rayon, no thread spawn and no par_iter in … |
 | G14 float-environment-invariants | 未達 | the build configuration sets no fast-math-style flag and no target-cpu=native: there is no .cargo directory and no build.rs, no RUSTFLAGS in any workflow, no … |
