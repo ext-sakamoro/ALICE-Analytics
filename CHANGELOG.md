@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- CI (ALICE-Law G14): 浮動小数点の結果を変える build の flag を静的と動的の 2 段で検査する (ALICE-DB と同一の `scripts/build_config_guard.py` / `scripts/build_flags_check.py` と test) 静的は target/ 以外の設定・script・Rust を comment を除いて読み、`target-cpu=native`、素の literal でない target-cpu / target-feature / llvm-args の値、command や file から取った RUSTFLAGS、fast-math 系の flag、sse / sse2 を外す target-feature を検出する (意図的な出現は `scripts/build_config_allowlist.toml` に理由付きで書く) 動的は新しい target dir で `cargo check -v` を走らせ、cargo が rustc に実際に渡した flag を読む 静的は docs-lint job (ubuntu / macOS / Windows)、動的は release-profile job (ubuntu / macOS、default / all-features / no-default) と preflight で実行
+- `tests/float_environment.rs` (ALICE-DB と同一): round-to-nearest-even と subnormal が flush されないことを実行時に確かめる test test job (4 OS) と release profile で `scripts/run_tests.sh` を通して実行 `alice-law-conformance.toml` の G14 を fail-known から pass にした
+
 ### Changed
 - CI: `scripts/semver_gate.py` を ALICE-DB と同じ版にした feature の全体を `cargo metadata --no-deps` から読み (読めなければ失敗)、どの feature からも名指しされない optional 依存の暗黙の feature も all features の組に入る consumer の組を宣言した repository では、どの組にも入らず `exclude-features` にも無い feature を拒否する この crate は組を宣言しないので全体 (law / simd / std) をそのまま検査する
 - CI: 公開 API の互換性検査を、`security-audit.yml` の結果を問わない 2 段の job (`--release-type patch` で比較件数だけを見る) から、crates.io の最新の alice-analytics との比較で失敗させる `semver-checks.yml` に置き換えた `scripts/semver_gate.py` (ALICE-DB と同一) が consumer の feature の組 (既定 / 既定なし / 全 feature、ALICE-Law の release-train.toml は組を宣言しない) ごとに `cargo semver-checks --baseline-version <最新>` を走らせ、Cargo.toml の版との差 (0.x では minor が major) が許さない変更、tool が走らない、別の step を名乗る、比較 0 件のいずれでも失敗する Cargo.toml が公開済みの版と同じ時は次の最小の版 (0.6.0 なら 0.6.1) として検査する (`.github/semver-gate.toml` の `equal-version`) 走るのは `src/**` / `Cargo.toml` / `Cargo.lock` / `rust-toolchain.toml` / 検査器と workflow の変更時と週 1 回 preflight の full も同じ step に置き換えた

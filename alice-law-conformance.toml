@@ -89,5 +89,18 @@ status = "unverified"
 note = "audit: no HashMap or HashSet in src (the only one in the repository is tests/analytic_oracle.rs:434, in a test), no rayon, no thread spawn and no par_iter in src, tests, examples or fuzz targets, so no Law-bearing output reads an unspecified order today. It is not pass because there is no lint banning HashMap / HashSet iteration or reasoned allowlist, and not n/a because that status needs a scanner finding zero sites with the mutant of adding one; a one-off grep is neither."
 
 [G14]
-status = "fail-known"
-note = "the build configuration sets no fast-math-style flag and no target-cpu=native: there is no .cargo directory and no build.rs, no RUSTFLAGS in any workflow, no [profile] section in Cargo.toml or fuzz/Cargo.toml (searched at 06cfa76). Unmet: no scan step in CI keeps that true, and no test asserts round-to-nearest-even or that subnormals are not flushed to zero (the gate names two tests; the repository has neither)."
+status = "pass"
+evidence = [
+    "scripts/build_config_guard.py, static half (byte-identical to ALICE-DB's: every .cargo/config*, *.toml, build.rs, *.rs, *.yml / *.yaml, *.json and script kind outside target/, plus any rustc wrapper named in them, comments and YAML name values blanked, TOML / JSON decoded values too: target-cpu=native, a target-cpu / target-feature / llvm-args value that is not a plain literal, a RUSTFLAGS value from a command or a file, LLVM and C fast-math-style flags, a target-feature list disabling sse / sse2, and in src/ the fast and algebraic float intrinsics; an exclude of a file a build reads is refused; nothing read or no root Cargo.toml is exit 2)",
+    "scripts/build_flags_check.py, dynamic half (byte-identical to ALICE-DB's: runs cargo check -v in a fresh target directory and reads every rustc command line; fails when no command line, or none for alice_analytics, was seen)",
+    "scripts/build_config_allowlist.toml (five excludes with reasons: the two G14 scripts, their tests, this manifest; no allow entry)",
+    "scripts/test_build_config_guard.py and scripts/test_build_flags_check.py",
+    ".github/workflows/ci.yml docs-lint job (ubuntu, macOS, Windows): the static guard and both test files",
+    ".github/workflows/release-profile.yml (ubuntu, macOS): tests/float_environment.rs in the release profile, and the dynamic check for the default, all-features and no-default feature sets",
+    "tests/float_environment.rs round_to_nearest_even and subnormals_are_not_flushed (byte-identical to ALICE-DB's; ci.yml test job on the four OS, every-feature and default runs, through scripts/run_tests.sh)",
+]
+mutant = "measured 2026-10-16, each reverted: `RUSTFLAGS: \"-C target-cpu=native\"` added to release-profile.yml's env makes scripts/build_config_guard.py exit 1 with `.github/workflows/release-profile.yml:30: target-cpu-native: target-cpu=native`; RUSTFLAGS=$'-C target-cpu=nat\\x69ve' makes scripts/build_flags_check.py exit 1 with `alice_analytics: target-cpu-native: target-cpu=native`; setting FPCR.RMode to round-toward-plus-infinity fails round_to_nearest_even and setting FPCR.FZ (flush-to-zero) fails subnormals_are_not_flushed (aarch64, macOS)"
+since = ""
+note = "the static scan covers the files of this repository and the dynamic check covers the builds CI runs on ubuntu and macOS; a flag passed by a build outside this repository (a consumer's own RUSTFLAGS) is outside both. YAML is not parsed by the static guard (the actionlint job parses the workflows). A Rust target-feature that only adds or removes instructions other than sse / sse2 is allowed: Rust does not contract a * b + c into an fma, and mul_add is correctly rounded either way"
+reference_repo = "ALICE-DB"
+

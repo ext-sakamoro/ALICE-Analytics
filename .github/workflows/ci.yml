@@ -43,11 +43,11 @@ jobs:
       # as an empty run); the full suite still runs
       - name: Test (unit + integration + doc, every feature)
         shell: bash
-        run: scripts/run_tests.sh determinism_golden,float_edge_golden -- cargo test --all-features
+        run: scripts/run_tests.sh determinism_golden,float_edge_golden,float_environment -- cargo test --all-features
 
       - name: Test (unit + integration + doc, default features)
         shell: bash
-        run: scripts/run_tests.sh determinism_golden,float_edge_golden -- cargo test
+        run: scripts/run_tests.sh determinism_golden,float_edge_golden,float_environment -- cargo test
 
       # The library is no_std, so its unit tests must also compile and run
       # without the `std` feature: that is the only lane that executes the
@@ -204,6 +204,16 @@ jobs:
       # the zero-test guard shared with ALICE-DB, on each OS's own bash
       - name: run_tests.sh (tests)
         run: python scripts/test_run_tests.py
+      # G14, static half: no fast-math-style flag, target-cpu=native or flag value
+      # the guard cannot resolve in any file a flag can come from (deliberate
+      # occurrences in scripts/build_config_allowlist.toml); nothing read fails
+      - name: Build configuration guard (test, then check)
+        run: |
+          python scripts/test_build_config_guard.py
+          python scripts/build_config_guard.py
+      # the dynamic half's parser on each OS (the check itself runs in release-profile.yml)
+      - name: Effective rustc flags check (tests)
+        run: python scripts/test_build_flags_check.py
       - name: Entropy guard (tests)
         run: python scripts/test_entropy_guard.py
       - name: Entropy guard (no OS entropy / wall clock in production code)

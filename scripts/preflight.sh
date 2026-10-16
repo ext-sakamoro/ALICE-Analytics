@@ -70,6 +70,11 @@ python3 scripts/tracked_binaries.py
 step "ci.yml / docs-lint: run_tests.sh (zero-test guard) tests"
 python3 scripts/test_run_tests.py
 
+step "ci.yml / docs-lint: build configuration guard (G14) and the dynamic check's tests"
+python3 scripts/test_build_config_guard.py
+python3 scripts/build_config_guard.py
+python3 scripts/test_build_flags_check.py
+
 step "ci.yml / clippy: clippy canary data (generator tests, generated from clippy.toml, no drift)"
 python3 scripts/test_gen_clippy_canary_calls.py
 python3 scripts/gen_clippy_canary_calls.py --check
@@ -134,15 +139,18 @@ step "ci.yml / clippy: libm ban list (complete for the resolved libm, and enforc
 python3 scripts/libm_ban_check.py
 
 step "ci.yml / test: every feature, default features, no_std lib, example (golden files must run tests)"
-scripts/run_tests.sh determinism_golden,float_edge_golden -- cargo test --all-features
-scripts/run_tests.sh determinism_golden,float_edge_golden -- cargo test
+scripts/run_tests.sh determinism_golden,float_edge_golden,float_environment -- cargo test --all-features
+scripts/run_tests.sh determinism_golden,float_edge_golden,float_environment -- cargo test
 # the no_std lane: the only one that runs the libm rounding path on a host
 cargo test --lib --no-default-features
 cargo test --lib --no-default-features --features law
 cargo run --example residual_summary --features law
 
 step "release-profile.yml: golden tests under the release profile (each file must run tests)"
-scripts/run_tests.sh determinism_golden,float_edge_golden -- cargo test --release --test determinism_golden --test float_edge_golden
+scripts/run_tests.sh determinism_golden,float_edge_golden,float_environment -- cargo test --release --test determinism_golden --test float_edge_golden --test float_environment
+python3 scripts/build_flags_check.py -- cargo check --release --lib
+python3 scripts/build_flags_check.py -- cargo check --release --lib --all-features
+python3 scripts/build_flags_check.py -- cargo check --release --lib --no-default-features
 
 step "ci.yml / feature-powerset: cargo hack (depth 2)"
 need cargo-hack "cargo install cargo-hack --locked"
