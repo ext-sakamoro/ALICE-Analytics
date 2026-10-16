@@ -139,15 +139,15 @@ step "ci.yml / clippy: libm ban list (complete for the resolved libm, and enforc
 python3 scripts/libm_ban_check.py
 
 step "ci.yml / test: every feature, default features, no_std lib, example (golden files must run tests)"
-scripts/run_tests.sh determinism_golden,float_edge_golden,float_environment -- cargo test --all-features
-scripts/run_tests.sh determinism_golden,float_edge_golden,float_environment -- cargo test
+scripts/run_tests.sh determinism_golden,float_edge_golden,float_environment=2 -- cargo test --all-features
+scripts/run_tests.sh determinism_golden,float_edge_golden,float_environment=2 -- cargo test
 # the no_std lane: the only one that runs the libm rounding path on a host
 cargo test --lib --no-default-features
 cargo test --lib --no-default-features --features law
 cargo run --example residual_summary --features law
 
 step "release-profile.yml: golden tests under the release profile (each file must run tests)"
-scripts/run_tests.sh determinism_golden,float_edge_golden,float_environment -- cargo test --release --test determinism_golden --test float_edge_golden --test float_environment
+scripts/run_tests.sh determinism_golden,float_edge_golden,float_environment=2 -- cargo test --release --test determinism_golden --test float_edge_golden --test float_environment
 python3 scripts/build_flags_check.py -- cargo check --release --lib
 python3 scripts/build_flags_check.py -- cargo check --release --lib --all-features
 python3 scripts/build_flags_check.py -- cargo check --release --lib --no-default-features

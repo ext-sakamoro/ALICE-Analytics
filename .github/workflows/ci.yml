@@ -43,11 +43,11 @@ jobs:
       # as an empty run); the full suite still runs
       - name: Test (unit + integration + doc, every feature)
         shell: bash
-        run: scripts/run_tests.sh determinism_golden,float_edge_golden,float_environment -- cargo test --all-features
+        run: scripts/run_tests.sh determinism_golden,float_edge_golden,float_environment=2 -- cargo test --all-features
 
       - name: Test (unit + integration + doc, default features)
         shell: bash
-        run: scripts/run_tests.sh determinism_golden,float_edge_golden,float_environment -- cargo test
+        run: scripts/run_tests.sh determinism_golden,float_edge_golden,float_environment=2 -- cargo test
 
       # The library is no_std, so its unit tests must also compile and run
       # without the `std` feature: that is the only lane that executes the
