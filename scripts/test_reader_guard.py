@@ -24,6 +24,19 @@ PLANTS = {
     "Python binding": "#[pyfunction] fn f() {}",
     "wasm binding": "#[wasm_bindgen] pub fn f() {}",
     "type erasure": "fn f(x: &dyn Any) {}",
+    "bytes to number": "let x = f64::from_le_bytes(b);",
+    "reader trait": "use std::io::Read;",
+    "conversion from bytes or text": "impl TryFrom<&[u8]> for Snapshot { type Error = (); }",
+}
+
+# reader shapes the structural half must report even with neutral names
+SHAPES = {
+    "try_from": "impl TryFrom<&[u8]> for ZzA {\n    type Error = ();\n    fn try_from(_b: &[u8]) -> Result<Self, ()> { Err(()) }\n}\n",
+    "unpack_snapshot": "pub fn unpack_snapshot(bytes: &[u8]) -> Vec<f64> {\n    bytes.chunks(8).map(|c| f64::from_le_bytes(c.try_into().unwrap())).collect()\n}\n",
+    "restore": "pub fn restore(src: &mut impl std::io::Read) -> u8 {\n    let mut b = [0u8; 1];\n    let _ = src.read_exact(&mut b);\n    b[0]\n}\n",
+    "generic_reader": "pub fn ingest<R: Read>(r: R) -> u8 { 0 }\n",
+    "owned_bytes": "pub fn ingest_owned(v: Vec<u8>) -> u8 { 0 }\n",
+    "text": "pub fn ingest_text(s: String) -> u8 { 0 }\n",
 }
 
 
@@ -52,6 +65,24 @@ class ReaderGuardTest(unittest.TestCase):
                 '// let v = serde_json::from_str(s);\n'
                 'pub const DOC: &str = "fn from_bytes( File::open";\n')
         self.assertEqual(reader_guard.check(self.tree({"src/lib.rs": text}))[0], [])
+
+    def test_reader_shapes_with_neutral_names_are_found(self):
+        for name, text in SHAPES.items():
+            problems, _ = reader_guard.check(self.tree({"src/stats.rs": text}))
+            self.assertTrue(any("src/stats.rs::" in p and "not in scripts/reader_allowlist.toml" in p
+                                for p in problems), (name, problems))
+
+    def test_allowlisted_fn_passes_and_stale_or_short_entries_fail(self):
+        d = self.tree({"src/sketch.rs": "pub fn hash_bytes(data: &[u8]) -> u64 { 0 }\n"
+                                        "pub fn hash_bytes(data: &[u8]) -> u64 { 1 }\n",
+                       "scripts/reader_allowlist.toml":
+                           '[allow]\n"src/sketch.rs::hash_bytes" = "hashes caller bytes, never decodes them"\n'
+                           '"src/sketch.rs::hash_bytes#2" = "hashes caller bytes, never decodes them"\n'})
+        self.assertEqual(reader_guard.check(d)[0], [])
+        d = self.tree({"src/sketch.rs": "pub fn other() {}\n",
+                       "scripts/reader_allowlist.toml": '[allow]\n"src/sketch.rs::hash_bytes" = "short"\n'})
+        problems, _ = reader_guard.check(d)
+        self.assertTrue(any("stale" in p for p in problems), problems)
 
     def test_build_script_and_proc_macro_fail(self):
         d = self.tree({"src/lib.rs": "\n", "build.rs": "fn main() {}\n",
