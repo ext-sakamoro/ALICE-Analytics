@@ -11,13 +11,10 @@ of this crate. G7 asks every type-erasing boundary that receives another
 crate's Law-bearing value to check the producer's identifier; with no such
 boundary the list is empty.
 
-This scanner keeps that true, in two halves. The structural half lists every
-fn of the production code whose parameters take bytes, text or a reader
-(`&[u8]`, `[u8; N]`, `Vec<u8>`, `&str`, `String`, `impl Read`, a `Read` bound)
-and requires each in scripts/reader_allowlist.toml (`<file>::<fn>`, `#2` for a
-second fn of the same name in the file) with the reason it is not a
-reader of external Law-bearing bytes (a new one, or a stale entry, fails). The
-pattern half reads the production code of src/ (strings,
+This scanner is the text layer; the structural layer is scripts/api_boundary.py,
+which enumerates every fn, impl and re-export of the public API that takes or
+returns bytes, text or a reader from rustdoc JSON. This text layer reads the
+production code of src/ (strings,
 chars, comments and `#[cfg(test)]` modules removed, by the same reader as
 scripts/entropy_guard.py) and fails on any reader or boundary pattern below,
 on a build.rs or a proc-macro crate, and when it read no file (compared
@@ -57,15 +54,6 @@ PATTERNS = {
     "conversion from bytes or text": r"\bimpl\b[^{;]*\b(?:TryFrom|From)\s*<\s*(?:&\s*(?:'\w+\s+)?(?:mut\s+)?(?:\[\s*u8|str)|Vec\s*<\s*u8|\[\s*u8\s*;|String|Box\s*<\s*\[\s*u8)|\bimpl\b[^{;]*\bFromStr\b",
 }
 
-# Structural half: every fn (pub or not) of the production code whose
-# parameters take bytes, text or a reader, keyed `<file>::<fn>`, must be in
-# scripts/reader_allowlist.toml with the reason it is not a reader of external
-# Law-bearing bytes; a new such fn fails, a stale entry fails
-SIG_RE = re.compile(r"\bfn\s+(\w+)\s*(<(?:[^<>]|<[^<>]*>)*>)?\s*\(([^)]*)\)([^{;]*)", re.S)
-BYTE_PARAM = re.compile(
-    r"&\s*(?:'\w+\s+)?(?:mut\s+)?\[\s*u8\s*[\];]|\bVec\s*<\s*u8\s*>|\[\s*u8\s*;|&\s*(?:'\w+\s+)?str\b"
-    r"|\bString\b|\bimpl\s+(?:(?:std\s*::\s*)?io\s*::\s*)?(?:Buf)?Read\b|\bBytes(?:Mut)?\b|\bCow\s*<[^>]*\b(?:str|\[\s*u8)")
-READ_BOUND = re.compile(r"\b(?:Buf)?Read\b")
 
 
 
@@ -79,28 +67,6 @@ def check(root: Path) -> tuple[list[str], int]:
             for name, rx in rxs.items():
                 if rx.search(code):
                     problems.append(f"{rel}:{n}: {name}: `{code.strip()}`")
-    allow_path = root / "scripts" / "reader_allowlist.toml"
-    allowed = tomllib.loads(allow_path.read_text(encoding="utf-8")).get("allow", {}) if allow_path.exists() else {}
-    seen: set[str] = set()
-    for path in files:
-        rel = path.relative_to(root).as_posix()
-        text = "\n".join(code for _, code in production_lines(path.read_text(encoding="utf-8")))
-        for m in SIG_RE.finditer(text):
-            name, generics, params, tail = m.group(1), m.group(2) or "", m.group(3), m.group(4)
-            if BYTE_PARAM.search(params) or (READ_BOUND.search(generics + tail) and READ_BOUND.search(generics + tail + params)):
-                key = f"{rel}::{name}"
-                n = 2
-                while key in seen:  # a second fn of the same name in the file
-                    key, n = f"{rel}::{name}#{n}", n + 1
-                seen.add(key)
-                if key not in allowed:
-                    problems.append(f"{key}: takes bytes, text or a reader ({' '.join(params.split())}); "
-                                    f"not in scripts/reader_allowlist.toml")
-    for key, reason in sorted(allowed.items()):
-        if key not in seen:
-            problems.append(f"scripts/reader_allowlist.toml: {key} matches no fn (stale entry)")
-        elif len(reason.strip()) < 12:
-            problems.append(f"scripts/reader_allowlist.toml: {key}: reason shorter than 12 characters")
     if (root / "build.rs").exists():
         problems.append("build.rs: a build script can compute values at build time (G7)")
     cargo = root / "Cargo.toml"
