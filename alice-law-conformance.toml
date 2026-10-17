@@ -43,8 +43,15 @@ note = "the replacement moved no golden: tests/determinism_golden.rs passes unch
 reference_repo = "ALICE-Physics"
 
 [G3]
-status = "fail-known"
-note = "no checker for an outer negation of an fma result exists in this repository. mul_add is used in src/stats.rs, src/privacy.rs, src/anomaly.rs and src/streaming_ops.rs (and declared in the src/math.rs trait); a read of each call site found negation only on operands (src/stats.rs:80,81,263-267; src/privacy.rs:185 negates `sign` and `u.abs()` inside the arguments), none on a whole fma result. That is an audit of today's tree, not a gate: a later outer negation would not turn anything red."
+status = "pass"
+evidence = [
+    "tools/no-outer-fneg-of-fma (syntax-tree pre-check, byte-identical to ALICE-LOL main, built with --locked; ci.yml test job on the four-OS matrix and preflight): src/ tests/ examples/ benches/ with the exact counts of scripts/no-outer-fneg-of-fma-allowlist.toml (24 fma calls, 16 of them library code in src/: src/stats.rs, src/privacy.rs, src/anomaly.rs, src/streaming_ops.rs and the src/math.rs trait; 4 more in src/ test modules), no [[allow]] entry",
+    "scripts/fneg_fma_ir_check.py + scripts/test_fneg_fma_ir_check.py (byte-identical to ALICE-LOL main; the 47 shared probes in tools/fneg-fma-ir-probes, each compiled for x86_64 and aarch64 with its expected verdict): .github/workflows/g3-ir.yml builds alice-analytics's optimised IR with --all-features on a runner native to each target (x86_64-unknown-linux-gnu on ubuntu-latest, aarch64-unknown-linux-gnu on ubuntu-24.04-arm) and fails on any negated fma result, on fewer fma calls than the [[ir]] floor (25 / 24) or on 0; the changes job (scripts/changed_paths.py, shared with ALICE-DB) decides from .github/paths/g3-ir.txt, weekly schedule",
+    "measured on aarch64-apple-darwin (preflight, findings-only): 676 functions, 24 fma calls, 0 negated; cross-built locally for the two CI targets: x86_64 25 fma calls, aarch64 24, 0 negated",
+]
+mutant = "measured 2026-10-18, each reverted: src/stats.rs iqr's upper fence written `-(1.5f64.mul_add(-iqr_val, -q3))` fails the syntax tool (1 violation) and the IR check (x86_64: 2 negated fma results, src/stats.rs:81); expected-src-fma-calls 15 instead of 16 fails the syntax tool"
+since = ""
+note = "the earlier audit (negation only on operands: src/stats.rs:80, src/privacy.rs:185) is now a gate: an outer negation of a whole fma result anywhere in the scanned files or in the release IR turns CI red. The [[ir]] floors are the measured totals for the pinned toolchain (rust-toolchain.toml); a change in the inlined dependencies can move them."
 reference_repo = "ALICE-LOL"
 
 [G4]

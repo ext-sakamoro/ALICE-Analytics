@@ -246,7 +246,7 @@ ALICE-Law の `scripts/gen-law-readme-block.py` が ALICE-Law `6a0a5587c152` と
 |---|---|---|
 | G1 no-libm-direct | 適合 | every method the G1 list marks banned is in clippy.toml for f32 and f64, the pending powi is banned, every feature and the no_std target are linted with -D … |
 | G2 ieee-max-min | 適合 | the replacement moved no golden: tests/determinism_golden.rs passes unchanged in debug and release with --all-features, so ANALYTICS_SEMANTICS_ID is unchanged; … |
-| G3 no-outer-fneg-of-fma | 未達 | no checker for an outer negation of an fma result exists in this repository. mul_add is used in src/stats.rs, src/privacy.rs, src/anomaly.rs and … |
+| G3 no-outer-fneg-of-fma | 適合 | the earlier audit (negation only on operands: src/stats.rs:80, src/privacy.rs:185) is now a gate: an outer negation of a whole fma result anywhere in the … |
 | G4 debug-release-arch-goldens | 適合 | the outer-negated fma rewrite of G3's mutant reaches these sites only through mul_add, which the release legs compile with the target's codegen; the G3 checker … |
 | G5 release-profile-test-leg | 適合 | the release legs build the Law-bearing goldens with opt-level 3; an aarch64 release-only divergence (contraction into fma, reassociation) fails macos-latest. |
 | G6 semantics-id | 適合 | the identifier is a constant of this crate version: a dependency bump or a toolchain change that moved any pinned bits fails a golden, and re-recording a … |

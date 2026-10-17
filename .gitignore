@@ -1,9 +1,12 @@
 /target/
+/tools/no-outer-fneg-of-fma/target/
 # the root Cargo.lock is tracked: the golden tests pin the arithmetic identifier
 # of the resolved alice-det-math, so CI must build with the recorded versions
 # (nested crates such as fuzz/ keep theirs untracked)
 Cargo.lock
 !/Cargo.lock
+# the G3 syntax-tree tool is built with --locked: its lock is tracked (identical in every carrier)
+!/tools/no-outer-fneg-of-fma/Cargo.lock
 .DS_Store
 *.swp
 *.swo
