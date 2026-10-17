@@ -106,6 +106,9 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
+        with:
+          # the release tags: scripts/id_move_check.py compares with the newest one
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Clippy (default features, all targets)
@@ -143,6 +146,22 @@ jobs:
         run: python3 scripts/test_libm_ban_check.py
       - name: libm ban list (complete for the resolved libm, and enforced)
         run: python3 scripts/libm_ban_check.py
+      # G9: an identifier (ANALYTICS_SEMANTICS_ID) moves only with a breaking version, with the
+      # released value in its previous list (when it has one) and both values named in
+      # CHANGELOG.md; the released value is read from the published crate at the newest
+      # release tag (scripts/id_move_check.py, shared with the other ALICE crates). A
+      # registry that cannot be read fails on main and warns on ci/ branches and PRs
+      - name: Identifier moves (tests)
+        run: python3 scripts/test_id_move_check.py
+      - name: Identifier moves (the release compared with)
+        id: id-base
+        run: echo "crate=$(python3 scripts/id_move_check.py --print-base)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v5
+        with:
+          path: ~/.cargo/registry/cache/*/${{ steps.id-base.outputs.crate }}.crate
+          key: id-move-${{ steps.id-base.outputs.crate }}
+      - name: Identifier moves (against the published release)
+        run: python3 scripts/id_move_check.py
 
   # The declared `rust-version` compiled with exactly that toolchain. Bump
   # `rust-version` in Cargo.toml and the version below in the same commit.

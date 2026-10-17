@@ -107,6 +107,10 @@ reference_repo = ""
 
 [G9]
 status = "unverified"
+evidence = [
+    "scripts/id_move_check.py (shared with the other ALICE crates that carry an identifier; tests scripts/test_id_move_check.py; config scripts/id_move.toml): builds a probe against the published release of the newest release tag (alice-analytics 0.6.0 today) and against the working tree, reads semantics::ANALYTICS_SEMANTICS_ID as a value and fails when it moved without a breaking version, without the released value in PREVIOUS_ANALYTICS_SEMANTICS_IDS, or without CHANGELOG.md naming both; every const / static / associated const of type [u8; 32] and every public re-export of another crate's constant must be listed or exempt (the re-exported alice-det-math SEMANTICS_ID is exempt: folded into ANALYTICS_SEMANTICS_ID); .github/workflows/ci.yml clippy job and scripts/preflight.sh; today: ANALYTICS_SEMANTICS_ID 31a52a37 is new since 0.6.0",
+]
+mutant = "measured 2026-10-17, reverted: scripts/id_move.toml naming another path makes scripts/id_move_check.py exit 1 (`ANALYTICS_SEMANTICS_ID (src/semantics.rs:119): a [u8; 32] item that is neither an [[id]] ...`)"
 note = "depends on G8 (the persisted identifier whose history G9 audits), which is undecided. For the in-process identifier the history is: SEMANTICS_ID first appears with the 0.3.0 release (git log -S SEMANTICS_ID -- src/lib.rs: d234a2d), and CHANGELOG.md [Unreleased] names its move d2209b30 to 135c407d with alice-det-math 0.4 to 0.5 (a breaking 0.x bump); the audit of every commit that changed the definition is not done."
 
 [G10]

@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- CI (ALICE-Law G9): `scripts/id_move_check.py` (ALICE の識別子を持つ crate で共有、ALICE-Zip と同じ file) を追加 最新の release tag の公開版と作業 tree で `ANALYTICS_SEMANTICS_ID` の値を読み、動いたのに破壊的な版になっていない / 公開版の値が `PREVIOUS_ANALYTICS_SEMANTICS_IDS` に無い / CHANGELOG が両方の値を書いていない時に fail する (ci.yml の clippy job と preflight)
 - CI (ALICE-Law G13): `scripts/order_guard.py` は許した行を本文の SHA-256 で固定する (`scripts/order_allowlist.toml` の `lines`) 件数が同じでも行を書き換えると一覧を直すまで fail する rayon の並列 method は `par_` で始まるもの全部と rayon の trait 名を、dot 付きでも trait 経由 (UFCS) でも拾う (ALICE-Zip と同じ file)
 - CI (ALICE-Law G13): `std::thread::spawn` / `scope` / `Builder::spawn` / `spawn_scoped` を `clippy.toml` の disallowed-methods に追加 (共有の canary の生成器が turbofish で植えられるようになったため) module の別名・再 export・glob import でも path で解決される `std::thread::Scope` の型の禁止は外した (唯一の入口の scope 関数を禁止したため) `alice-law-conformance.toml` の G13 を pass にした
 - CI (ALICE-Law G7 / G8): `scripts/api_boundary.py` (ALICE-Sync と同じ file) と試験を追加 rustdoc JSON から公開 API の境界 (bytes・文字列・reader を取るか返す関数、C-ABI、serde / FromStr / Read の実装と bytes からの From / TryFrom、外部の再 export) を型で列挙し、28 件それぞれに理由付きの判断が `scripts/api_boundary.toml` にあることを確かめる 第 2 層の `scripts/reader_guard.py` は src/ の本番 code の decoder・serde の Deserialize・file や network の入力・FFI などの文字列を拒否する JSON / Prometheus の export は crate 内に読み手の無い監視用の出力で永続形式ではないので、`alice-law-conformance.toml` の G7 と G8 を n/a にした (読み手を足すと検査が失敗する)

@@ -67,6 +67,10 @@ step "ci.yml / docs-lint: Reader guard (G7 / G8, tests, then src/)"
 python3 scripts/test_reader_guard.py
 python3 scripts/reader_guard.py
 
+step "ci.yml / clippy: Identifier moves (tests, then against the published release)"
+python3 scripts/test_id_move_check.py
+python3 scripts/id_move_check.py
+
 step "ci.yml / clippy: API boundary (rustdoc JSON, G7 / G8)"
 python3 scripts/test_api_boundary.py
 python3 scripts/api_boundary.py
