@@ -218,6 +218,11 @@ jobs:
         run: python scripts/test_entropy_guard.py
       - name: Entropy guard (no OS entropy / wall clock in production code)
         run: python scripts/entropy_guard.py
+      # G7 / G8: no reader of external bytes and no type-erasing entry point (both n/a while this holds)
+      - name: Reader guard (tests)
+        run: python scripts/test_reader_guard.py
+      - name: Reader guard
+        run: python scripts/reader_guard.py
       # Apache-2.0 everywhere it is stated (manifest, files, READMEs, NOTICE);
       # 0 comparisons fail
       - name: Licence agrees (tests)

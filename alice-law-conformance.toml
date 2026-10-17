@@ -58,12 +58,26 @@ note = "src/lib.rs:80 is `pub use alice_det_math::SEMANTICS_ID;`: the crate re-e
 reference_repo = "ALICE-Zip"
 
 [G7]
-status = "unverified"
-note = "audit: the crate has no decode / read / from_bytes / open entry point, no extern \"C\" or no_mangle item, no pyo3 or wasm-bindgen export, no dyn Any or name-keyed registry, and no build.rs or procedural macro (grep over src and Cargo.toml and a file listing at 06cfa76 found none); the one cross-crate Law value it takes, alice_zip::law::SignalLaw (src/law.rs, `law` feature), is passed as a concrete Rust type. By the gate's own rule the list of type-erasing boundaries is therefore empty. It is not claimed as n/a because that status needs a scanner that finds zero such sites with the mutant of adding one, and this repository has none; a one-off grep is not that."
+status = "n/a"
+evidence = [
+    "scripts/reader_guard.py (ci.yml docs-lint job and preflight, tests scripts/test_reader_guard.py): the production code of src/ (strings, chars, comments and cfg(test) modules removed) has no decoder or bytes reader, no file or network input, no extern \"C\" / no_mangle, no pyo3 or wasm-bindgen export, no dyn Any or downcast, and the crate has no build.rs and is not a proc-macro crate; 11 files, 12 patterns, 0 hits; reading no file fails",
+    "the one cross-crate Law-bearing value, alice_zip::law::SignalLaw (src/law.rs, law feature), is passed as a concrete Rust type, which the gate exempts",
+]
+mutant = "measured 2026-10-17, reverted: a `pub fn from_json(_s: &str) -> Option<MetricSnapshot>` added to src/export.rs fails reader_guard.py (decode function); a `#[derive(serde::Deserialize)]` on a src/stats.rs struct fails it (serde Deserialize); scripts/test_reader_guard.py plants one line per pattern and requires each to be reported"
+since = ""
+note = "n/a while the scanner finds no type-erasing entry point: the list of boundaries that receive another crate's Law-bearing values is empty. A new reader or binding fails the scanner, which is the point where this cell has to become pass (with a handshake and its mismatch test) or record why the boundary carries no Law-bearing value."
+reference_repo = ""
 
 [G8]
-status = "unverified"
-note = "undecided: the crate writes no file or database row, but src/export.rs:24 snapshot_to_json, :58 snapshots_to_json, :86 snapshot_to_prometheus and :146 snapshots_to_prometheus format det-math-derived floats (p50 / p95 / p99 / mean / cardinality of a MetricSnapshot) as text with no identifier, and whether that text counts as a durable form meant to be read back (G8) or a monitoring output is a decision about the crate's intent, not something the tree answers. ResidualSummary::law_id (src/law.rs:147) is carried in the in-memory struct, which has no writer in this crate. The decision is needed before the cell can be pass, fail-known or n/a."
+status = "n/a"
+evidence = [
+    "the crate's writers of Law-bearing values are text exports for monitoring with no reader in the crate: src/export.rs snapshot_to_json / snapshots_to_json (JSON) and snapshot_to_prometheus / snapshots_to_prometheus (Prometheus exposition format); the crate writes no file or database row",
+    "scripts/reader_guard.py (see G7) keeps the crate free of any reader of its own exports: a decoder, serde Deserialize, a file or network input fails it",
+]
+mutant = "measured 2026-10-17, reverted: adding a reader of the exports (`pub fn from_json` in src/export.rs) fails reader_guard.py, so the exports cannot become a format read back by this crate without this cell changing"
+since = ""
+note = "ruling (2026-10-17): the JSON and Prometheus exports are monitoring output, not a durable format of this crate, because nothing in the crate reads them back; G8 constrains a format and its reader, and the crate has neither. A consumer that stores the export text and reads it into Law-bearing state does so with its own reader, which is that consumer's G8. If this crate ever reads the exports (or any bytes) back, the scanner fails and the format needs the identifier field and check_semantics-style reader of G8."
+reference_repo = ""
 
 [G9]
 status = "unverified"
