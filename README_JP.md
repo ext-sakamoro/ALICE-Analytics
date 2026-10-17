@@ -256,7 +256,7 @@ ALICE-Law の `scripts/gen-law-readme-block.py` が ALICE-Law `6a0a5587c152` と
 | G10 no-run-varying-artifacts | 適合 | the clock-seeded constructors of the deprecated privacy module (XorShift64::from_entropy, impl Default for XorShift64, LaplaceNoise::new, Rappor::new, … |
 | G11 gate-self-tests | 未達 | unmet: clause (c). scripts/clippy_canary.py, scripts/test_clippy_canary.py, scripts/gen_clippy_canary_calls.py, scripts/test_gen_clippy_canary_calls.py, … |
 | G12 public-repo-text-rules | 適合 | the CI job fetches ALICE-Law's own scripts/public_text_check.py at the revision named in .github/public-text-pin and refuses it unless its SHA-256 is the one … |
-| G13 no-unspecified-order | 適合 | no parallel reduction over floats exists, so the ordered-reduction test with two thread counts has nothing to test; the scanner keeps it that way. |
+| G13 no-unspecified-order | 適合 | no parallel reduction over floats exists, so the ordered-reduction test with two thread counts has nothing to test; both halves keep it that way. |
 | G14 float-environment-invariants | 適合 | the static scan covers the files of this repository and the dynamic check covers the builds CI runs on ubuntu and macOS; a flag passed by a build outside this … |
 
 ### feature と保証の範囲
