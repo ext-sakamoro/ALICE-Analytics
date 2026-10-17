@@ -92,8 +92,8 @@ reference_repo = ""
 [G8]
 status = "n/a"
 evidence = [
-    "the machine-checked writer list: scripts/api_boundary.py (see G7) enumerates every fn of the public API returning or taking bytes or text from rustdoc JSON, count-locked against scripts/api_boundary.toml; the writers of Law-bearing values among them are the monitoring exports src/export.rs snapshot_to_json / snapshots_to_json (JSON) and snapshot_to_prometheus / snapshots_to_prometheus (Prometheus exposition format), and the crate writes no file or database row",
-    "no reader: neither api_boundary.py (no fn taking bytes or text that decodes a value, no Deserialize / FromStr / Read impl, no From / TryFrom of bytes) nor reader_guard.py (no decoder, file or network input in production code) finds one",
+    "scripts/api_boundary.py (see G7): the machine-checked writer list; it enumerates every fn of the public API returning or taking bytes or text from rustdoc JSON, count-locked against scripts/api_boundary.toml; the writers of Law-bearing values among them are the monitoring exports src/export.rs snapshot_to_json / snapshots_to_json (JSON) and snapshot_to_prometheus / snapshots_to_prometheus (Prometheus exposition format), and the crate writes no file or database row",
+    "scripts/reader_guard.py: no reader; neither api_boundary.py (no fn taking bytes or text that decodes a value, no Deserialize / FromStr / Read impl, no From / TryFrom of bytes) nor reader_guard.py (no decoder, file or network input in production code) finds one",
 ]
 mutant = "measured 2026-10-17, reverted: a reader of the exports (`pub fn from_json` in src/export.rs) fails reader_guard.py and api_boundary.py, so the exports cannot become a format read back by this crate without this cell changing"
 since = ""
