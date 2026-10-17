@@ -247,8 +247,8 @@ ALICE-Law の `scripts/gen-law-readme-block.py` が ALICE-Law `6a0a5587c152` と
 | G1 no-libm-direct | 適合 | every method the G1 list marks banned is in clippy.toml for f32 and f64, the pending powi is banned, every feature and the no_std target are linted with -D … |
 | G2 ieee-max-min | 適合 | the replacement moved no golden: tests/determinism_golden.rs passes unchanged in debug and release with --all-features, so ANALYTICS_SEMANTICS_ID is unchanged; … |
 | G3 no-outer-fneg-of-fma | 未達 | no checker for an outer negation of an fma result exists in this repository. mul_add is used in src/stats.rs, src/privacy.rs, src/anomaly.rs and … |
-| G4 debug-release-arch-goldens | 未達 | the cross-platform golden file is tests/determinism_golden.rs (golden_sketch, golden_stats, golden_window, golden_anomaly, golden_privacy, … |
-| G5 release-profile-test-leg | 未達 | no CI step runs the test suite under the release profile: ci.yml:46,50,57,59 are `cargo test` without --release, and the aarch64 legs (macos-latest, … |
+| G4 debug-release-arch-goldens | 適合 | the outer-negated fma rewrite of G3's mutant reaches these sites only through mul_add, which the release legs compile with the target's codegen; the G3 checker … |
+| G5 release-profile-test-leg | 適合 | the release legs build the Law-bearing goldens with opt-level 3; an aarch64 release-only divergence (contraction into fma, reassociation) fails macos-latest. |
 | G6 semantics-id | 適合 | the identifier is a constant of this crate version: a dependency bump or a toolchain change that moved any pinned bits fails a golden, and re-recording a … |
 | G7 handshake-carries-id | 未確認 | audit: the crate has no decode / read / from_bytes / open entry point, no extern "C" or no_mangle item, no pyo3 or wasm-bindgen export, no dyn Any or … |
 | G8 persisted-semantics-id | 未確認 | undecided: the crate writes no file or database row, but src/export.rs:24 snapshot_to_json, :58 snapshots_to_json, :86 snapshot_to_prometheus and :146 … |
@@ -256,7 +256,7 @@ ALICE-Law の `scripts/gen-law-readme-block.py` が ALICE-Law `6a0a5587c152` と
 | G10 no-run-varying-artifacts | 適合 | the clock-seeded constructors of the deprecated privacy module (XorShift64::from_entropy, impl Default for XorShift64, LaplaceNoise::new, Rappor::new, … |
 | G11 gate-self-tests | 未達 | unmet: clause (c). scripts/clippy_canary.py, scripts/test_clippy_canary.py, scripts/gen_clippy_canary_calls.py, scripts/test_gen_clippy_canary_calls.py, … |
 | G12 public-repo-text-rules | 適合 | the CI job fetches ALICE-Law's own scripts/public_text_check.py at the revision named in .github/public-text-pin and refuses it unless its SHA-256 is the one … |
-| G13 no-unspecified-order | 未確認 | audit: no HashMap or HashSet in src (the only one in the repository is tests/analytic_oracle.rs:434, in a test), no rayon, no thread spawn and no par_iter in … |
+| G13 no-unspecified-order | 適合 | no parallel reduction over floats exists, so the ordered-reduction test with two thread counts has nothing to test; the scanner keeps it that way. |
 | G14 float-environment-invariants | 適合 | the static scan covers the files of this repository and the dynamic check covers the builds CI runs on ubuntu and macOS; a flag passed by a build outside this … |
 
 ### feature と保証の範囲
