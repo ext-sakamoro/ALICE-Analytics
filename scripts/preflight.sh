@@ -63,6 +63,10 @@ step "ci.yml / docs-lint: entropy guard (no OS entropy / wall clock in productio
 python3 scripts/test_entropy_guard.py
 python3 scripts/entropy_guard.py
 
+step "ci.yml / docs-lint: Order guard (G13, tests, then src/)"
+python3 scripts/test_order_guard.py
+python3 scripts/order_guard.py
+
 step "ci.yml / docs-lint: no built binary is tracked"
 python3 scripts/test_tracked_binaries.py
 python3 scripts/tracked_binaries.py
@@ -148,6 +152,7 @@ cargo run --example residual_summary --features law
 
 step "release-profile.yml: golden tests under the release profile (each file must run tests)"
 scripts/run_tests.sh determinism_golden,float_edge_golden,float_environment=2 -- cargo test --release --test determinism_golden --test float_edge_golden --test float_environment
+scripts/run_tests.sh determinism_golden,float_edge_golden,float_environment=2 -- cargo test --release --all-features --test determinism_golden --test float_edge_golden --test float_environment
 python3 scripts/build_flags_check.py -- cargo check --release --lib
 python3 scripts/build_flags_check.py -- cargo check --release --lib --all-features
 python3 scripts/build_flags_check.py -- cargo check --release --lib --no-default-features

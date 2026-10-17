@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+"""Tests of scripts/order_guard.py on throwaway trees."""
+from __future__ import annotations
+
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import order_guard  # noqa: E402
+
+PLANTS = {
+    "HashMap": "let m: std::collections::HashMap<u32, f64> = Default::default();",
+    "HashSet": "let s = std::collections::HashSet::<u32>::new();",
+    "parallel": "let t: f64 = xs.par_iter().sum();",
+    "threads": "let h = std::thread::spawn(|| 1);",
+    "address order": "let a = p as *const u8 as usize;",
+}
+
+
+class OrderGuardTest(unittest.TestCase):
+    def tree(self, files: dict[str, str]) -> Path:
+        d = Path(tempfile.mkdtemp())
+        (d / "src").mkdir()
+        for name, text in files.items():
+            p = d / name
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(text, encoding="utf-8")
+        return d
+
+    def test_clean_tree_passes(self):
+        d = self.tree({"src/lib.rs": "pub fn f(m: &std::collections::BTreeMap<u32, f64>) -> f64 { 0.0 }\n"})
+        self.assertEqual(order_guard.check(d)[0], [])
+
+    def test_every_pattern_is_found(self):
+        self.assertEqual(set(PLANTS), set(order_guard.PATTERNS))
+        for name, line in PLANTS.items():
+            problems, _, _ = order_guard.check(self.tree({"src/lib.rs": f"fn f() {{ {line} }}\n"}))
+            self.assertTrue(any(f"src/lib.rs::{name}" in p for p in problems), (name, problems))
+
+    def test_listed_site_passes_and_drift_fails(self):
+        src = {"src/store.rs": "use std::collections::HashMap;\npub struct S { m: HashMap<u32, u32> }\n"}
+        ok = '[allow]\n"src/store.rs::HashMap" = { count = 2, reason = "keyed lookup only, never iterated" }\n'
+        self.assertEqual(order_guard.check(self.tree(dict(src, **{"scripts/order_allowlist.toml": ok})))[0], [])
+        wrong = ok.replace("count = 2", "count = 1")
+        problems = order_guard.check(self.tree(dict(src, **{"scripts/order_allowlist.toml": wrong})))[0]
+        self.assertTrue(any("says 1" in p for p in problems), problems)
+        stale = ok + '"src/gone.rs::HashSet" = { count = 1, reason = "removed some time ago" }\n'
+        problems = order_guard.check(self.tree(dict(src, **{"scripts/order_allowlist.toml": stale})))[0]
+        self.assertTrue(any("stale" in p for p in problems), problems)
+
+    def test_test_modules_and_comments_are_not_production(self):
+        text = ("#[cfg(test)]\nmod tests {\n    fn f() { let m = std::collections::HashMap::<u8, u8>::new(); }\n}\n"
+                "// HashMap in a comment\npub const DOC: &str = \"HashSet in a string\";\n")
+        self.assertEqual(order_guard.check(self.tree({"src/lib.rs": text}))[0], [])
+
+    def test_no_source_file_fails(self):
+        d = Path(tempfile.mkdtemp())
+        (d / "src").mkdir()
+        self.assertEqual(order_guard.main(["--root", str(d)]), 1)
+
+
+if __name__ == "__main__":
+    unittest.main()

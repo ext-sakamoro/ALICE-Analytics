@@ -218,6 +218,11 @@ jobs:
         run: python scripts/test_entropy_guard.py
       - name: Entropy guard (no OS entropy / wall clock in production code)
         run: python scripts/entropy_guard.py
+      # G13: no HashMap / HashSet, parallel combination or address order in production code
+      - name: Order guard (tests)
+        run: python scripts/test_order_guard.py
+      - name: Order guard
+        run: python scripts/order_guard.py
       # Apache-2.0 everywhere it is stated (manifest, files, READMEs, NOTICE);
       # 0 comparisons fail
       - name: Licence agrees (tests)
