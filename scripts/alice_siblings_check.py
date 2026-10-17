@@ -20,7 +20,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-LIST_FILE = Path(".github/alice-siblings")
+# a POSIX string, not a Path: it appears in messages that must read the same on every OS
+LIST_FILE = ".github/alice-siblings"
 MANIFESTS = ("Cargo.toml", "fuzz/Cargo.toml")
 LINE_RE = re.compile(r"(ALICE-[A-Za-z0-9-]+) ([0-9a-f]{40})")
 PATH_RE = re.compile(r'path\s*=\s*"((?:\.\./)+)(ALICE-[A-Za-z0-9-]+)"')
