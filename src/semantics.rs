@@ -12,7 +12,7 @@
 //! # Hex form
 //!
 //! ```text
-//! 31a52a378746ecce9d76df395884477c92dacdf94c402b34bfffbad5c965c991
+//! f8ded5961a8ef8be2d79ea4bfafd68f494c2443d725fb926cf9775824e043d4d
 //! ```
 //!
 //! # Entries
@@ -24,12 +24,11 @@
 //! `law` feature). The identifier goldens (`GOLDEN_SEMANTICS_ID`,
 //! `GOLDEN_LAW_ID`) are not pins: they are functions of the entries.
 //!
-//! `alice-zip` 0.10 re-exports `alice-det-math`'s identifier as its
-//! `law::SEMANTICS_ID`, so its entry has the same digest as the
-//! `"alice-det-math"` entry today: it names the arithmetic, not alice-zip's
-//! own rules, which reach this identifier through the `"law"` golden. The
-//! entry is kept so that an identifier alice-zip defines later moves this
-//! one.
+//! `alice-zip` 0.11 defines its own `law::SEMANTICS_ID` (a fold of its own
+//! Law pins with the arithmetic identifier), so its entry differs from the
+//! `"alice-det-math"` entry. Under 0.10 the two entries were equal (0.10
+//! re-exported `alice-det-math`'s identifier); the `"law"` golden and every
+//! scenario golden are unchanged between the two, only this entry moved.
 //!
 //! # Fold
 //!
@@ -110,14 +109,14 @@ pub const ANALYTICS_SEMANTICS_PINS: [(&str, [u8; 32]); 9] = [
     ),
     (
         "alice-zip",
-        hex32("85e0884623b154a3b2b264374907b6cbac09307ca3f9a08339e48c567d3cb315"),
+        hex32("51ffeb079769ea34bd3cb3df756b6cb940b8d2d6a6a0f1e1115ab8139415935e"),
     ),
 ];
 
 /// The semantics identifier of this crate: the fold of
 /// [`ANALYTICS_SEMANTICS_PINS`] (see the module documentation).
 pub const ANALYTICS_SEMANTICS_ID: [u8; 32] =
-    hex32("31a52a378746ecce9d76df395884477c92dacdf94c402b34bfffbad5c965c991");
+    hex32("f8ded5961a8ef8be2d79ea4bfafd68f494c2443d725fb926cf9775824e043d4d");
 
 /// Earlier values of [`ANALYTICS_SEMANTICS_ID`] whose pinned bits this
 /// release still reproduces (none yet: this is the first identifier).
