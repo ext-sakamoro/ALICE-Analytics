@@ -42,6 +42,7 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v5
+      - uses: ./.github/actions/alice-siblings
       # the toolchain itself comes from rust-toolchain.toml
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2

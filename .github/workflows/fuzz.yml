@@ -12,12 +12,16 @@ on:
       - 'src/**'
       - 'fuzz/**'
       - '.github/workflows/fuzz.yml'
+      - '.github/alice-siblings'
+      - '.github/actions/alice-siblings/**'
   pull_request:
     branches: [main]
     paths:
       - 'src/**'
       - 'fuzz/**'
       - '.github/workflows/fuzz.yml'
+      - '.github/alice-siblings'
+      - '.github/actions/alice-siblings/**'
   schedule:
     # every day 03:00 UTC
     - cron: '0 3 * * *'
@@ -53,6 +57,7 @@ jobs:
           - fuzz_sketch_insert
     steps:
       - uses: actions/checkout@v5
+      - uses: ./.github/actions/alice-siblings
 
       - name: Install nightly toolchain
         uses: dtolnay/rust-toolchain@nightly

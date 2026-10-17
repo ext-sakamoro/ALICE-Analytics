@@ -25,6 +25,8 @@ on:
       - 'deny.toml'
       - '.github/workflows/security-audit.yml'
       - 'scripts/stub_guard.sh'
+      - '.github/alice-siblings'
+      - '.github/actions/alice-siblings/**'
   pull_request:
     branches: [main]
     paths:
@@ -35,6 +37,8 @@ on:
       - 'deny.toml'
       - '.github/workflows/security-audit.yml'
       - 'scripts/stub_guard.sh'
+      - '.github/alice-siblings'
+      - '.github/actions/alice-siblings/**'
   schedule:
     # every Monday 09:00 UTC
     - cron: '0 9 * * 1'
@@ -57,6 +61,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
+      - uses: ./.github/actions/alice-siblings
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Install cargo-audit
@@ -75,6 +80,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
+      - uses: ./.github/actions/alice-siblings
       - uses: dtolnay/rust-toolchain@stable
       - name: Install cargo-deny
         uses: taiki-e/install-action@v2
@@ -89,6 +95,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
+      - uses: ./.github/actions/alice-siblings
       - name: Install cargo-machete
         uses: taiki-e/install-action@v2
         with:
@@ -102,6 +109,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
+      - uses: ./.github/actions/alice-siblings
       - name: Detect todo! / unimplemented! / panic!(STUB) / dbg! in src/**
         run: scripts/stub_guard.sh
 
@@ -111,6 +119,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
+      - uses: ./.github/actions/alice-siblings
       - uses: dtolnay/rust-toolchain@stable
       # A file the package needs but does not contain (include_str! across the
       # package boundary, an over-broad exclude) builds fine in the repository
@@ -142,6 +151,7 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v5
+      - uses: ./.github/actions/alice-siblings
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: llvm-tools-preview

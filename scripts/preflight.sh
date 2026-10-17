@@ -48,6 +48,10 @@ step "ci.yml / actionlint: workflow-concurrency (branch runs cancel, main never)
 python3 scripts/test_workflow_concurrency.py
 python3 scripts/workflow_concurrency.py
 
+step "ci.yml / docs-lint: ALICE siblings (each ../ALICE-* is the commit in .github/alice-siblings)"
+python3 scripts/test_alice_siblings_check.py
+python3 scripts/alice_siblings_check.py
+
 step "ci.yml / fmt: cargo fmt --check"
 cargo fmt --all -- --check
 
