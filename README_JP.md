@@ -245,7 +245,7 @@ ALICE-Law の `scripts/gen-law-readme-block.py` が ALICE-Law `6a0a5587c152` と
 | gate | 状態 | 注記 |
 |---|---|---|
 | G1 no-libm-direct | 適合 | every method the G1 list marks banned is in clippy.toml for f32 and f64, the pending powi is banned, every feature and the no_std target are linted with -D … |
-| G2 ieee-max-min | 未達 | no Law helper for max/min and no default-deny manifest of raw_* exceptions exist. The library calls f64::max / f64::min / clamp directly at src/anomaly.rs:799, … |
+| G2 ieee-max-min | 適合 | the replacement moved no golden: tests/determinism_golden.rs passes unchanged in debug and release with --all-features, so ANALYTICS_SEMANTICS_ID is unchanged; … |
 | G3 no-outer-fneg-of-fma | 未達 | no checker for an outer negation of an fma result exists in this repository. mul_add is used in src/stats.rs, src/privacy.rs, src/anomaly.rs and … |
 | G4 debug-release-arch-goldens | 未達 | the cross-platform golden file is tests/determinism_golden.rs (golden_sketch, golden_stats, golden_window, golden_anomaly, golden_privacy, … |
 | G5 release-profile-test-leg | 未達 | no CI step runs the test suite under the release profile: ci.yml:46,50,57,59 are `cargo test` without --release, and the aarch64 legs (macos-latest, … |
