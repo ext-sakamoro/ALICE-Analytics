@@ -250,7 +250,7 @@ ALICE-Law の `scripts/gen-law-readme-block.py` が ALICE-Law `6a0a5587c152` と
 | G4 debug-release-arch-goldens | 未達 | the cross-platform golden file is tests/determinism_golden.rs (golden_sketch, golden_stats, golden_window, golden_anomaly, golden_privacy, … |
 | G5 release-profile-test-leg | 未達 | no CI step runs the test suite under the release profile: ci.yml:46,50,57,59 are `cargo test` without --release, and the aarch64 legs (macos-latest, … |
 | G6 semantics-id | 未達 | src/lib.rs:80 is `pub use alice_det_math::SEMANTICS_ID;`: the crate re-exports its arithmetic crate's identifier and folds none of its own pins. Its own … |
-| G7 handshake-carries-id | 対象外 | n/a while the scanner finds no type-erasing entry point: the list of boundaries that receive another crate's Law-bearing values is empty. A new reader or … |
+| G7 handshake-carries-id | 対象外 | n/a while the enumerated boundary has no entry point that receives another crate's Law-bearing value: every enumerated item is decided local. A new reader, … |
 | G8 persisted-semantics-id | 対象外 | ruling (2026-10-17): the JSON and Prometheus exports are monitoring output, not a durable format of this crate, because nothing in the crate reads them back; … |
 | G9 persisted-meaning-change-is-major | 未確認 | depends on G8 (the persisted identifier whose history G9 audits), which is undecided. For the in-process identifier the history is: SEMANTICS_ID first appears … |
 | G10 no-run-varying-artifacts | 適合 | the clock-seeded constructors of the deprecated privacy module (XorShift64::from_entropy, impl Default for XorShift64, LaplaceNoise::new, Rappor::new, … |
