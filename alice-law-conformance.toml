@@ -53,9 +53,16 @@ note = "no CI step runs the test suite under the release profile: ci.yml:46,50,5
 reference_repo = "ALICE-LOL"
 
 [G6]
-status = "fail-known"
-note = "src/lib.rs:80 is `pub use alice_det_math::SEMANTICS_ID;`: the crate re-exports its arithmetic crate's identifier and folds none of its own pins. Its own Law-bearing value is law::ResidualSummary::law_id (src/law.rs:147,294), which is alice-zip's SignalLaw::law_id taken under that identifier, i.e. a per-law identifier, not a crate identifier. The identifier is pinned as hex by tests/determinism_golden.rs:652 (GOLDEN_SEMANTICS_ID, golden_semantics_id) and golden_law_id; there is no test that changing a pin of this crate changes the identifier (it has no pin of its own), and no tie to the crate version or toolchain that makes a stale identifier visible."
-reference_repo = "ALICE-Zip"
+status = "pass"
+evidence = [
+    "src/semantics.rs ANALYTICS_SEMANTICS_ID (exported from the crate root with ANALYTICS_SEMANTICS_PINS and PREVIOUS_ANALYTICS_SEMANTICS_IDS): the fold (sorted by name, u32 big-endian name length, name, 32 digest bytes, SHA-256) of nine pins: the seven scenario goldens of tests/determinism_golden.rs (sketch, stats, window, anomaly, privacy, streaming_ops, law) and the identifiers of the Law-bearing dependencies, alice-det-math SEMANTICS_ID and alice-zip law::SEMANTICS_ID (law feature), recorded as hex so the value does not depend on cargo features",
+    "src/lib.rs: the re-exported SEMANTICS_ID is documented as the arithmetic identifier only and points to ANALYTICS_SEMANTICS_ID as the crate's own",
+    "tests/analytics_semantics_id.rs: the_identifier_is_the_fold_of_its_pins (constant, module-doc hex and recomputed fold agree), golden_pins_are_the_recorded_goldens (read from tests/determinism_golden.rs, not copied), det_math_pin_is_the_resolved_arithmetic_identifier, zip_pin_is_the_resolved_zip_identifier (law), every_pin_moves_the_identifier (each of the nine pins flipped moves the fold)",
+]
+mutant = "measured 2026-10-17, each reverted: the anomaly pin with its last hex digit changed fails the fold test and golden_pins_are_the_recorded_goldens; GOLDEN_STATS changed fails golden_stats and golden_pins_are_the_recorded_goldens; the alice-zip pin changed fails zip_pin_is_the_resolved_zip_identifier and the fold test"
+since = ""
+note = "the identifier is a constant of this crate version: a dependency bump or a toolchain change that moved any pinned bits fails a golden, and re-recording a golden or resolving another upstream identifier moves the identifier; earlier identifiers whose pinned bits are still reproduced go into PREVIOUS_ANALYTICS_SEMANTICS_IDS (empty: this is the first). law::ResidualSummary::law_id stays a per-law identifier taken under the arithmetic SEMANTICS_ID (unchanged); the identifier goldens GOLDEN_SEMANTICS_ID and GOLDEN_LAW_ID are not pins, being functions of the entries. Estimator paths with no golden are not pins, so a change there does not move the identifier."
+reference_repo = "ALICE-Physics"
 
 [G7]
 status = "unverified"
