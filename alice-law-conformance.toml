@@ -43,14 +43,27 @@ note = "no checker for an outer negation of an fma result exists in this reposit
 reference_repo = "ALICE-LOL"
 
 [G4]
-status = "fail-known"
-note = "the cross-platform golden file is tests/determinism_golden.rs (golden_sketch, golden_stats, golden_window, golden_anomaly, golden_privacy, golden_streaming_ops, golden_law, golden_semantics_id, golden_law_id: SHA-256 of bit patterns recorded on macOS aarch64), run on macos-latest (aarch64), ubuntu-24.04-arm (aarch64), ubuntu-latest (x86_64) and windows-latest (x86_64), .github/workflows/ci.yml:34. Two parts are unmet: (1) every test step is the debug profile (ci.yml:46,50,57,59 have no --release), so the {debug, release} half of the matrix is not run; (2) the goldens are driven by pseudo-random streams, and no case is built to hit a signed zero or an exact cancellation with a fixed expected bit pattern (the only -0.0 inputs are in tests/panic_contract.rs:587 and tests/law_identity.rs:168, which assert behaviour, not golden bits)."
-reference_repo = "ALICE-LOL"
+status = "pass"
+evidence = [
+    "tests/float_edge_golden.rs: the signed-zero and exact-cancellation cases against fixed bit patterns (to_bits): streaming_stats_mean_of_single_negative_zero_is_positive_zero, streaming_stats_variance_of_near_equal_large_values, streaming_stats_skewness_of_symmetric_large_values_is_zero, streaming_stats_kurtosis_of_four_near_equal_large_values, streaming_stats_opposite_sign_values_mean_zero, linear_regression_collinear_points_with_large_mean_x, linear_regression_flat_negative_zero_line_is_positive_zero, ema_of_negative_zeros_keeps_negative_zero, ema_of_opposite_large_values_cancels_to_positive_zero and the rest of the file (21 tests); tests/determinism_golden.rs pins the scenario hashes",
+    "debug x {x86_64, aarch64}: .github/workflows/ci.yml test job, matrix macos-latest (aarch64), ubuntu-24.04-arm (aarch64), ubuntu-latest (x86_64), windows-latest (x86_64), each running scripts/run_tests.sh determinism_golden,float_edge_golden,float_environment=2 with every feature and with the default features (a named file that runs no test fails the step), no continue-on-error",
+    "release x {x86_64, aarch64}: .github/workflows/release-profile.yml, matrix ubuntu-latest (x86_64) and macos-latest (aarch64), the same run_tests.sh guard for the default features and for every feature (the law goldens), no continue-on-error; mirrored in scripts/preflight.sh",
+]
+mutant = "measured 2026-10-17, reverted: the expected bits of streaming_stats_variance_of_near_equal_large_values changed in the last digit (0x3fe5_5555_5555_5556) fails float_edge_golden under --release (20 passed, 1 failed), and the same file fails on every leg because the expected value is a constant"
+since = ""
+note = "the outer-negated fma rewrite of G3's mutant reaches these sites only through mul_add, which the release legs compile with the target's codegen; the G3 checker itself is the G3 cell."
+reference_repo = "ALICE-Sync"
 
 [G5]
-status = "fail-known"
-note = "no CI step runs the test suite under the release profile: ci.yml:46,50,57,59 are `cargo test` without --release, and the aarch64 legs (macos-latest, ubuntu-24.04-arm, ci.yml:34) therefore never compile the arithmetic with release codegen (where an fma instruction is contracted differently). A text search for `--release` over the workflows matches only `--release-type patch` in security-audit.yml:190 (semver-checks), which is not a test leg."
-reference_repo = "ALICE-LOL"
+status = "pass"
+evidence = [
+    ".github/workflows/release-profile.yml job release-golden, runner labels ubuntu-latest (x86_64) and macos-latest (aarch64): cargo test --release for tests/determinism_golden.rs, tests/float_edge_golden.rs and tests/float_environment.rs, with the default features and with every feature (the law-feature goldens), through scripts/run_tests.sh, which fails the step when a named file ran no test",
+    "no paths filter: every commit to main and ci/** runs it",
+]
+mutant = "measured 2026-10-17: removing the macos-latest leg leaves no aarch64 release run in any workflow (the only other release runs are cargo check in the same job); the flipped expected bit of the G4 mutant fails the release step"
+since = ""
+note = "the release legs build the Law-bearing goldens with opt-level 3; an aarch64 release-only divergence (contraction into fma, reassociation) fails macos-latest."
+reference_repo = "ALICE-Sync"
 
 [G6]
 status = "pass"
@@ -115,8 +128,14 @@ note = "the CI job fetches ALICE-Law's own scripts/public_text_check.py at the r
 reference_repo = "ALICE-Law"
 
 [G13]
-status = "unverified"
-note = "audit: no HashMap or HashSet in src (the only one in the repository is tests/analytic_oracle.rs:434, in a test), no rayon, no thread spawn and no par_iter in src, tests, examples or fuzz targets, so no Law-bearing output reads an unspecified order today. It is not pass because there is no lint banning HashMap / HashSet iteration or reasoned allowlist, and not n/a because that status needs a scanner finding zero sites with the mutant of adding one; a one-off grep is neither."
+status = "fail-known"
+evidence = [
+    "clippy.toml disallowed-types HashMap, HashSet and their iterators (hash_map::Iter / Keys / Values / IntoIter, hash_set::Iter / IntoIter), std::thread::Builder / JoinHandle / ScopedJoinHandle / Scope, disallowed-methods available_parallelism (every target, -D warnings; canary 188 planted); src has no HashMap / HashSet; tests/analytic_oracle.rs counts in a BTreeMap",
+    "interim text layer: scripts/order_guard.py (the same file as ALICE-Edge's, tests scripts/test_order_guard.py; ci.yml docs-lint job and preflight): paths and imports through std::thread (other than sleep / yield_now / current / park), hash_map:: / hash_set:: paths, rayon / par_iter / crossbeam, a pointer-to-integer cast, and a normal dependency on rayon / crossbeam / hashbrown / indexmap / dashmap / ahash / fxhash / rustc-hash: 12 files, 0 lines",
+]
+since = ""
+note = "located: std::thread::spawn / scope are not yet in clippy disallowed-methods because the shared clippy canary generator plants a bare path, which does not compile for a generic function; until the generator update (a turbofish table for generic paths) lands in the enforced repos, a spawn reached through a re-export chain is caught only by the text layer, which is evadable, so the cell is not pass. Measured 2026-10-17: the text layer catches `use std::thread::{self as t}`, `{spawn}`, `*`, `use std::thread as t`, `pub use std::thread as pool`, `use std as s; s::thread::spawn` and hash_set::Iter; clippy catches the HashMap alias, hash_set::Iter and Builder."
+reference_repo = ""
 
 [G14]
 status = "pass"
