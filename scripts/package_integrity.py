@@ -21,6 +21,14 @@ and not assumed:
 A sibling whose requirement crates.io already satisfies is not patched, so it cannot hide
 a failure. Every other packaging or build error fails. No .crate produced fails.
 
+Options for what a crate's package must hold (each runs with the same patches; a value
+that starts with "--" is passed as --opt=VALUE):
+  --require-file F / --forbid-prefix P   on `cargo package --list` (an empty list fails)
+  --doctests-min N [--doctest-args A]    `cargo test --doc` in the unpacked crate, >= N pass
+  --test-in-package "ARGS"               `cargo test ARGS` in the unpacked crate, >= 1 pass
+  --check-args "ARGS"                    the fresh-resolution check (default --all-features)
+  --expect-in-lock NAME                  a package the fresh resolution must contain
+
 --publish-gate does not package: it fails when any dependency is blocked, so nothing
 that only builds against an unpublished sibling can be published.
 """
@@ -31,6 +39,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import tarfile
@@ -230,10 +239,44 @@ def run_cmd(cmd: list[str], cwd: Path) -> tuple[int, str]:
     return p.returncode, p.stdout + p.stderr
 
 
+TEST_RESULT_RE = re.compile(r"^test result: (\w+)\. (\d+) passed; (\d+) failed", re.M)
+
+
+def passed_tests(out: str) -> tuple[int, int]:
+    """(passed, failed) summed over every `test result:` line of a cargo test run."""
+    passed = failed = 0
+    for m in TEST_RESULT_RE.finditer(out):
+        passed += int(m.group(2))
+        failed += int(m.group(3))
+    return passed, failed
+
+
+def check_list(root: Path, patches: list[str], opts: argparse.Namespace, runner: Runner) -> list[str]:
+    """`cargo package --list`: not empty, no forbidden prefix, every required file present."""
+    if not opts.require_file and not opts.forbid_prefix:
+        return []
+    rc, out = runner(["cargo", "package", "--list", "--allow-dirty", *patches], root)
+    if rc != 0:
+        return [f"cargo package --list failed:\n{out}"]
+    files = [line.strip() for line in out.splitlines() if line.strip() and not line.startswith(" ")]
+    if not files:
+        return ["cargo package --list listed no file (compared nothing)"]
+    problems = [f"the package lacks {f}" for f in opts.require_file if f not in files]
+    for prefix in opts.forbid_prefix:
+        problems += [f"the package contains {f} (forbidden prefix {prefix})" for f in files if f.startswith(prefix)]
+    if not problems:
+        print(f"package_integrity: package lists {len(files)} files, {len(opts.require_file)} required "
+              f"present, {len(opts.forbid_prefix)} forbidden prefixes absent")
+    return problems
+
+
 def package_and_build(
-    root: Path, blocked: list[dict], expect: list[str], runner: Runner, target: Path
+    root: Path, blocked: list[dict], opts: argparse.Namespace, runner: Runner, target: Path
 ) -> list[str]:
     patches = patch_args(blocked)
+    problems = check_list(root, patches, opts, runner)
+    if problems:
+        return problems
     pkg_meta = tomllib.loads((root / "Cargo.toml").read_text(encoding="utf-8"))["package"]
     crate = target / "package" / f"{pkg_meta['name']}-{pkg_meta['version']}.crate"
     started = time.time()
@@ -255,12 +298,28 @@ def package_and_build(
         rc, out = runner(["cargo", "check", "--all-features", "--locked", *patches], pkg)
         if rc != 0:
             return [f"the unpacked crate does not build with its shipped lock:\n{out}"]
+        if opts.doctests_min:
+            rc, out = runner(["cargo", "test", "--doc", "--locked", *shlex.split(opts.doctest_args), *patches], pkg)
+            passed, failed = passed_tests(out)
+            if rc != 0 or failed:
+                return [f"the unpacked crate's doctests fail:\n{out}"]
+            if passed < opts.doctests_min:
+                return [f"the unpacked crate ran {passed} doctests, expected at least {opts.doctests_min}"]
+            print(f"package_integrity: unpacked doctests: {passed} passed")
+        for spec in opts.test_in_package:
+            rc, out = runner(["cargo", "test", "--locked", *shlex.split(spec), *patches], pkg)
+            passed, failed = passed_tests(out)
+            if rc != 0 or failed:
+                return [f"`cargo test {spec}` fails in the unpacked crate:\n{out}"]
+            if passed == 0:
+                return [f"`cargo test {spec}` ran no test in the unpacked crate (compared nothing)"]
+            print(f"package_integrity: unpacked `cargo test {spec}`: {passed} passed")
         (pkg / "Cargo.lock").unlink(missing_ok=True)
-        rc, out = runner(["cargo", "check", "--all-features", *patches], pkg)
+        rc, out = runner(["cargo", "check", *shlex.split(opts.check_args), *patches], pkg)
         if rc != 0:
             return [f"the unpacked crate does not build with a fresh resolution:\n{out}"]
         lock = (pkg / "Cargo.lock").read_text(encoding="utf-8") if (pkg / "Cargo.lock").exists() else ""
-        missing = [n for n in expect if f'name = "{n}"' not in lock]
+        missing = [n for n in opts.expect_in_lock if f'name = "{n}"' not in lock]
         if missing:
             return [f"the fresh resolution did not resolve {', '.join(missing)}"]
     return []
@@ -270,7 +329,19 @@ def main(argv: list[str] | None = None, versions_of=registry_versions, runner: R
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default=".")
     ap.add_argument("--publish-gate", action="store_true")
-    ap.add_argument("--expect-in-lock", action="append", default=[])
+    ap.add_argument("--expect-in-lock", action="append", default=[],
+                    help="a package the fresh resolution must contain (repeatable)")
+    ap.add_argument("--check-args", default="--all-features",
+                    help="arguments of the fresh-resolution `cargo check` (default --all-features)")
+    ap.add_argument("--require-file", action="append", default=[],
+                    help="a file `cargo package --list` must contain (repeatable)")
+    ap.add_argument("--forbid-prefix", action="append", default=[],
+                    help="a path prefix no packaged file may start with (repeatable)")
+    ap.add_argument("--doctests-min", type=int, default=0,
+                    help="run `cargo test --doc` in the unpacked crate and require at least N to pass")
+    ap.add_argument("--doctest-args", default="", help="extra arguments of that doctest run")
+    ap.add_argument("--test-in-package", action="append", default=[],
+                    help="`cargo test` arguments to run in the unpacked crate; at least one test must pass (repeatable)")
     args = ap.parse_args(argv)
     root = Path(args.root).resolve()
     try:
@@ -290,7 +361,7 @@ def main(argv: list[str] | None = None, versions_of=registry_versions, runner: R
         print("package_integrity: publish gate: OK (nothing blocked)")
         return 0
     target = Path(os.environ.get("CARGO_TARGET_DIR", root / "target"))
-    errors = package_and_build(root, blocked, args.expect_in_lock, runner, target)
+    errors = package_and_build(root, blocked, args, runner, target)
     for e in errors:
         print(f"package_integrity: {e}")
     if errors:

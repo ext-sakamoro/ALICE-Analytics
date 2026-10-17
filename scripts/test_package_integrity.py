@@ -76,9 +76,21 @@ class Fixture(unittest.TestCase):
             info.size = len(data)
             tar.addfile(info, io.BytesIO(data))
 
-    def runner(self, package_error: str | None = None, build_error: str | None = None):
+    def runner(
+        self,
+        package_error: str | None = None,
+        build_error: str | None = None,
+        files: str = "Cargo.toml\nREADME.md\nsrc/lib.rs\n",
+        doc_out: str = "test result: ok. 2 passed; 0 failed; 0 ignored",
+        test_out: str = "test result: ok. 3 passed; 0 failed; 0 ignored",
+    ):
         def run(cmd: list[str], cwd: Path) -> tuple[int, str]:
             self.calls.append(cmd)
+            if cmd[1] == "package" and "--list" in cmd:
+                return 0, files
+            if cmd[1] == "test":
+                out = doc_out if "--doc" in cmd else test_out
+                return (1 if " 0 failed" not in out else 0), out
             if cmd[1] == "package":
                 if package_error:
                     return 101, package_error
@@ -169,6 +181,54 @@ class PackageIntegrity(Fixture):
         self.assertEqual(rc, 1, buf.getvalue())
         self.assertIn("index unreadable", buf.getvalue())
 
+
+
+class PackageContents(Fixture):
+    def test_required_files_and_prefixes(self) -> None:
+        rc, out = self.main("--require-file", "README.md", "--forbid-prefix", ".github/")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("1 required present, 1 forbidden prefixes absent", out)
+        rc, out = self.main("--require-file", "README_JP.md")
+        self.assertEqual(rc, 1, out)
+        self.assertIn("the package lacks README_JP.md", out)
+        rc, out = self.main("--forbid-prefix", "scripts/", runner=self.runner(files="Cargo.toml\nscripts/x.py\n"))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("forbidden prefix scripts/", out)
+
+    def test_empty_package_list_fails(self) -> None:
+        rc, out = self.main("--require-file", "README.md", runner=self.runner(files=""))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("listed no file", out)
+
+    def test_doctests_minimum(self) -> None:
+        rc, out = self.main("--doctests-min", "1")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("unpacked doctests: 2 passed", out)
+        rc, out = self.main("--doctests-min", "3")
+        self.assertEqual(rc, 1, out)
+        self.assertIn("ran 2 doctests, expected at least 3", out)
+        rc, out = self.main("--doctests-min", "1", runner=self.runner(doc_out="test result: FAILED. 1 passed; 1 failed;"))
+        self.assertEqual(rc, 1, out)
+
+    def test_tests_in_package_must_run_and_pass(self) -> None:
+        spec = "--features open-file-audit --test residual_arithmetic"
+        rc, out = self.main(f"--test-in-package={spec}")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("3 passed", out)
+        self.assertTrue(any(c[:3] == ["cargo", "test", "--locked"] and "residual_arithmetic" in c for c in self.calls))
+        rc, out = self.main(f"--test-in-package={spec}", runner=self.runner(test_out="test result: ok. 0 passed; 0 failed;"))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("ran no test", out)
+        rc, out = self.main(f"--test-in-package={spec}", runner=self.runner(test_out="test result: FAILED. 2 passed; 1 failed;"))
+        self.assertEqual(rc, 1, out)
+
+    def test_every_cargo_call_carries_the_sibling_patch(self) -> None:
+        rc, out = self.main("--require-file", "README.md", "--doctests-min", "1", "--test-in-package=--lib",
+                            "--check-args=--lib --all-features")
+        self.assertEqual(rc, 0, out)
+        self.assertGreaterEqual(len(self.calls), 6)
+        self.assertTrue(all(any("patch.crates-io.alice-zip.path=" in a for a in c) for c in self.calls), self.calls)
+        self.assertIn(["--lib", "--all-features"], [c[2:4] for c in self.calls if c[1] == "check" and "--locked" not in c])
 
 if __name__ == "__main__":
     unittest.main()
