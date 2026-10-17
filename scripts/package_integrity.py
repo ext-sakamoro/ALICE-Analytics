@@ -1,0 +1,303 @@
+#!/usr/bin/env python3
+"""The published .crate builds on its own, or names exactly what blocks it.
+
+    python3 scripts/package_integrity.py [--expect-in-lock NAME ...]   (CI: security-audit.yml)
+    python3 scripts/package_integrity.py --publish-gate                (before a publish)
+
+Default mode packages this crate (`cargo package --no-verify --allow-dirty`), unpacks the
+.crate and builds it as a standalone package twice: with the shipped lock (`--locked`) and
+with a fresh resolution. A file the package needs but does not contain, bad metadata or a
+dependency that does not resolve fails here and not only for users of the published crate.
+
+A path dependency on a sibling repository listed in .github/alice-siblings ("<Repo> <SHA>",
+cloned next to this one) can require a version that is not on crates.io yet. `cargo
+package` can never pass for it, so such a dependency is *blocked*: it is packaged and
+built with the sibling patched in (`--config patch.crates-io.<name>.path=...`) and
+reported as `blocked: ...`. A dependency is blocked only when all of these hold, checked
+and not assumed:
+  - its manifest entry names `path = "../<Repo>"` for a listed repository,
+  - the sibling's own [package] version satisfies the requirement,
+  - no published, non-yanked version in the crates.io index satisfies it.
+A sibling whose requirement crates.io already satisfies is not patched, so it cannot hide
+a failure. Every other packaging or build error fails. No .crate produced fails.
+
+--publish-gate does not package: it fails when any dependency is blocked, so nothing
+that only builds against an unpublished sibling can be published.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+import tarfile
+import tempfile
+import time
+import tomllib
+import urllib.request
+from pathlib import Path
+from typing import Callable
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from alice_siblings_check import read_list  # noqa: E402
+
+DEP_TABLES = ("dependencies", "dev-dependencies", "build-dependencies")
+PATH_RE = re.compile(r"^((?:\.\./)+)(ALICE-[A-Za-z0-9-]+)$")
+VERSION_RE = re.compile(r"(\d+)(?:\.(\d+))?(?:\.(\d+))?")
+CMP_RE = re.compile(r"^(>=|<=|>|<|=|\^|~)?\s*(\d+(?:\.\d+){0,2}|\*)$")
+
+Version = tuple[int, int, int]
+
+
+class Problem(Exception):
+    pass
+
+
+def parse_version(text: str) -> Version:
+    m = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)", text)
+    if not m:
+        raise Problem(f"not a release version: {text!r}")
+    return int(m.group(1)), int(m.group(2)), int(m.group(3))
+
+
+def comparators(req: str) -> list[tuple[str, Version]]:
+    """Cargo requirement -> (op, version) bounds; unsupported syntax is a Problem."""
+    out: list[tuple[str, Version]] = []
+    parts = [p.strip() for p in req.split(",")]
+    if not parts or any(not p for p in parts):
+        raise Problem(f"empty part in requirement {req!r}")
+    for part in parts:
+        m = CMP_RE.fullmatch(part)
+        if not m:
+            raise Problem(f"unsupported requirement {req!r}")
+        op, ver = m.group(1) or "^", m.group(2)
+        if ver == "*":
+            continue
+        nums = [int(x) for x in ver.split(".")]
+        given = len(nums)
+        major, minor, patch = (nums + [0, 0])[:3]
+        low = (major, minor, patch)
+        if op in (">=", ">", "<", "<="):
+            out.append((op, low))
+        elif op == "=":
+            if given == 3:
+                out.append(("=", low))
+            else:
+                out.append((">=", low))
+                out.append(("<", (major + 1, 0, 0) if given == 1 else (major, minor + 1, 0)))
+        elif op == "~":
+            out.append((">=", low))
+            out.append(("<", (major + 1, 0, 0) if given == 1 else (major, minor + 1, 0)))
+        else:  # caret
+            out.append((">=", low))
+            if major > 0 or given == 1:
+                out.append(("<", (major + 1, 0, 0)))
+            elif minor > 0 or given == 2:
+                out.append(("<", (0, minor + 1, 0)))
+            else:
+                out.append(("<", (0, 0, patch + 1)))
+    return out
+
+
+def satisfies(version: Version, req: str) -> bool:
+    for op, bound in comparators(req):
+        ok = {
+            ">=": version >= bound,
+            ">": version > bound,
+            "<": version < bound,
+            "<=": version <= bound,
+            "=": version == bound,
+        }[op]
+        if not ok:
+            return False
+    return True
+
+
+def registry_versions(name: str) -> list[Version]:
+    """Published, non-yanked release versions of `name` from the crates.io sparse index."""
+    n = name.lower()
+    prefix = {1: "1", 2: "2", 3: f"3/{n[0]}"}.get(len(n), f"{n[:2]}/{n[2:4]}")
+    url = f"https://index.crates.io/{prefix}/{n}"
+    req = urllib.request.Request(url, headers={"User-Agent": "alice-package-integrity"})
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        lines = resp.read().decode("utf-8").splitlines()
+    out = []
+    for line in lines:
+        entry = json.loads(line)
+        if entry.get("yanked") or "-" in entry["vers"] or "+" in entry["vers"]:
+            continue
+        out.append(parse_version(entry["vers"]))
+    return out
+
+
+def sibling_deps(root: Path) -> list[dict]:
+    """Every manifest dependency that names path = "../<Repo>" (any dependency table)."""
+    manifest = tomllib.loads((root / "Cargo.toml").read_text(encoding="utf-8"))
+    tables = [manifest.get(t, {}) for t in DEP_TABLES]
+    for target in manifest.get("target", {}).values():
+        tables += [target.get(t, {}) for t in DEP_TABLES]
+    deps = []
+    for table in tables:
+        for key, spec in table.items():
+            if not isinstance(spec, dict) or "path" not in spec:
+                continue
+            m = PATH_RE.match(spec["path"])
+            if not m or m.group(1) != "../":
+                continue
+            deps.append(
+                {"name": spec.get("package", key), "repo": m.group(2), "req": spec.get("version")}
+            )
+    return deps
+
+
+def classify(
+    root: Path, versions_of: Callable[[str], list[Version]]
+) -> tuple[list[dict], list[str]]:
+    """(blocked dependencies, problems) for the sibling path dependencies."""
+    listed, problems = read_list(root)
+    if problems:
+        return [], problems
+    blocked: list[dict] = []
+    seen: set[str] = set()
+    for dep in sibling_deps(root):
+        if dep["name"] in seen:
+            continue
+        seen.add(dep["name"])
+        if dep["repo"] not in listed:
+            problems.append(f"{dep['name']}: ../{dep['repo']} is not in .github/alice-siblings")
+            continue
+        if not dep["req"]:
+            problems.append(f"{dep['name']}: path dependency without a version cannot be published")
+            continue
+        sib = root / ".." / dep["repo"] / "Cargo.toml"
+        if not sib.is_file():
+            problems.append(f"{dep['name']}: ../{dep['repo']}/Cargo.toml is missing")
+            continue
+        pkg = tomllib.loads(sib.read_text(encoding="utf-8")).get("package", {})
+        try:
+            sib_version = parse_version(str(pkg.get("version", "")))
+            if pkg.get("name") != dep["name"]:
+                raise Problem(f"../{dep['repo']} is package {pkg.get('name')!r}, not {dep['name']}")
+            if not satisfies(sib_version, dep["req"]):
+                raise Problem(
+                    f"the sibling ../{dep['repo']} is {'.'.join(map(str, sib_version))}, "
+                    f"which does not satisfy {dep['req']!r}"
+                )
+            published = versions_of(dep["name"])
+            if any(satisfies(v, dep["req"]) for v in published):
+                continue  # resolvable from crates.io: packaged without the sibling
+            top = ".".join(map(str, max(published))) if published else "none"
+            blocked.append(
+                {
+                    **dep,
+                    "sibling": ".".join(map(str, sib_version)),
+                    "registry_max": top,
+                    "sha": listed[dep["repo"]],
+                    "path": str((root / ".." / dep["repo"]).resolve()),
+                }
+            )
+        except Problem as e:
+            problems.append(f"{dep['name']}: {e}")
+    return blocked, problems
+
+
+def report_blocked(blocked: list[dict]) -> None:
+    for b in blocked:
+        print(
+            f"blocked: {b['name']} {b['req']} unpublished (crates.io max {b['registry_max']}), "
+            f"satisfied only by .github/alice-siblings {b['repo']} {b['sha'][:12]} "
+            f"({b['name']} {b['sibling']}); publish wave: {b['name']}@{b['req']}"
+        )
+    print(f"package_integrity: blocked {len(blocked)}")
+
+
+def patch_args(blocked: list[dict]) -> list[str]:
+    args: list[str] = []
+    for b in blocked:
+        args += ["--config", f"patch.crates-io.{b['name']}.path={json.dumps(b['path'])}"]
+    return args
+
+
+Runner = Callable[[list[str], Path], tuple[int, str]]
+
+
+def run_cmd(cmd: list[str], cwd: Path) -> tuple[int, str]:
+    env = {**os.environ, "CARGO_TERM_COLOR": "never"}
+    p = subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True)
+    return p.returncode, p.stdout + p.stderr
+
+
+def package_and_build(
+    root: Path, blocked: list[dict], expect: list[str], runner: Runner, target: Path
+) -> list[str]:
+    patches = patch_args(blocked)
+    pkg_meta = tomllib.loads((root / "Cargo.toml").read_text(encoding="utf-8"))["package"]
+    crate = target / "package" / f"{pkg_meta['name']}-{pkg_meta['version']}.crate"
+    started = time.time()
+    rc, out = runner(["cargo", "package", "--no-verify", "--allow-dirty", *patches], root)
+    if rc != 0:
+        return [f"cargo package failed:\n{out}"]
+    if not crate.is_file() or crate.stat().st_mtime < started - 1:
+        return [f"cargo package wrote no {crate.name} in {crate.parent} (inspected nothing)"]
+    print(f"package_integrity: packaged {crate.name} ({crate.stat().st_size} bytes), packages inspected 1")
+    with tempfile.TemporaryDirectory() as tmp:
+        with tarfile.open(crate) as tar:
+            tar.extractall(tmp, filter="data")
+        dirs = [d for d in Path(tmp).iterdir() if d.is_dir()]
+        if len(dirs) != 1:
+            return [f"{crate.name} unpacked to {len(dirs)} directories"]
+        pkg = dirs[0]
+        with open(pkg / "Cargo.toml", "a", encoding="utf-8") as f:
+            f.write("\n[workspace]\n")
+        rc, out = runner(["cargo", "check", "--all-features", "--locked", *patches], pkg)
+        if rc != 0:
+            return [f"the unpacked crate does not build with its shipped lock:\n{out}"]
+        (pkg / "Cargo.lock").unlink(missing_ok=True)
+        rc, out = runner(["cargo", "check", "--all-features", *patches], pkg)
+        if rc != 0:
+            return [f"the unpacked crate does not build with a fresh resolution:\n{out}"]
+        lock = (pkg / "Cargo.lock").read_text(encoding="utf-8") if (pkg / "Cargo.lock").exists() else ""
+        missing = [n for n in expect if f'name = "{n}"' not in lock]
+        if missing:
+            return [f"the fresh resolution did not resolve {', '.join(missing)}"]
+    return []
+
+
+def main(argv: list[str] | None = None, versions_of=registry_versions, runner: Runner = run_cmd) -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--root", default=".")
+    ap.add_argument("--publish-gate", action="store_true")
+    ap.add_argument("--expect-in-lock", action="append", default=[])
+    args = ap.parse_args(argv)
+    root = Path(args.root).resolve()
+    try:
+        blocked, problems = classify(root, versions_of)
+    except OSError as e:  # the registry index could not be read: never a pass
+        print(f"package_integrity: crates.io index unreadable: {e}")
+        return 1
+    for p in problems:
+        print(f"package_integrity: {p}")
+    if problems:
+        return 1
+    report_blocked(blocked)
+    if args.publish_gate:
+        if blocked:
+            print("package_integrity: publish gate: FAIL (a dependency is satisfied only by an unpublished sibling)")
+            return 1
+        print("package_integrity: publish gate: OK (nothing blocked)")
+        return 0
+    target = Path(os.environ.get("CARGO_TARGET_DIR", root / "target"))
+    errors = package_and_build(root, blocked, args.expect_in_lock, runner, target)
+    for e in errors:
+        print(f"package_integrity: {e}")
+    if errors:
+        return 1
+    print(f"package_integrity: OK (packages inspected 1, blocked {len(blocked)})")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

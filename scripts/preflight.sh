@@ -52,6 +52,9 @@ step "ci.yml / docs-lint: ALICE siblings (each ../ALICE-* is the commit in .gith
 python3 scripts/test_alice_siblings_check.py
 python3 scripts/alice_siblings_check.py
 
+step "security-audit.yml / package-integrity: tests (the packaging run itself is CI only)"
+python3 scripts/test_package_integrity.py
+
 step "ci.yml / fmt: cargo fmt --check"
 cargo fmt --all -- --check
 
