@@ -25,6 +25,7 @@ ALLOWED = {
     "tests/determinism_golden.rs",
     "tests/panic_contract.rs",
     "tests/analytic_oracle.rs",
+    "tests/minmax_ties.rs",
 }
 MIN_REASON = 12
 SKIP_DIRS = {"target", ".git"}
