@@ -46,6 +46,7 @@ pub mod anomaly;
 pub mod export;
 pub mod pipeline;
 pub mod privacy;
+pub mod semantics;
 pub mod sketch;
 pub mod stats;
 pub mod streaming_ops;
@@ -77,4 +78,12 @@ pub mod law;
 /// summarises, giving a single value that names both (not linked here: the
 /// module is behind that feature, so the link would not resolve in a build
 /// without it).
+///
+/// This is the arithmetic identifier only. The identifier of this crate's own
+/// semantics, which folds its estimator goldens with this value and the
+/// identifiers of its other Law-bearing dependencies, is
+/// [`ANALYTICS_SEMANTICS_ID`].
 pub use alice_det_math::SEMANTICS_ID;
+pub use semantics::{
+    ANALYTICS_SEMANTICS_ID, ANALYTICS_SEMANTICS_PINS, PREVIOUS_ANALYTICS_SEMANTICS_IDS,
+};
