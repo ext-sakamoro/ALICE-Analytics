@@ -115,11 +115,13 @@ reference_repo = "ALICE-Law"
 [G13]
 status = "pass"
 evidence = [
-    "scripts/order_guard.py (ci.yml docs-lint job and preflight, tests scripts/test_order_guard.py): the production code of src/ (strings, chars, comments and cfg(test) modules removed) has no HashMap / HashSet (or Fx / A / Index / Dash variants), no rayon / par_iter / par_chunks / crossbeam, no thread::spawn / thread::scope / available_parallelism and no pointer-to-integer cast: 12 files, 5 patterns, 0 lines; a new site must be listed in scripts/order_allowlist.toml with its exact count and why its order cannot reach an output (the file is absent: no allowed site), a stale entry fails, and reading no file fails",
+    "type-resolved half: clippy.toml disallowed-types std::collections::HashMap, HashSet and their iterators (hash_map::Iter / Keys / Values / IntoIter, hash_set::Iter / IntoIter), std::thread::Builder / JoinHandle / ScopedJoinHandle / Scope, and disallowed-methods std::thread::available_parallelism, on every target with -D warnings (ci.yml clippy job); aliases and glob or braced imports resolve to the same paths; scripts/clippy_canary.py plants each entry (188 planted, 0 skipped)",
+    "text and dependency half: scripts/order_guard.py (ci.yml docs-lint job and preflight, tests scripts/test_order_guard.py) reads the production code of src/ (strings, chars, comments and cfg(test) modules removed) and fails on HashMap / HashSet (and Fx / A / Index / Dash forms, hash_map:: / hash_set:: paths), rayon / par_iter / crossbeam, any path through std::thread or a braced / glob import of it (std::thread::spawn and scope are generic functions the shared canary cannot plant, so their calls are caught here), available_parallelism, a pointer-to-integer cast, and a normal dependency on rayon / crossbeam / hashbrown / indexmap / dashmap / ahash / fxhash / rustc-hash: 12 files, 0 lines; a site must be listed in scripts/order_allowlist.toml with its exact count and reason (none is), a stale entry fails, reading no file fails",
+    "tests/analytic_oracle.rs counts the Count-Min truth in a BTreeMap (the only HashMap of the repository, in a test)",
 ]
-mutant = "measured 2026-10-17, reverted: a fn collecting into a HashMap<u32, f64> and summing its values added to src/stats.rs fails order_guard.py; scripts/test_order_guard.py plants one line per pattern and requires each to be reported"
+mutant = "measured 2026-10-17, each appended to src/stats.rs and reverted: `use std::thread::{self as t}; t::spawn(..)`, `use std::thread::{spawn}; spawn(..)`, `use std::thread::*; spawn(..)` each fail order_guard.py; a `std::collections::hash_set::Iter<u64>` parameter, a `use std::collections::HashMap as Zz` map and `std::thread::Builder::new()` each fail both order_guard.py and clippy (disallowed_types); a fn collecting into a HashMap fails both"
 since = ""
-note = "no parallel reduction over floats exists, so the ordered-reduction test with two thread counts has nothing to test; the scanner keeps it that way."
+note = "no parallel reduction over floats exists, so the ordered-reduction test with two thread counts has nothing to test; both halves keep it that way."
 reference_repo = ""
 
 [G14]

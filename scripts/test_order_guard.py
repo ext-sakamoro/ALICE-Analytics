@@ -50,6 +50,19 @@ class OrderGuardTest(unittest.TestCase):
         problems = order_guard.check(self.tree(dict(src, **{"scripts/order_allowlist.toml": stale})))[0]
         self.assertTrue(any("stale" in p for p in problems), problems)
 
+    def test_import_forms_of_threads_and_hash_modules_are_found(self):
+        for line in ("use std::thread::{self as t};", "use std::thread::{spawn};", "use std::thread::*;",
+                     "use std::{thread as t};", "use std::*;", "fn f(i: std::collections::hash_set::Iter<u64>) {}",
+                     "fn f(i: std::collections::hash_map::Keys<u8, u8>) {}"):
+            problems, _, _ = order_guard.check(self.tree({"src/lib.rs": line + "\n"}))
+            self.assertTrue(problems, line)
+
+    def test_an_order_dependency_fails_unless_listed(self):
+        cargo = '[package]\nname = "x"\n[dependencies]\nrayon = "1"\nfast = { package = "hashbrown", version = "0.14" }\n'
+        problems, _, _ = order_guard.check(self.tree({"src/lib.rs": "\n", "Cargo.toml": cargo}))
+        self.assertTrue(any("Cargo.toml::rayon" in p for p in problems), problems)
+        self.assertTrue(any("Cargo.toml::hashbrown" in p for p in problems), problems)
+
     def test_test_modules_and_comments_are_not_production(self):
         text = ("#[cfg(test)]\nmod tests {\n    fn f() { let m = std::collections::HashMap::<u8, u8>::new(); }\n}\n"
                 "// HashMap in a comment\npub const DOC: &str = \"HashSet in a string\";\n")

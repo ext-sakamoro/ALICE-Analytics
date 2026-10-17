@@ -431,7 +431,7 @@ fn sketches_stay_inside_their_published_error_bounds() {
     // Count-Min: never under-estimates; over-estimate ≤ ε·N with ε = e/w at the
     // published confidence 1 − e⁻ᵈ (checked on a Zipf-like stream)
     let mut cm = CountMinSketch::new();
-    let mut truth = std::collections::HashMap::new();
+    let mut truth = std::collections::BTreeMap::new();
     let mut total = 0u64;
     for _ in 0..50_000u64 {
         let u = lcg(&mut seed);

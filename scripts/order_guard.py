@@ -7,7 +7,11 @@ every use of a collection whose iteration order is unspecified (HashMap,
 HashSet and their hasher-parametrised and third-party forms) and every source
 of a combination order that depends on thread count or scheduling (rayon,
 par_iter / par_chunks, thread::spawn / thread::scope, available_parallelism,
-crossbeam) or on addresses (a pointer cast to an integer).
+crossbeam) or on addresses (a pointer cast to an integer), and every normal
+dependency in ORDER_DEPS (rayon, crossbeam, hashbrown, indexmap, ...). The
+type-resolved half is clippy.toml (disallowed-types HashMap / HashSet and
+their iterators, std::thread::Builder / JoinHandle / Scope; disallowed-methods
+available_parallelism), which aliases and glob imports cannot evade.
 
 Each hit must be listed in scripts/order_allowlist.toml as
 `"<file>::<pattern>" = { count = N, reason = "..." }`: the exact number of
@@ -31,10 +35,12 @@ from entropy_guard import production_lines  # noqa: E402
 
 MIN_REASON = 12
 PATTERNS = {
-    "HashMap": r"\b(?:HashMap|FxHashMap|AHashMap|IndexMap|DashMap)\b",
-    "HashSet": r"\b(?:HashSet|FxHashSet|AHashSet|IndexSet|DashSet)\b",
+    "HashMap": r"\b(?:HashMap|FxHashMap|AHashMap|IndexMap|DashMap)\b|\bhash_map\s*::",
+    "HashSet": r"\b(?:HashSet|FxHashSet|AHashSet|IndexSet|DashSet)\b|\bhash_set\s*::",
     "parallel": r"\brayon\b|\.par_(?:iter|iter_mut|chunks|chunks_mut|bridge|extend)\b|\binto_par_iter\b|\bcrossbeam\b",
-    "threads": r"\bthread\s*::\s*(?:spawn|scope|Builder)\b|\bavailable_parallelism\b",
+    # any path through std::thread, a braced or glob import of it, or a glob of std
+    "threads": r"\bthread\s*::|\buse\s+(?:::)?std\s*::\s*\{[^}]*\bthread\b|\buse\s+(?:::)?std\s*::\s*\*"
+               r"|\bavailable_parallelism\b",
     "address order": r"\bas\s+\*\s*(?:const|mut)\s+\w+\s+as\s+usize\b|\.as_ptr\(\)\s+as\s+usize\b|\baddr\(\)",
 }
 
@@ -52,6 +58,30 @@ def scan(root: Path) -> tuple[dict[str, int], int]:
     return counts, len(files)
 
 
+# dependencies whose presence means a parallel combination or an unspecified
+# iteration order is available to the library
+ORDER_DEPS = {"rayon", "rayon-core", "crossbeam", "crossbeam-utils", "crossbeam-channel", "crossbeam-deque",
+              "hashbrown", "indexmap", "dashmap", "ahash", "fxhash", "rustc-hash"}
+
+
+def order_deps(root: Path) -> list[str]:
+    """Names in ORDER_DEPS among the normal dependencies of Cargo.toml (also
+    target-specific ones and renamed ones by their package name)."""
+    cargo = root / "Cargo.toml"
+    if not cargo.exists():
+        return []
+    doc = tomllib.loads(cargo.read_text(encoding="utf-8"))
+    tables = [doc.get("dependencies", {})]
+    tables += [t.get("dependencies", {}) for t in doc.get("target", {}).values()]
+    found = []
+    for deps in tables:
+        for key, spec in deps.items():
+            name = spec.get("package", key) if isinstance(spec, dict) else key
+            if name in ORDER_DEPS:
+                found.append(name)
+    return sorted(found)
+
+
 def check(root: Path) -> tuple[list[str], int, int]:
     allow_path = root / "scripts" / "order_allowlist.toml"
     allowed = tomllib.loads(allow_path.read_text(encoding="utf-8")).get("allow", {}) if allow_path.exists() else {}
@@ -65,6 +95,12 @@ def check(root: Path) -> tuple[list[str], int, int]:
             problems.append(f"{key}: {n} line(s) in production code, not in scripts/order_allowlist.toml")
         elif entry.get("count") != n:
             problems.append(f"{key}: {n} line(s), scripts/order_allowlist.toml says {entry.get('count')}")
+    for dep in order_deps(root):
+        key = f"Cargo.toml::{dep}"
+        counts[key] = 1
+        if key not in allowed:
+            problems.append(f"{key}: a dependency that provides parallel combination or unspecified order, "
+                            f"not in scripts/order_allowlist.toml")
     for key, entry in sorted(allowed.items()):
         if key not in counts:
             problems.append(f"{key}: listed but not found (stale entry)")
