@@ -22,7 +22,9 @@ runs:
         set -euo pipefail
         base="$GITHUB_WORKSPACE/$REPO_DIR"
         list="$base/.github/alice-siblings"
-        # the clone URL prefix; overridden only by the action's own test (local repositories)
+        # the clone URL prefix; ALICE_SIBLINGS_GIT_BASE exists for the action's own test (local
+        # repositories). Redirecting it does not weaken the pin: every checkout must end at the
+        # listed 40-hex commit, checked below, or the step fails
         git_base="${ALICE_SIBLINGS_GIT_BASE:-https://github.com/ext-sakamoro}"
         n=0
         while IFS= read -r line || [ -n "$line" ]; do

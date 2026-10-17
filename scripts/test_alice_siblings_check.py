@@ -150,6 +150,14 @@ class SiblingsCheck(unittest.TestCase):
         self.workspace('"crates/*", "tools/deep/b", "nowhere/*"', '"crates/skip"')
         self.assertProblem("workspace member 'nowhere/*' matches no package")
 
+    def test_workspace_member_matching_only_dirs_without_a_manifest_fails(self) -> None:
+        # the pattern matches an existing directory (docs, or a member whose Cargo.toml was
+        # removed) but no package: that is not a member that was read
+        self.workspace('"crates/*", "tools/deep/b", "docs/*"', '"crates/skip"')
+        (self.root / "docs" / "guide").mkdir(parents=True)
+        (self.root / "docs" / "guide" / "README.md").write_text("no manifest here\n")
+        self.assertProblem("workspace member 'docs/*' matches no package")
+
     def test_no_manifest_read_fails(self) -> None:
         (self.root / "Cargo.toml").unlink()
         self.assertProblem("no Cargo.toml was read")
