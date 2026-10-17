@@ -231,13 +231,14 @@ def patch_args(blocked: list[dict]) -> list[str]:
     return args
 
 
-Runner = Callable[[list[str], Path], tuple[int, str]]
+# (exit code, stdout, stderr): stdout alone is parsed where it is data (`cargo package --list`)
+Runner = Callable[[list[str], Path], tuple[int, str, str]]
 
 
-def run_cmd(cmd: list[str], cwd: Path) -> tuple[int, str]:
+def run_cmd(cmd: list[str], cwd: Path) -> tuple[int, str, str]:
     env = {**os.environ, "CARGO_TERM_COLOR": "never"}
     p = subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True)
-    return p.returncode, p.stdout + p.stderr
+    return p.returncode, p.stdout, p.stderr
 
 
 TEST_RESULT_RE = re.compile(r"^test result: (\w+)\. (\d+) passed; (\d+) failed", re.M)
@@ -256,10 +257,11 @@ def check_list(root: Path, patches: list[str], opts: argparse.Namespace, runner:
     """`cargo package --list`: not empty, no forbidden prefix, every required file present."""
     if not opts.require_file and not opts.forbid_prefix:
         return []
-    rc, out = runner(["cargo", "package", "--list", "--allow-dirty", *patches], root)
+    rc, listing, err = runner(["cargo", "package", "--list", "--allow-dirty", *patches], root)
     if rc != 0:
-        return [f"cargo package --list failed:\n{out}"]
-    files = [line.strip() for line in out.splitlines() if line.strip() and not line.startswith(" ")]
+        return [f"cargo package --list failed:\n{listing}{err}"]
+    # stdout only: a warning on stderr is not a packaged file
+    files = [line.strip() for line in listing.splitlines() if line.strip()]
     if not files:
         return ["cargo package --list listed no file (compared nothing)"]
     problems = [f"the package lacks {f}" for f in opts.require_file if f not in files]
@@ -281,7 +283,8 @@ def package_and_build(
     pkg_meta = tomllib.loads((root / "Cargo.toml").read_text(encoding="utf-8"))["package"]
     crate = target / "package" / f"{pkg_meta['name']}-{pkg_meta['version']}.crate"
     started = time.time()
-    rc, out = runner(["cargo", "package", "--no-verify", "--allow-dirty", *patches], root)
+    rc, stdout, stderr = runner(["cargo", "package", "--no-verify", "--allow-dirty", *patches], root)
+    out = stdout + stderr
     if rc != 0:
         return [f"cargo package failed:\n{out}"]
     if not crate.is_file() or crate.stat().st_mtime < started - 1:
@@ -296,11 +299,13 @@ def package_and_build(
         pkg = dirs[0]
         with open(pkg / "Cargo.toml", "a", encoding="utf-8") as f:
             f.write("\n[workspace]\n")
-        rc, out = runner(["cargo", "check", "--locked", *shlex.split(opts.locked_check_args), *patches], pkg)
+        rc, stdout, stderr = runner(["cargo", "check", "--locked", *shlex.split(opts.locked_check_args), *patches], pkg)
+        out = stdout + stderr
         if rc != 0:
             return [f"the unpacked crate does not build with its shipped lock:\n{out}"]
         if opts.doctests_min:
-            rc, out = runner(["cargo", "test", "--doc", "--locked", *shlex.split(opts.doctest_args), *patches], pkg)
+            rc, stdout, stderr = runner(["cargo", "test", "--doc", "--locked", *shlex.split(opts.doctest_args), *patches], pkg)
+            out = stdout + stderr
             passed, failed = passed_tests(out)
             if rc != 0 or failed:
                 return [f"the unpacked crate's doctests fail:\n{out}"]
@@ -308,7 +313,8 @@ def package_and_build(
                 return [f"the unpacked crate ran {passed} doctests, expected at least {opts.doctests_min}"]
             print(f"package_integrity: unpacked doctests: {passed} passed")
         for spec in opts.test_in_package:
-            rc, out = runner(["cargo", "test", "--locked", *shlex.split(spec), *patches], pkg)
+            rc, stdout, stderr = runner(["cargo", "test", "--locked", *shlex.split(spec), *patches], pkg)
+            out = stdout + stderr
             passed, failed = passed_tests(out)
             if rc != 0 or failed:
                 return [f"`cargo test {spec}` fails in the unpacked crate:\n{out}"]
@@ -316,7 +322,8 @@ def package_and_build(
                 return [f"`cargo test {spec}` ran no test in the unpacked crate (compared nothing)"]
             print(f"package_integrity: unpacked `cargo test {spec}`: {passed} passed")
         (pkg / "Cargo.lock").unlink(missing_ok=True)
-        rc, out = runner(["cargo", "check", *shlex.split(opts.check_args), *patches], pkg)
+        rc, stdout, stderr = runner(["cargo", "check", *shlex.split(opts.check_args), *patches], pkg)
+        out = stdout + stderr
         if rc != 0:
             return [f"the unpacked crate does not build with a fresh resolution:\n{out}"]
         lock = (pkg / "Cargo.lock").read_text(encoding="utf-8") if (pkg / "Cargo.lock").exists() else ""

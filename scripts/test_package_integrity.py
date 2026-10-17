@@ -83,24 +83,25 @@ class Fixture(unittest.TestCase):
         files: str = "Cargo.toml\nREADME.md\nsrc/lib.rs\n",
         doc_out: str = "test result: ok. 2 passed; 0 failed; 0 ignored",
         test_out: str = "test result: ok. 3 passed; 0 failed; 0 ignored",
+        list_stderr: str = "",
     ):
-        def run(cmd: list[str], cwd: Path) -> tuple[int, str]:
+        def run(cmd: list[str], cwd: Path) -> tuple[int, str, str]:
             self.calls.append(cmd)
             if cmd[1] == "package" and "--list" in cmd:
-                return 0, files
+                return 0, files, list_stderr
             if cmd[1] == "test":
                 out = doc_out if "--doc" in cmd else test_out
-                return (1 if " 0 failed" not in out else 0), out
+                return (1 if " 0 failed" not in out else 0), out, ""
             if cmd[1] == "package":
                 if package_error:
-                    return 101, package_error
+                    return 101, "", package_error
                 self.write_crate()
-                return 0, "Packaged"
+                return 0, "", "Packaged"
             if build_error:
-                return 101, build_error
+                return 101, "", build_error
             if "--locked" not in cmd:
                 (cwd / "Cargo.lock").write_text('[[package]]\nname = "alice-det-math"\n')
-            return 0, "Finished"
+            return 0, "", "Finished"
 
         return run
 
@@ -147,8 +148,8 @@ class PackageIntegrity(Fixture):
         self.assertIn("publish gate: OK", out)
 
     def test_no_crate_produced_fails(self) -> None:
-        def run(cmd: list[str], cwd: Path) -> tuple[int, str]:
-            return 0, "Packaged"
+        def run(cmd: list[str], cwd: Path) -> tuple[int, str, str]:
+            return 0, "", "Packaged"
 
         rc, out = self.main(runner=run)
         self.assertEqual(rc, 1, out)
@@ -199,6 +200,16 @@ class PackageContents(Fixture):
         rc, out = self.main("--require-file", "README.md", runner=self.runner(files=""))
         self.assertEqual(rc, 1, out)
         self.assertIn("listed no file", out)
+
+    def test_stderr_lines_are_not_packaged_files(self) -> None:
+        # a cargo warning on stderr must not count as a file nor hide an empty list
+        warn = "warning: manifest has no documentation\nnote: see more\n"
+        rc, out = self.main("--forbid-prefix", ".github/", runner=self.runner(files="", list_stderr=warn))
+        self.assertEqual(rc, 1, out)
+        self.assertIn("listed no file", out)
+        rc, out = self.main("--forbid-prefix", "warning", runner=self.runner(list_stderr=warn))
+        self.assertEqual(rc, 0, out)
+        self.assertIn("package lists 3 files", out)
 
     def test_doctests_minimum(self) -> None:
         rc, out = self.main("--doctests-min", "1")
