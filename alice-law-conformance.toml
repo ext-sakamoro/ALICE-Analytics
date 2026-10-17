@@ -65,12 +65,27 @@ note = "the identifier is a constant of this crate version: a dependency bump or
 reference_repo = "ALICE-Physics"
 
 [G7]
-status = "unverified"
-note = "audit: the crate has no decode / read / from_bytes / open entry point, no extern \"C\" or no_mangle item, no pyo3 or wasm-bindgen export, no dyn Any or name-keyed registry, and no build.rs or procedural macro (grep over src and Cargo.toml and a file listing at 06cfa76 found none); the one cross-crate Law value it takes, alice_zip::law::SignalLaw (src/law.rs, `law` feature), is passed as a concrete Rust type. By the gate's own rule the list of type-erasing boundaries is therefore empty. It is not claimed as n/a because that status needs a scanner that finds zero such sites with the mutant of adding one, and this repository has none; a one-off grep is not that."
+status = "n/a"
+evidence = [
+    "scripts/api_boundary.py (ci.yml clippy job and preflight, tests scripts/test_api_boundary.py; the same file as ALICE-Sync's): the public API, enumerated with rustdoc JSON (pinned toolchain, RUSTC_BOOTSTRAP=1, --document-hidden-items, features std,law,simd, format_version 60 checked), has no non-Rust ABI function, no Serialize / Deserialize / FromStr / Read impl and no From / TryFrom of bytes or text; its 28 items that take or return u8 / str / char / String / Read at any depth (through references, slices, arrays, Box / Vec / Cow, impl / dyn bounds, associated-type constraints and type aliases) and its one re-export of an outside item are each decided local with a reason in scripts/api_boundary.toml (metric labels, item bytes hashed for the sketches, RAPPOR bits, the law identifier, the monitoring exports, alice-det-math's SEMANTICS_ID); an undecided item, a stale entry or 0 items enumerated fails",
+    "text layer: scripts/reader_guard.py (ci.yml docs-lint job and preflight, tests scripts/test_reader_guard.py) fails on any decoder name, serde Deserialize, T::from_le/be/ne_bytes, io::Read / read_exact, TryFrom / From of bytes or text, FromStr, file or network input, extern \"C\" / no_mangle, pyo3 / wasm-bindgen, dyn Any / downcast in production code of src/ (12 files, 15 patterns, 0 hits), on a build.rs or proc-macro crate, and when it read no file",
+    "the one cross-crate Law-bearing value, alice_zip::law::SignalLaw (src/law.rs, law feature), is passed as a concrete Rust type, which the gate exempts",
+]
+mutant = "measured 2026-10-17, each reverted, appended to src/stats.rs: fns taking `impl AsRef<[u8]>`, `Box<[u8]>`, `Cow<[u8]>`, `B: AsRef<[u8]>`, `where B: AsRef<str>`, `impl Iterator<Item = u8>`, a `pub type ZzBlob = Vec<u8>` parameter and `&mut dyn std::io::Read`, `impl TryFrom<&[u8]>`, `pub use core::str::from_utf8` and an extern \"C\" fn each fail api_boundary.py; a Deserialize derive or manual impl does not compile without a serde dependency (the crate has none), and `#[derive(serde::Deserialize)]` and `pub fn from_json` each fail reader_guard.py"
+since = ""
+note = "n/a while the enumerated boundary has no entry point that receives another crate's Law-bearing value: every enumerated item is decided local. A new reader, binding or re-export fails api_boundary.py, which is the point where this cell has to become pass (with a handshake and its mismatch test) or the item gets a reasoned local decision."
+reference_repo = ""
 
 [G8]
-status = "unverified"
-note = "undecided: the crate writes no file or database row, but src/export.rs:24 snapshot_to_json, :58 snapshots_to_json, :86 snapshot_to_prometheus and :146 snapshots_to_prometheus format det-math-derived floats (p50 / p95 / p99 / mean / cardinality of a MetricSnapshot) as text with no identifier, and whether that text counts as a durable form meant to be read back (G8) or a monitoring output is a decision about the crate's intent, not something the tree answers. ResidualSummary::law_id (src/law.rs:147) is carried in the in-memory struct, which has no writer in this crate. The decision is needed before the cell can be pass, fail-known or n/a."
+status = "n/a"
+evidence = [
+    "the machine-checked writer list: scripts/api_boundary.py (see G7) enumerates every fn of the public API returning or taking bytes or text from rustdoc JSON, count-locked against scripts/api_boundary.toml; the writers of Law-bearing values among them are the monitoring exports src/export.rs snapshot_to_json / snapshots_to_json (JSON) and snapshot_to_prometheus / snapshots_to_prometheus (Prometheus exposition format), and the crate writes no file or database row",
+    "no reader: neither api_boundary.py (no fn taking bytes or text that decodes a value, no Deserialize / FromStr / Read impl, no From / TryFrom of bytes) nor reader_guard.py (no decoder, file or network input in production code) finds one",
+]
+mutant = "measured 2026-10-17, reverted: a reader of the exports (`pub fn from_json` in src/export.rs) fails reader_guard.py and api_boundary.py, so the exports cannot become a format read back by this crate without this cell changing"
+since = ""
+note = "ruling (2026-10-17): the JSON and Prometheus exports are monitoring output, not a durable format of this crate, because nothing in the crate reads them back; G8 constrains a format and its reader, and the crate has neither. A consumer that stores the export text and reads it into Law-bearing state does so with its own reader, which is that consumer's G8. If this crate ever reads the exports (or any bytes) back, both checks fail and the format needs the identifier field and a check_semantics-style reader."
+reference_repo = ""
 
 [G9]
 status = "unverified"
