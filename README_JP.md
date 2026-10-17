@@ -252,7 +252,7 @@ ALICE-Law の `scripts/gen-law-readme-block.py` が ALICE-Law `6a0a5587c152` と
 | G6 semantics-id | 適合 | the identifier is a constant of this crate version: a dependency bump or a toolchain change that moved any pinned bits fails a golden, and re-recording a … |
 | G7 handshake-carries-id | 対象外 | n/a while the enumerated boundary has no entry point that receives another crate's Law-bearing value: every enumerated item is decided local. A new reader, … |
 | G8 persisted-semantics-id | 対象外 | ruling (2026-10-17): the JSON and Prometheus exports are monitoring output, not a durable format of this crate, because nothing in the crate reads them back; … |
-| G9 persisted-meaning-change-is-major | 未確認 | depends on G8 (the persisted identifier whose history G9 audits), which is undecided. For the in-process identifier the history is: SEMANTICS_ID first appears … |
+| G9 persisted-meaning-change-is-major | 適合 | definition: ANALYTICS_SEMANTICS_ID (the crate's own identifier, [[id]] in scripts/id_move.toml with PREVIOUS_ANALYTICS_SEMANTICS_IDS) may move only with a … |
 | G10 no-run-varying-artifacts | 適合 | the clock-seeded constructors of the deprecated privacy module (XorShift64::from_entropy, impl Default for XorShift64, LaplaceNoise::new, Rappor::new, … |
 | G11 gate-self-tests | 未達 | unmet: clause (c). scripts/clippy_canary.py, scripts/test_clippy_canary.py, scripts/gen_clippy_canary_calls.py, scripts/test_gen_clippy_canary_calls.py, … |
 | G12 public-repo-text-rules | 適合 | the CI job fetches ALICE-Law's own scripts/public_text_check.py at the revision named in .github/public-text-pin and refuses it unless its SHA-256 is the one … |
