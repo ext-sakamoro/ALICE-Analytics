@@ -496,7 +496,7 @@ impl PrivacyBudget {
     #[inline]
     #[must_use]
     pub fn remaining(&self) -> f64 {
-        (self.max_epsilon - self.total_epsilon).max(0.0)
+        alice_det_math::max64(self.max_epsilon - self.total_epsilon, 0.0)
     }
 
     /// Get total spent

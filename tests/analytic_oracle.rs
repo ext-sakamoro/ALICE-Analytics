@@ -53,7 +53,7 @@ use alice_analytics::streaming_ops::{
     SimpleMovingAverage,
 };
 use alice_analytics::window::SlidingWindow;
-use alice_det_math::{exp64, powf64};
+use alice_det_math::{exp64, max64, min64, powf64};
 
 fn lcg(seed: &mut u64) -> f64 {
     *seed = seed
@@ -126,39 +126,39 @@ fn streaming_moments_equal_the_two_pass_reference_in_any_order() {
             s.observe(x);
         }
         assert_eq!(s.count() as usize, xs.len());
-        assert!((s.mean() - mean).abs() < 1e-9 * mean.abs().max(1.0), "mean");
         assert!(
-            (s.variance() - var).abs() < 1e-9 * var.max(1.0),
+            (s.mean() - mean).abs() < 1e-9 * max64(mean.abs(), 1.0),
+            "mean"
+        );
+        assert!(
+            (s.variance() - var).abs() < 1e-9 * max64(var, 1.0),
             "variance {} vs {var}",
             s.variance()
         );
         assert!(
-            (s.sample_variance() - svar).abs() < 1e-9 * svar.max(1.0),
+            (s.sample_variance() - svar).abs() < 1e-9 * max64(svar, 1.0),
             "sample variance"
         );
-        assert!((s.std_dev() - var.sqrt()).abs() < 1e-9 * var.sqrt().max(1.0));
+        assert!((s.std_dev() - var.sqrt()).abs() < 1e-9 * max64(var.sqrt(), 1.0));
         assert!(
-            (s.skewness() - skew).abs() < 1e-7 * skew.abs().max(1.0),
+            (s.skewness() - skew).abs() < 1e-7 * max64(skew.abs(), 1.0),
             "skew {} vs {skew}",
             s.skewness()
         );
         assert!(
-            (s.kurtosis() - kurt).abs() < 1e-6 * kurt.abs().max(1.0),
+            (s.kurtosis() - kurt).abs() < 1e-6 * max64(kurt.abs(), 1.0),
             "kurtosis {} vs {kurt}",
             s.kurtosis()
         );
-        assert_eq!(s.min(), xs.iter().copied().fold(f64::INFINITY, f64::min));
-        assert_eq!(
-            s.max(),
-            xs.iter().copied().fold(f64::NEG_INFINITY, f64::max)
-        );
+        assert_eq!(s.min(), xs.iter().copied().fold(f64::INFINITY, min64));
+        assert_eq!(s.max(), xs.iter().copied().fold(f64::NEG_INFINITY, max64));
         // order independence: reversed and interleaved feeds give the same moments
         let mut r = StreamingStats::default();
         for &x in xs.iter().rev() {
             r.observe(x);
         }
-        assert!((r.skewness() - s.skewness()).abs() < 1e-7 * skew.abs().max(1.0));
-        assert!((r.kurtosis() - s.kurtosis()).abs() < 1e-6 * kurt.abs().max(1.0));
+        assert!((r.skewness() - s.skewness()).abs() < 1e-7 * max64(skew.abs(), 1.0));
+        assert!((r.kurtosis() - s.kurtosis()).abs() < 1e-6 * max64(kurt.abs(), 1.0));
     }
     // symmetric set ⇒ skewness exactly 0, uniform-ish ⇒ negative excess kurtosis
     let mut s = StreamingStats::default();
@@ -218,7 +218,7 @@ fn covariance_matrix_is_symmetric_and_correlation_is_exact_on_known_relations() 
     for i in 0..3 {
         for j in 0..3 {
             assert!(
-                (cm.covariance(i, j) - cov(i, j)).abs() < 1e-9 * cov(i, j).abs().max(1.0),
+                (cm.covariance(i, j) - cov(i, j)).abs() < 1e-9 * max64(cov(i, j).abs(), 1.0),
                 "cov({i},{j})"
             );
             assert_eq!(cm.covariance(i, j), cm.covariance(j, i), "symmetry");
@@ -259,12 +259,12 @@ fn sliding_window_and_moving_averages_are_the_closed_forms_of_the_last_n() {
         assert!((sma.value() - mean).abs() < 1e-12, "k={k} sma");
         assert_eq!(
             w.min(),
-            last.iter().copied().fold(f64::INFINITY, f64::min),
+            last.iter().copied().fold(f64::INFINITY, min64),
             "k={k} min"
         );
         assert_eq!(
             w.max(),
-            last.iter().copied().fold(f64::NEG_INFINITY, f64::max),
+            last.iter().copied().fold(f64::NEG_INFINITY, max64),
             "k={k} max"
         );
         assert!(
@@ -352,7 +352,7 @@ fn streaming_regression_recovers_an_exact_line_and_matches_the_normal_equations(
         "slope {} vs {a}",
         lr.slope()
     );
-    assert!((lr.intercept() - b).abs() < 1e-9 * b.abs().max(1.0));
+    assert!((lr.intercept() - b).abs() < 1e-9 * max64(b.abs(), 1.0));
     assert!(
         (lr.r_squared() - r2).abs() < 1e-9,
         "R² {} vs {r2}",

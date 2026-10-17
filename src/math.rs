@@ -95,7 +95,7 @@ pub(crate) const fn usize_f64(n: usize) -> f64 {
 #[inline]
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 pub(crate) fn f64_usize(x: f64) -> usize {
-    x.max(0.0) as usize
+    alice_det_math::max64(x, 0.0) as usize
 }
 
 /// hash (`u64`) → bucket index 用 `usize` 呼出側で `& (M - 1)` / `% N` を掛ける前提

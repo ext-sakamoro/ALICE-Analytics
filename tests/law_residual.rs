@@ -18,6 +18,7 @@
 use alice_analytics::law::{
     residual_summary, PointClass, ResidualError, ResidualSketch, DEFAULT_RELATIVE_ACCURACY,
 };
+use alice_det_math::{max64, min64};
 use alice_zip::law::{Provenance, ResidualStats, SignalLaw, SignalLawParts, ValidRange};
 
 /// Rounding allowance on top of α: a value on a bin edge `γ^i` sits exactly
@@ -406,8 +407,8 @@ fn default_scale_follows_the_law_residual() {
     // min / max are exact through the power-of-two scale; the mean is the
     // two-pass mean of the same residuals up to summation rounding
     let d = s.distribution.unwrap();
-    let lo = seen.iter().copied().fold(f64::INFINITY, f64::min);
-    let hi = seen.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let lo = seen.iter().copied().fold(f64::INFINITY, min64);
+    let hi = seen.iter().copied().fold(f64::NEG_INFINITY, max64);
     assert_eq!((d.min, d.max), (lo, hi));
     let mean = seen.iter().sum::<f64>() / seen.len() as f64;
     assert!(

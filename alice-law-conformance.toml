@@ -25,9 +25,16 @@ note = "every method the G1 list marks banned is in clippy.toml for f32 and f64,
 reference_repo = ""
 
 [G2]
-status = "fail-known"
-note = "no Law helper for max/min and no default-deny manifest of raw_* exceptions exist. The library calls f64::max / f64::min / clamp directly at src/anomaly.rs:799, src/math.rs:98, src/law.rs:309, src/privacy.rs:352,408-410,555, src/sketch.rs:527, src/stats.rs:96,181 and src/streaming_ops.rs:450; the integer max/min elsewhere in src are not float. Whether the std f64 max/min equal IEEE 754 maximumNumber on every target was not measured here; the gate requires the helper and the manifest regardless. This crate is scalar f64 only (the simd feature is a no-op, Cargo.toml: simd = [])."
-reference_repo = "ALICE-SDF"
+status = "pass"
+evidence = [
+    "src/anomaly.rs:799 (EnsembleDetector score), src/law.rs:309 (max_abs), src/privacy.rs:499 (PrivacyBudget::remaining) and src/math.rs:98 (f64_usize) call alice_det_math::max64, which defines the sign of an equal pair of zeros (+0 from max, -0 from min) and returns the other operand for a NaN (maximumNumber / minimumNumber); these were the only f32 / f64 max / min calls in library code",
+    "clippy.toml disallowed-methods f32::max, f32::min, f64::max, f64::min on every target, enforced by the ci.yml clippy steps with -D warnings; tests/analytic_oracle.rs and tests/law_residual.rs use alice_det_math::max64 / min64 for their tolerances and fold references",
+    "scripts/clippy_canary_calls.tsv (generated from clippy.toml, ci.yml --check step) plants the four max / min rows with every other entry, and scripts/clippy_canary.py fails unless each gets a disallowed_methods diagnostic: 175 planted, 0 skipped, measured 2026-10-17",
+]
+mutant = "measured 2026-10-17, reverted: src/math.rs f64_usize back to x.max(0.0) fails `cargo clippy --lib -- -D warnings` with `use of a disallowed method f64::max`; removing one max / min entry from clippy.toml fails the canary data --check step"
+since = ""
+note = "the replacement moved no golden: tests/determinism_golden.rs passes unchanged in debug and release with --all-features, so ANALYTICS_SEMANTICS_ID is unchanged; std and the helper differ only on an equal pair of zeros of different sign (and a NaN pair's payload), which none of the four sites receives in the golden scenarios. The ban covers every target, so no raw_* site exists and no exception manifest is needed. f64::clamp sites (src/privacy.rs, src/stats.rs, src/sketch.rs, src/streaming_ops.rs) are comparisons with a defined result and outside the gate's max / min list. SIMD widths: none; the crate is scalar f64 (the simd feature is a no-op, Cargo.toml simd = []), so the per-width (+0, -0) clause has no width here, and the scalar helper's (+0, -0) tests live in alice-det-math."
+reference_repo = "ALICE-Physics"
 
 [G3]
 status = "fail-known"

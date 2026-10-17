@@ -306,7 +306,7 @@ impl<'a> ResidualSketch<'a> {
                 mean: self.sketch.sum() * self.scale / u64_f64(count),
                 min,
                 max,
-                max_abs: min.abs().max(max.abs()),
+                max_abs: alice_det_math::max64(min.abs(), max.abs()),
                 p50: q(0.50),
                 p90: q(0.90),
                 p99: q(0.99),
