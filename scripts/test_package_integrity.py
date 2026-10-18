@@ -241,6 +241,12 @@ class PackageContents(Fixture):
         rc, out = self.main("--publish-gate")
         self.assertIn("package_integrity: blocked 1", out)
         self.assertNotIn("alice-crate", out)
+        # with a version too: still the crate itself, never a dependency to patch onto itself
+        (self.root / "Cargo.toml").write_text(manifest + '\n[dev-dependencies]\nalice-crate = { path = ".", version = "0.6.0" }\n')
+        self.published["alice-crate"] = []
+        rc, out = self.main("--publish-gate")
+        self.assertIn("package_integrity: blocked 1", out)
+        self.assertNotIn("alice-crate", out)
 
     def test_every_cargo_call_carries_the_sibling_patch(self) -> None:
         rc, out = self.main("--require-file", "README.md", "--doctests-min", "1", "--test-in-package=--lib",
@@ -345,6 +351,31 @@ class Workspace(unittest.TestCase):
             rc, out, _ = self.main("--member", "ws-lib", "--publish-gate")
             self.assertEqual(rc, 1, (path, out))
             self.assertIn(f"thing: path '{path}' is neither a listed sibling", out)
+
+    def test_version_less_path_in_dependencies_is_a_problem_in_every_kind(self) -> None:
+        # only a dev-dependency is left out of the package; in [dependencies] it is published
+        for spec, expect in (
+            ('other = { path = "../../Other" }', "other: path '../../Other' is neither a listed sibling"),
+            ('ws-macro = { path = "../ws-macro" }', "ws-macro: path dependency without a version"),
+            ('alice-zip = { path = "../../ALICE-Zip" }', "alice-zip: path dependency without a version"),
+        ):
+            self.write_lib(spec + "\n")
+            rc, out, _ = self.main("--member", "ws-lib", "--publish-gate")
+            self.assertEqual(rc, 1, (spec, out))
+            self.assertIn(expect, out)
+
+    def test_version_less_sibling_dev_dependency_is_left_out(self) -> None:
+        self.write_lib("", '\n[dev-dependencies]\nalice-zip = { path = "../../ALICE-Zip", features = ["x"] }\n')
+        rc, out, _ = self.main("--member", "ws-lib", "--publish-gate")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("package_integrity: blocked 0", out)
+
+    def test_same_name_with_another_path_in_a_target_table_is_checked(self) -> None:
+        self.write_lib('alice-zip = { path = "../../ALICE-Zip", version = ">=0.11, <0.12" }\n',
+                       '\n[target.\'cfg(unix)\'.dependencies]\nalice-zip = { path = "../../Other", version = "1" }\n')
+        rc, out, _ = self.main("--member", "ws-lib", "--publish-gate")
+        self.assertEqual(rc, 1, out)
+        self.assertIn("alice-zip: path '../../Other' is neither a listed sibling", out)
 
     def test_inherited_workspace_dependency_is_followed(self) -> None:
         self.write_lib("ws-macro = { workspace = true }\n")

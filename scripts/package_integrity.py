@@ -237,15 +237,18 @@ def classify(
     if problems:
         return [], problems
     blocked: list[dict] = []
-    seen: set[str] = set()
+    seen: set[tuple[str, str]] = set()
     try:
         deps = sibling_deps(root, member)
     except Problem as e:
         return [], [str(e)]
     for dep in deps:
-        if dep["name"] in seen:
+        # one entry per (name, place): the same crate named in two tables is checked once,
+        # a second spec of it with another path (a target table) is checked on its own
+        key = (dep["name"], str(dep.get("repo") or dep.get("dir") or dep.get("path")))
+        if key in seen:
             continue
-        seen.add(dep["name"])
+        seen.add(key)
         if dep["kind"] == "unresolved":
             if dep["table"] == "dev-dependencies" and not dep["req"]:
                 continue  # cargo leaves a version-less path dev-dependency out of the package
@@ -267,6 +270,8 @@ def classify(
             if b:
                 blocked.append({**b, "member": rel})
             continue
+        if not dep["req"] and dep["table"] == "dev-dependencies":
+            continue  # cargo leaves a version-less path dev-dependency out of the package
         if dep["repo"] not in listed:
             problems.append(f"{dep['name']}: ../{dep['repo']} is not in .github/alice-siblings")
             continue
