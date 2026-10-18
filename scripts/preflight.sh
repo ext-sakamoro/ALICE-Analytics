@@ -91,6 +91,7 @@ python3 scripts/test_tracked_binaries.py
 python3 scripts/tracked_binaries.py
 
 step "ci.yml / test + g3-ir.yml: no negated fma result (G3, syntax tree, then the IR findings on this host)"
+cargo fmt --manifest-path tools/no-outer-fneg-of-fma/Cargo.toml -- --check
 cargo test --quiet --locked --manifest-path tools/no-outer-fneg-of-fma/Cargo.toml
 cargo run --quiet --locked --release --manifest-path tools/no-outer-fneg-of-fma/Cargo.toml -- --root .
 # the floors are for the CI runners' targets (g3-ir.yml); here only the findings on this host
