@@ -258,6 +258,8 @@ jobs:
       # the path decision, gate and trigger lint of g3-ir.yml's changes job (shared with ALICE-DB)
       - name: changed_paths oracle (path filter decision, gate and trigger lint)
         run: python scripts/test_changed_paths.py
+      - name: changed_paths sync (no on.push paths off main, pull_request paths = pattern file, 0 compared fails)
+        run: python scripts/changed_paths.py sync
       # G14, static half: no fast-math-style flag, target-cpu=native or flag value
       # the guard cannot resolve in any file a flag can come from (deliberate
       # occurrences in scripts/build_config_allowlist.toml); nothing read fails

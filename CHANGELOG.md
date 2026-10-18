@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - CI: clippy の禁止一覧の canary (`scripts/clippy_canary.py`) が `clippy.toml` の全 entry を植えて確かめるようにした 植える呼び出しの表 `scripts/clippy_canary_calls.tsv` は `scripts/gen_clippy_canary_calls.py` が `clippy.toml` から 1 entry 1 行で生成し (この repo は 171 件、以前は手書きの 7 件)、CI が再生成して byte で比べる canary は全 entry に行があること (植えるか、理由付きで飛ばすか) を確かめ、外部 crate の path は `Cargo.lock` の版を固定して依存に足す この repo の `libm::` の path は `Cargo.lock` が固定する libm (0.2.16) を依存に足して植える 型も禁止された inherent method (`RandomState::new`) は、その型の診断を 1 件だけ許す
 - CI: `scripts/run_tests.sh` が名前ごとの最低の件数 (`float_environment=2`) を受け付けるようにし (ALICE-DB と同じ中身)、G14 の `tests/float_environment.rs` を名指す全 step を `float_environment=2` にした 2 つの試験の片方を `#[ignore]` にする・cfg で外す・名前を変えると、その step が失敗する
 
+- CI: fuzz.yml / security-audit.yml / semver-checks.yml の on.push から paths を外し、`scripts/changed_paths.py` の changes job で走らせるかを決める形にした (g3-ir.yml と同じ、pattern は `.github/paths/<workflow>.txt`) 既存の SHA に新しい ci/ branch を作った時は GitHub の paths filter が空の差分を見て run を飛ばしていた 各 workflow の gate job は、走らせると決めた時は全 job の成功を、決めなかった時は全 job の skip を要求する `changed_paths.py sync` (on.push に paths が無いこと、pull_request の paths が pattern file と一致すること、比較 0 件で失敗) を CI の docs-lint job と preflight に足した
 ## [0.6.0] - 2026-10-15
 
 ### Added

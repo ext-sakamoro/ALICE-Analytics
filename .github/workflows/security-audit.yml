@@ -15,21 +15,11 @@ name: Security & Hygiene
 
 on:
   push:
+    # no paths here: a branch created at a SHA another ref already has gets an empty
+    # diff from GitHub's filter and the run is skipped; the changes job below compares
+    # with merge-base(origin/main) instead (patterns: .github/paths/security-audit.txt)
     # ci/**: the same checks on a branch before it is fast-forwarded to main
     branches: [main, 'ci/**']
-    paths:
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - 'src/**'
-      - 'examples/**'
-      - 'deny.toml'
-      - '.github/workflows/security-audit.yml'
-      - 'scripts/stub_guard.sh'
-      - '.github/alice-siblings'
-      - '.github/actions/alice-siblings/**'
-      - 'scripts/package_integrity.py'
-      - 'scripts/test_package_integrity.py'
-      - 'scripts/alice_siblings_check.py'
   pull_request:
     branches: [main]
     paths:
@@ -45,6 +35,8 @@ on:
       - 'scripts/package_integrity.py'
       - 'scripts/test_package_integrity.py'
       - 'scripts/alice_siblings_check.py'
+      - 'scripts/changed_paths.py'
+      - '.github/paths/security-audit.txt'
   schedule:
     # every Monday 09:00 UTC
     - cron: '0 9 * * 1'
@@ -61,7 +53,38 @@ env:
   CARGO_NET_RETRY: "5"
 
 jobs:
+  # which files changed: a new or force-pushed branch is compared with merge-base(origin/main),
+  # another push with before..after, a pull request with base...head; schedule and manual
+  # runs always run; any error runs (fail-closed) — scripts/changed_paths.py
+  changes:
+    name: Changed paths
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: decide
+        id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.event.after || github.sha }}
+          CREATED: ${{ github.event.created }}
+          FORCED: ${{ github.event.forced }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: >-
+          python3 scripts/changed_paths.py decide --event "$EVENT"
+          --before "$BEFORE" --after "$AFTER" --created "$CREATED" --forced "$FORCED"
+          --base "$PR_BASE" --head "$PR_HEAD"
+          --patterns-file .github/paths/security-audit.txt
+
   audit:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     name: cargo audit (RustSec advisories)
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -81,6 +104,8 @@ jobs:
         run: cargo audit --db "$RUNNER_TEMP/advisory-db" --deny yanked
 
   deny:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     name: cargo-deny (licenses + advisories + bans + sources)
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -96,6 +121,8 @@ jobs:
         run: cargo deny --all-features check all
 
   unused-deps:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     name: cargo-machete (unused dependencies)
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -110,6 +137,8 @@ jobs:
         run: cargo machete
 
   stub-guard:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     name: Stub / dbg guard (grep)
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -120,6 +149,8 @@ jobs:
         run: scripts/stub_guard.sh
 
   package-integrity:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     name: Package integrity (the published .crate builds on its own)
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -140,6 +171,8 @@ jobs:
         run: python3 scripts/package_integrity.py --expect-in-lock alice-det-math
 
   coverage:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     name: Coverage (cargo-llvm-cov, informational)
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -163,3 +196,21 @@ jobs:
           name: coverage-summary
           path: coverage-summary.txt
           retention-days: 30
+
+  # one result for the workflow: run=true needs every job above to succeed, run=false
+  # needs them skipped (a skipped, cancelled or failed job after run=true is red)
+  # coverage is informational: a job-level continue-on-error failure reaches needs as
+  # `success`, so its failure stays non-blocking, but a skip or a cancel after run=true is
+  # red like any other job
+  gate:
+    name: Gate
+    if: always()
+    needs: [changes, audit, deny, unused-deps, stub-guard, package-integrity, coverage]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: gate
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: python3 scripts/changed_paths.py gate --needs-json "$NEEDS"
