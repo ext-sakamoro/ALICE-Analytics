@@ -44,11 +44,11 @@ jobs:
       # as an empty run); the full suite still runs
       - name: Test (unit + integration + doc, every feature)
         shell: bash
-        run: scripts/run_tests.sh determinism_golden,float_edge_golden,float_environment=2 -- cargo test --all-features
+        run: scripts/run_tests.sh determinism_golden,float_edge_golden,float_environment=2,analytics_semantics_id -- cargo test --all-features
 
       - name: Test (unit + integration + doc, default features)
         shell: bash
-        run: scripts/run_tests.sh determinism_golden,float_edge_golden,float_environment=2 -- cargo test
+        run: scripts/run_tests.sh determinism_golden,float_edge_golden,float_environment=2,analytics_semantics_id -- cargo test
 
       # The library is no_std, so its unit tests must also compile and run
       # without the `std` feature: that is the only lane that executes the
@@ -261,6 +261,14 @@ jobs:
         run: python scripts/test_changed_paths.py
       - name: changed_paths sync (no on.push paths off main, pull_request paths = pattern file, 0 compared fails)
         run: python scripts/changed_paths.py sync
+      # ALICE-Law G11 (c): the files shared with the other crates are the bytes ALICE-Law's
+      # table records (table and checker fetched at .github/shared-files-pin, both SHA-256
+      # pinned); a difference, an unlisted shared path or nothing compared fails
+      - name: Shared files equal ALICE-Law's table
+        shell: bash
+        run: |
+          python scripts/test_shared_files.py
+          scripts/shared_files.sh
       # G14, static half: no fast-math-style flag, target-cpu=native or flag value
       # the guard cannot resolve in any file a flag can come from (deliberate
       # occurrences in scripts/build_config_allowlist.toml); nothing read fails
