@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- CI: `scripts/alice_siblings_check.py` (と試験): `.github/alice-siblings` が空か無い時は、manifest を 1 つ以上読んで sibling の path 依存が 0 の時だけ通し ("N manifests scanned, 0 path deps, nothing to pin")、path 依存があればその manifest と行を名指しして失敗する `read_list` は空か無い一覧を空の対応として返す (package_integrity の依存ごとの検査はそのまま効く) path は " と ' のどちらで囲んでもよく、TOML の comment は依存として読まない ALICE-Law の共有の file の移動 (21cbc8d) の owner の写しで、`.github/shared-files-pin` を ALICE-Law 21cbc8d に移した
 - `conformance/g11-own.toml`: ALICE-Law G11 の表のうち、この crate 固有の行 (G4 / G5 / G6 の golden と識別子の試験、比較 0 件は `scripts/run_tests.sh` の試験) 共有の検査器の行は ALICE-Law の `conformance/g11-shared-rows.toml` から生成する
 - CI (ALICE-Law G11): test job の every feature と default feature の `scripts/run_tests.sh` に `analytics_semantics_id` を足した 識別子の試験の binary が 1 件も走らない時に step が落ちる (G6 の canary がその binary にある、default で 5 件)
 - CI (ALICE-Law G11 (c)): ほかの ALICE の crate と同じ bytes で持つ file を ALICE-Law の表と比べる `scripts/shared_files.sh` (試験 `scripts/test_shared_files.py`、ALICE-DetMath などと同じ中身) と `.github/shared-files-pin` を足し、docs-lint job (3 OS) と preflight で走らせる 表と検査器は pin の版で取得し SHA-256 を確かめる 差、表に無い共有の path、比較 0 件は失敗

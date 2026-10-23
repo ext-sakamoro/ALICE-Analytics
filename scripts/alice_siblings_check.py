@@ -6,10 +6,16 @@ checkouts ("../ALICE-Zip", or a package inside one, "../ALICE-Physics/crates/ali
 CI clones each at the full SHA in .github/alice-siblings
 ("<Repo> <40-hex SHA>" per line, "#" comments) through .github/actions/alice-siblings.
 This check makes the local build use the same commits. It fails when a line is
-malformed or repeated, when nothing is listed, when a manifest names a sibling path
-that is not listed or a listed repository is named by no manifest, when a manifest
+malformed or repeated, when a manifest names a sibling path that is not listed (by
+file and line) or a listed repository is named by no manifest, when a manifest
 path does not resolve to the sibling directory, or when a sibling is missing, at
 another commit or has uncommitted changes.
+
+An empty or missing list is right only for a repository whose manifests name no
+sibling path (its siblings come by git and rev, or not at all): the manifests are
+still read (none read is a failure), and the pass says "N manifests scanned, 0 path
+deps, nothing to pin". A sibling path beside an empty list is a failure naming it.
+Comments are not read as dependencies; a path may be quoted with " or '.
 
     python3 scripts/alice_siblings_check.py [repo root]
 """
@@ -30,9 +36,31 @@ MANIFESTS = ("Cargo.toml", "fuzz/Cargo.toml")
 LINE_RE = re.compile(r"(ALICE-[A-Za-z0-9-]+) ([0-9a-f]{40})")
 # a sibling, or a package inside one: after the repository only plain components (no "."
 # or "..", no empty one), so the repository the path names is the one it reaches
-PATH_RE = re.compile(r'path\s*=\s*"((?:\.\./)+)(ALICE-[A-Za-z0-9-]+)((?:/[A-Za-z0-9_-][A-Za-z0-9_.-]*)*)/?"')
+PATH_RE = re.compile(
+    r"""path\s*=\s*(["'])((?:\.\./)+)(ALICE-[A-Za-z0-9-]+)((?:/[A-Za-z0-9_-][A-Za-z0-9_.-]*)*)/?\1"""
+)
 # every path that names an ALICE repository; one PATH_RE does not read is a finding
-ALICE_PATH_RE = re.compile(r'path\s*=\s*"[^"]*ALICE-[^"]*"')
+ALICE_PATH_RE = re.compile(r"""path\s*=\s*(["'])[^"']*ALICE-[^"']*\1""")
+
+
+def uncommented(text: str) -> list[tuple[int, str]]:
+    """(line number, the line without its TOML comment): a "#" inside a quoted string is not a comment"""
+    out = []
+    for no, line in enumerate(text.splitlines(), 1):
+        quote = None
+        for i, ch in enumerate(line):
+            if quote:
+                if ch == "\\" and quote == '"':
+                    continue
+                if ch == quote:
+                    quote = None
+            elif ch in "\"'":
+                quote = ch
+            elif ch == "#":
+                line = line[:i]
+                break
+        out.append((no, line))
+    return out
 
 
 def git(cwd: Path, *args: str) -> str:
@@ -42,11 +70,13 @@ def git(cwd: Path, *args: str) -> str:
 
 
 def read_list(root: Path) -> tuple[dict[str, str], list[str]]:
+    """(repository -> pinned commit, problems with the lines); a missing or empty list is an empty mapping (whether
+    that is right depends on the manifests: see `check`)"""
     listed: dict[str, str] = {}
     problems: list[str] = []
     path = root / LIST_FILE
     if not path.is_file():
-        return listed, [f"{LIST_FILE} is missing"]
+        return listed, []
     for no, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         line = " ".join(raw.split("#", 1)[0].split())
         if not line:
@@ -58,8 +88,6 @@ def read_list(root: Path) -> tuple[dict[str, str], list[str]]:
             problems.append(f"{LIST_FILE}:{no}: {m.group(1)} is listed twice")
         else:
             listed[m.group(1)] = m.group(2)
-    if not listed and not problems:
-        problems.append(f"{LIST_FILE} lists no repository (compared nothing)")
     return listed, problems
 
 
@@ -102,17 +130,17 @@ def check(root: Path) -> list[str]:
 
     named: set[str] = set()
     for rel, manifest in found:
-        text = manifest.read_text(encoding="utf-8")
-        for m in ALICE_PATH_RE.finditer(text):
-            if not PATH_RE.fullmatch(m.group(0)):
-                problems.append(f"{rel} names {m.group(0)}, not ../ALICE-<Repo> or a plain path inside it")
-        for m in PATH_RE.finditer(text):
-            repo = m.group(2)
-            named.add(repo)
-            if (manifest.parent / f"{m.group(1)}{repo}").resolve() != (root / ".." / repo).resolve():
-                problems.append(f"{rel} names {m.group(0)}, not the sibling ../{repo}")
-            if repo not in listed:
-                problems.append(f"{rel} names ../{repo}, which {LIST_FILE} does not list")
+        for no, code in uncommented(manifest.read_text(encoding="utf-8")):
+            for m in ALICE_PATH_RE.finditer(code):
+                if not PATH_RE.fullmatch(m.group(0)):
+                    problems.append(f"{rel} names {m.group(0)}, not ../ALICE-<Repo> or a plain path inside it")
+            for m in PATH_RE.finditer(code):
+                repo = m.group(3)
+                named.add(repo)
+                if (manifest.parent / f"{m.group(2)}{repo}").resolve() != (root / ".." / repo).resolve():
+                    problems.append(f"{rel} names {m.group(0)}, not the sibling ../{repo}")
+                if repo not in listed:
+                    problems.append(f"{rel}:{no} names ../{repo}, which {LIST_FILE} does not list")
     for repo in sorted(set(listed) - named):
         problems.append(f"{LIST_FILE} lists {repo}, which no manifest names as a path")
 
@@ -137,6 +165,11 @@ def main(argv: list[str]) -> int:
     if problems:
         return 1
     listed, _ = read_list(root)
+    if not listed:
+        # check() passed with nothing listed: the manifests were read and name no sibling path
+        found, _ = manifests(root)
+        print(f"alice_siblings_check: {len(found)} manifests scanned, 0 path deps, nothing to pin")
+        return 0
     for repo, ref in listed.items():
         print(f"alice_siblings_check: ../{repo} at {ref}")
     print(f"alice_siblings_check: {len(listed)} sibling(s), each at the commit CI builds against")

@@ -91,9 +91,10 @@ class SiblingsCheck(unittest.TestCase):
         self.write(f"ALICE-Zip {self.zip}\nALICE-Zip {self.zip}\nALICE-DB {self.db}\n")
         self.assertProblem("listed twice")
 
-    def test_empty_list_fails(self) -> None:
+    def test_empty_list_beside_a_path_dependency_fails_naming_it(self) -> None:
         self.write("# nothing\n\n")
-        self.assertProblem("compared nothing")
+        self.assertProblem("Cargo.toml:2 names ../ALICE-Zip, which .github/alice-siblings does not list")
+        self.assertProblem("Cargo.toml:3 names ../ALICE-DB, which .github/alice-siblings does not list")
 
     def test_unlisted_manifest_path_fails(self) -> None:
         self.write(f"ALICE-Zip {self.zip}\n")
@@ -186,9 +187,58 @@ class SiblingsCheck(unittest.TestCase):
         (self.root / "Cargo.toml").unlink()
         self.assertProblem("no Cargo.toml was read")
 
-    def test_missing_list_fails(self) -> None:
+    def test_missing_list_beside_a_path_dependency_fails_naming_it(self) -> None:
         (self.root / ".github" / "alice-siblings").unlink()
-        self.assertEqual(self.problems(), [".github/alice-siblings is missing"])
+        self.assertProblem("Cargo.toml:2 names ../ALICE-Zip, which .github/alice-siblings does not list")
+
+    def no_path_dependency(self) -> None:
+        (self.root / "Cargo.toml").write_text(
+            "[dependencies]\n"
+            'alice-zip = { git = "https://github.com/ext-sakamoro/ALICE-Zip", rev = "%s", version = "0.11" }\n'
+            '# alice-db = { path = "../ALICE-DB", version = "0.6" }  (a comment names no dependency)\n'
+            'serde = { version = "1", features = ["derive"] }  # path = "../ALICE-DB" in a comment\n' % ("0" * 40)
+        )
+
+    def main_output(self) -> tuple[int, str]:
+        import contextlib
+        import io
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = c.main(["x", str(self.root)])
+        return code, out.getvalue()
+
+    def test_empty_list_with_no_path_dependency_passes_saying_so(self) -> None:
+        self.no_path_dependency()
+        self.write("# no sibling path dependency\n")
+        self.assertEqual(self.problems(), [])
+        code, out = self.main_output()
+        self.assertEqual(code, 0, out)
+        self.assertIn("alice_siblings_check: 1 manifests scanned, 0 path deps, nothing to pin\n", out)
+
+    def test_missing_list_with_no_path_dependency_passes_saying_so(self) -> None:
+        self.no_path_dependency()
+        (self.root / ".github" / "alice-siblings").unlink()
+        self.assertEqual(self.problems(), [])
+        self.assertIn("1 manifests scanned, 0 path deps, nothing to pin", self.main_output()[1])
+
+    def test_an_empty_list_with_no_manifest_read_fails(self) -> None:
+        (self.root / "Cargo.toml").unlink()
+        self.write("")
+        self.assertProblem("no Cargo.toml was read (compared nothing)")
+
+    def test_a_single_quoted_path_dependency_counts(self) -> None:
+        (self.root / "Cargo.toml").write_text("[dependencies]\nalice-zip = { path = '../ALICE-Zip', version = '0.11' }\n")
+        self.write("")
+        self.assertProblem("Cargo.toml:2 names ../ALICE-Zip, which .github/alice-siblings does not list")
+        self.write(f"ALICE-Zip {self.zip}\n")
+        self.assertEqual(self.problems(), [])
+
+    def test_read_list_of_a_missing_or_empty_file_is_an_empty_mapping(self) -> None:
+        self.write("# none\n")
+        self.assertEqual(c.read_list(self.root), ({}, []))
+        (self.root / ".github" / "alice-siblings").unlink()
+        self.assertEqual(c.read_list(self.root), ({}, []))
 
 
 
