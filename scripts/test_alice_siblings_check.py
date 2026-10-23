@@ -234,6 +234,35 @@ class SiblingsCheck(unittest.TestCase):
         self.write(f"ALICE-Zip {self.zip}\n")
         self.assertEqual(self.problems(), [])
 
+    def test_a_path_dependency_toml_hides_from_a_line_scan_still_counts(self) -> None:
+        # the manifest is read as TOML: a quoted key, a multi-line literal string, and an escaped quote followed
+        # by a "#" earlier on the line all still name the sibling
+        cases = {
+            "quoted key": '[dependencies]\nalice-zip = { "path" = "../ALICE-Zip", version = "0.11" }\n',
+            "multi-line literal": "[dependencies]\nalice-zip = { version = \"0.11\", path = \'\'\'../ALICE-Zip\'\'\' }\n",
+            "escaped quote and #": '[dependencies]\nalice-zip = { version = "0.11", features = ["a\\" # x"], path = "../ALICE-Zip" }\n',
+            "dotted key": "[dependencies]\nalice-zip.path = \"../ALICE-Zip\"\nalice-zip.version = \"0.11\"\n",
+            "target table": "[target.'cfg(unix)'.dependencies]\nalice-zip = { path = \"../ALICE-Zip\" }\n",
+        }
+        for name, text in cases.items():
+            with self.subTest(name=name):
+                (self.root / "Cargo.toml").write_text(text)
+                self.write("")
+                self.assertProblem("names ../ALICE-Zip, which .github/alice-siblings does not list")
+
+    def test_a_manifest_that_does_not_parse_fails_closed(self) -> None:
+        (self.root / "Cargo.toml").write_text("[dependencies\nalice-zip = { path = ")
+        self.write("")
+        self.assertProblem("Cargo.toml is not TOML")
+
+    def test_a_path_that_is_not_a_dependency_is_not_a_sibling(self) -> None:
+        # [lib] / [[bin]] paths, and a string that only mentions a sibling, name no dependency
+        (self.root / "Cargo.toml").write_text(
+            '[package]\nname = "x"\nversion = "0.1.0"\ndescription = "see path = \\"../ALICE-Zip\\""\n'
+            '[lib]\npath = "src/lib.rs"\n[[bin]]\nname = "b"\npath = "src/bin/b.rs"\n')
+        self.write("")
+        self.assertEqual(self.problems(), [])
+
     def test_read_list_of_a_missing_or_empty_file_is_an_empty_mapping(self) -> None:
         self.write("# none\n")
         self.assertEqual(c.read_list(self.root), ({}, []))
