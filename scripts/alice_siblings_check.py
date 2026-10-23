@@ -15,7 +15,11 @@ An empty or missing list is right only for a repository whose manifests name no
 sibling path (its siblings come by git and rev, or not at all): the manifests are
 still read (none read is a failure), and the pass says "N manifests scanned, 0 path
 deps, nothing to pin". A sibling path beside an empty list is a failure naming it.
-Comments are not read as dependencies; a path may be quoted with " or '.
+Manifests are read as TOML: the dependencies are the entries of the dependency tables
+(`[dependencies]`, `[dev-dependencies]`, `[build-dependencies]`, their `[target.<cfg>.*]` forms,
+`[workspace.dependencies]` and `[patch.<source>]`) that have a `path`, however the TOML spells them
+(quoted or dotted keys, any string form); comments and other strings are not dependencies. A manifest
+that does not parse is a failure.
 
     python3 scripts/alice_siblings_check.py [repo root]
 """
@@ -36,31 +40,40 @@ MANIFESTS = ("Cargo.toml", "fuzz/Cargo.toml")
 LINE_RE = re.compile(r"(ALICE-[A-Za-z0-9-]+) ([0-9a-f]{40})")
 # a sibling, or a package inside one: after the repository only plain components (no "."
 # or "..", no empty one), so the repository the path names is the one it reaches
-PATH_RE = re.compile(
-    r"""path\s*=\s*(["'])((?:\.\./)+)(ALICE-[A-Za-z0-9-]+)((?:/[A-Za-z0-9_-][A-Za-z0-9_.-]*)*)/?\1"""
-)
-# every path that names an ALICE repository; one PATH_RE does not read is a finding
-ALICE_PATH_RE = re.compile(r"""path\s*=\s*(["'])[^"']*ALICE-[^"']*\1""")
+# a sibling, or a package inside one: after the repository only plain components (no "." or "..", no empty one), so
+# the repository the path names is the one it reaches
+SIBLING_RE = re.compile(r"((?:\.\./)+)(ALICE-[A-Za-z0-9-]+)((?:/[A-Za-z0-9_-][A-Za-z0-9_.-]*)*)/?")
+DEP_TABLES = ("dependencies", "dev-dependencies", "build-dependencies")
 
 
-def uncommented(text: str) -> list[tuple[int, str]]:
-    """(line number, the line without its TOML comment): a "#" inside a quoted string is not a comment"""
-    out = []
-    for no, line in enumerate(text.splitlines(), 1):
-        quote = None
-        for i, ch in enumerate(line):
-            if quote:
-                if ch == "\\" and quote == '"':
-                    continue
-                if ch == quote:
-                    quote = None
-            elif ch in "\"'":
-                quote = ch
-            elif ch == "#":
-                line = line[:i]
-                break
-        out.append((no, line))
+def dependency_paths(doc: dict) -> list[str]:
+    """the `path` of every dependency entry of a parsed manifest (see the module doc for the tables read)"""
+    out: list[str] = []
+
+    def table(t: object) -> None:
+        if isinstance(t, dict):
+            for spec in t.values():
+                if isinstance(spec, dict) and isinstance(spec.get("path"), str):
+                    out.append(spec["path"])
+
+    for k in DEP_TABLES:
+        table(doc.get(k))
+    for tgt in (doc.get("target") or {}).values():
+        if isinstance(tgt, dict):
+            for k in DEP_TABLES:
+                table(tgt.get(k))
+    table((doc.get("workspace") or {}).get("dependencies"))
+    for src in (doc.get("patch") or {}).values():
+        table(src)
     return out
+
+
+def line_of(text: str, value: str) -> str:
+    """the first line naming `value` (for the message only; the dependency itself is read as TOML)"""
+    for no, line in enumerate(text.splitlines(), 1):
+        if value in line:
+            return str(no)
+    return "?"
 
 
 def git(cwd: Path, *args: str) -> str:
@@ -98,7 +111,10 @@ def manifests(root: Path) -> tuple[list[tuple[str, Path]], list[str]]:
     dirs = [root]
     top = root / "Cargo.toml"
     if top.is_file():
-        workspace = tomllib.loads(top.read_text(encoding="utf-8")).get("workspace", {})
+        try:
+            workspace = tomllib.loads(top.read_text(encoding="utf-8")).get("workspace", {})
+        except tomllib.TOMLDecodeError:
+            workspace = {}  # reported as "is not TOML" when the manifest itself is read
         excluded: set[Path] = set()
         for pattern in workspace.get("exclude", []):
             excluded |= {d.resolve() for d in root.glob(pattern)}
@@ -130,17 +146,24 @@ def check(root: Path) -> list[str]:
 
     named: set[str] = set()
     for rel, manifest in found:
-        for no, code in uncommented(manifest.read_text(encoding="utf-8")):
-            for m in ALICE_PATH_RE.finditer(code):
-                if not PATH_RE.fullmatch(m.group(0)):
-                    problems.append(f"{rel} names {m.group(0)}, not ../ALICE-<Repo> or a plain path inside it")
-            for m in PATH_RE.finditer(code):
-                repo = m.group(3)
-                named.add(repo)
-                if (manifest.parent / f"{m.group(2)}{repo}").resolve() != (root / ".." / repo).resolve():
-                    problems.append(f"{rel} names {m.group(0)}, not the sibling ../{repo}")
-                if repo not in listed:
-                    problems.append(f"{rel}:{no} names ../{repo}, which {LIST_FILE} does not list")
+        text = manifest.read_text(encoding="utf-8")
+        try:
+            doc = tomllib.loads(text)
+        except tomllib.TOMLDecodeError as e:
+            problems.append(f"{rel} is not TOML: {e}")
+            continue
+        for path in dependency_paths(doc):
+            m = SIBLING_RE.fullmatch(path)
+            if m is None:
+                if "ALICE-" in path:
+                    problems.append(f'{rel} names path = "{path}", not ../ALICE-<Repo> or a plain path inside it')
+                continue
+            repo = m.group(2)
+            named.add(repo)
+            if (manifest.parent / f"{m.group(1)}{repo}").resolve() != (root / ".." / repo).resolve():
+                problems.append(f'{rel} names path = "{path}", not the sibling ../{repo}')
+            if repo not in listed:
+                problems.append(f"{rel}:{line_of(text, path)} names ../{repo}, which {LIST_FILE} does not list")
     for repo in sorted(set(listed) - named):
         problems.append(f"{LIST_FILE} lists {repo}, which no manifest names as a path")
 

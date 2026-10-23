@@ -243,6 +243,9 @@ class SiblingsCheck(unittest.TestCase):
             "escaped quote and #": '[dependencies]\nalice-zip = { version = "0.11", features = ["a\\" # x"], path = "../ALICE-Zip" }\n',
             "dotted key": "[dependencies]\nalice-zip.path = \"../ALICE-Zip\"\nalice-zip.version = \"0.11\"\n",
             "target table": "[target.'cfg(unix)'.dependencies]\nalice-zip = { path = \"../ALICE-Zip\" }\n",
+            "dev-dependencies": "[dev-dependencies]\nalice-zip = { path = \"../ALICE-Zip\" }\n",
+            "workspace dependencies": "[workspace.dependencies]\nalice-zip = { path = \"../ALICE-Zip\" }\n",
+            "patch": "[patch.crates-io]\nalice-zip = { path = \"../ALICE-Zip\" }\n",
         }
         for name, text in cases.items():
             with self.subTest(name=name):
