@@ -51,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - CI: fuzz.yml / security-audit.yml / semver-checks.yml の on.push から paths を外し、`scripts/changed_paths.py` の changes job で走らせるかを決める形にした (g3-ir.yml と同じ、pattern は `.github/paths/<workflow>.txt`) 既存の SHA に新しい ci/ branch を作った時は GitHub の paths filter が空の差分を見て run を飛ばしていた 各 workflow の gate job は、走らせると決めた時は全 job の成功を、決めなかった時は全 job の skip を要求する `changed_paths.py sync` (on.push に paths が無いこと、pull_request の paths が pattern file と一致すること、比較 0 件で失敗) を CI の docs-lint job と preflight に足した
 ### Fixed
+- `scripts/test_package_integrity.py` (この crate が owner の共有 file): `--patches` の行と patch の引数を比べる 3 件の試験が path を引用符で囲んだだけの文字列を期待しており、Windows では `package_integrity.py` が書く TOML の文字列 (`json.dumps` で backslash を escape する、cargo の `--config` に正しい形) と合わなかった 期待値を同じ escape にした (POSIX の path では文字列は変わらない) shared-files の pin を ALICE-Law 1fc131d (この file の新しい bytes を計画した行) に移した
 - `scripts/package_integrity.py`: crates.io の sparse index が 404 を返す crate (一度も公開されていない) を「公開版なし」として読む (検査器の説明どおり、隣の repo の依存は blocked として patch して build する) これまでは 404 を「index を読めない」として失敗にしていた 404 以外 (403 / 429 / 5xx / timeout / 名前解決の失敗 / index の行でない本文) は従来どおり失敗 index の path を `index_path` に切り出し、既知の答えの表で試験する
 
 ## [0.6.0] - 2026-10-15
