@@ -214,14 +214,18 @@ jobs:
         run: cargo doc --lib --no-deps --all-features
         env:
           RUSTDOCFLAGS: "-Dwarnings"
-      # Apache-2.0 §4: the published package carries LICENSE-APACHE and NOTICE
+      # the package carries the licence text and the trademark notice, and none
+      # of the previous licence files
       - name: Licence files are packaged
         run: |
           list=$(cargo package --list --allow-dirty)
-          for f in LICENSE-APACHE NOTICE; do
+          for f in LICENSE-Proprietary TRADEMARK_NOTICE; do
             printf '%s\n' "$list" | grep -qx "$f" || { echo "::error::the package lacks $f"; exit 1; }
           done
-          echo "LICENSE-APACHE and NOTICE packaged"
+          for f in LICENSE-APACHE LICENSE-MIT NOTICE; do
+            if printf '%s\n' "$list" | grep -qx "$f"; then echo "::error::the package still carries $f"; exit 1; fi
+          done
+          echo "LICENSE-Proprietary and TRADEMARK_NOTICE packaged, no previous licence file"
 
   docs-lint:
     # run on every OS so a locale or path difference in the checker itself
@@ -293,7 +297,7 @@ jobs:
         run: python scripts/test_order_guard.py
       - name: Order guard
         run: python scripts/order_guard.py
-      # Apache-2.0 everywhere it is stated (manifest, files, READMEs, NOTICE);
+      # LicenseRef-Proprietary everywhere it is stated (manifest, files, READMEs);
       # 0 comparisons fail
       - name: Licence agrees (tests)
         run: python scripts/test_license_check.py

@@ -13,7 +13,7 @@ heavy hitter、ストリーミングのモーメント / 共分散 / 回帰、�
 持つだけで、保存と転送は呼び出し側に任せる sketch の答えは近似であり、厳密な分位点や
 厳密な異なり数が必要なら生の値を保持する
 
-License: Apache-2.0 (0.3.0 以前は MIT OR Apache-2.0)
+License: LicenseRef-Proprietary
 
 ## 目次
 
@@ -270,9 +270,8 @@ ALICE-Law の `scripts/gen-law-readme-block.py` が ALICE-Law `6a0a5587c152` と
 
 ## ライセンス
 
-- [Apache License, Version 2.0](LICENSE-APACHE) (0.4.0 から)
-- 再配布 (source でも binary でも) には [LICENSE-APACHE](LICENSE-APACHE) と
-  [NOTICE](NOTICE) を添える (Apache-2.0 第 4 条) application の画面に表示する必要は無い
-- それより前の版は出した時のライセンスのまま: crates.io の `alice-analytics` 0.3.0 までは
-  MIT OR Apache-2.0
-- 「ALICE」の名前はライセンスによらず [TRADEMARK_NOTICE](TRADEMARK_NOTICE) の対象
+この版から `LicenseRef-Proprietary`: ソースは閲覧用に公開しており、利用・複製・改変・配布には
+著作権者との書面での合意が必要 条文は [LICENSE-Proprietary](LICENSE-Proprietary)
+それより前に公開した版は、公開時のライセンスのまま
+
+ライセンスの問い合わせ: <contact@extoria.co.jp>

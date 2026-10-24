@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 """The licence is stated the same way everywhere it is stated.
 
-From 0.4.0 ALICE-Analytics is Apache-2.0 only. This checks that:
+ALICE-Analytics is LicenseRef-Proprietary (versions published before keep
+the licence they were published under). This checks that:
 
-- `Cargo.toml` says `license = "Apache-2.0"`;
-- `LICENSE-APACHE` and `NOTICE` exist and no `LICENSE-MIT` is left;
-- `NOTICE` carries the attribution sentence;
-- both READMEs link `LICENSE-APACHE` and `NOTICE` in their licence section and
-  link no `LICENSE-MIT`, and every `License:` line and licence badge anywhere in
-  them states Apache-2.0 first;
-- no comment in `deny.toml` describes this crate as MIT (the `MIT` entry in
-  its allow list is for dependencies and stays).
+- `Cargo.toml` says `license = "LicenseRef-Proprietary"` and `publish = false`,
+  and its `include` list carries `/LICENSE-Proprietary` and none of the
+  previous licence files;
+- `LICENSE-Proprietary` exists and no `LICENSE-APACHE`, `LICENSE-MIT` or
+  `NOTICE` is left;
+- both READMEs link `LICENSE-Proprietary` in their licence section and link
+  none of the previous licence files, and every `License:` line anywhere in
+  them states LicenseRef-Proprietary first and no licence badge names an open
+  licence;
+- no comment in `deny.toml` describes this crate as MIT, Apache or AGPL (the
+  entries in its allow list are for dependencies and stay).
 
 A run that compares nothing fails.
 
@@ -21,12 +25,14 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SPDX = "Apache-2.0"
-ATTRIBUTION = "This product includes ALICE-Analytics, Copyright 2025-2026 Moroya Sakamoto"
+SPDX = "LicenseRef-Proprietary"
+TEXT = "LICENSE-Proprietary"
+OLD_FILES = ("LICENSE-APACHE", "LICENSE-MIT", "NOTICE")
+OPEN = re.compile(r"MIT|Apache|AGPL|GPL", re.I)
 READMES = {"README.md": "## License", "README_JP.md": "## ライセンス"}
-# a line stating the licence, e.g. `License: Apache-2.0 (...)`
+# a line stating the licence, e.g. `License: LicenseRef-Proprietary`
 LICENSE_LINE = re.compile(r"^\s*(?:\*\*)?(?:License|Licence|ライセンス)(?:\*\*)?\s*[:：]")
-# a shields.io licence badge, e.g. `img.shields.io/badge/license-Apache--2.0-green`
+# a shields.io licence badge, e.g. `img.shields.io/badge/license-MIT-green`
 LICENSE_BADGE = re.compile(r"img\.shields\.io/badge/licen[cs]e-([^)\s\"]+)", re.I)
 
 
@@ -63,18 +69,22 @@ def check(root: Path) -> list:
 
     manifest = root / "Cargo.toml"
     if manifest.is_file():
-        lic = string_field(table(manifest.read_text(encoding="utf-8"), "package"), "license")
+        package = table(manifest.read_text(encoding="utf-8"), "package")
+        lic = string_field(package, "license")
         expect(lic == SPDX, f"Cargo.toml: license is {lic!r}, not {SPDX!r}")
+        expect(re.search(r"^\s*publish\s*=\s*false\s*$", package, re.M) is not None,
+               "Cargo.toml: publish = false is missing")
+        m = re.search(r"^\s*include\s*=\s*\[(.*?)\]", package, re.M | re.S)
+        listed = set(re.findall(r'"/?([^"]+)"', m.group(1))) if m else set()
+        expect(TEXT in listed, f"Cargo.toml: include does not list /{TEXT}")
+        for old in OLD_FILES:
+            expect(old not in listed, f"Cargo.toml: include still lists /{old}")
     else:
         expect(False, "Cargo.toml: missing")
 
-    expect((root / "LICENSE-APACHE").is_file(), "LICENSE-APACHE: missing")
-    expect(not (root / "LICENSE-MIT").exists(), "LICENSE-MIT: still present")
-    notice = root / "NOTICE"
-    expect(notice.is_file(), "NOTICE: missing")
-    if notice.is_file():
-        expect(ATTRIBUTION in " ".join(notice.read_text(encoding="utf-8").split()),
-               "NOTICE: the attribution sentence is missing")
+    expect((root / TEXT).is_file(), f"{TEXT}: missing")
+    for old in OLD_FILES:
+        expect(not (root / old).exists(), f"{old}: still present")
 
     for rel, heading in READMES.items():
         path = root / rel
@@ -84,25 +94,24 @@ def check(root: Path) -> list:
         text = path.read_text(encoding="utf-8")
         lic = section(text, heading)
         expect(bool(lic), f"{rel}: no `{heading}` section")
-        expect("(LICENSE-APACHE)" in lic, f"{rel}: the licence section does not link LICENSE-APACHE")
-        expect("(NOTICE)" in lic, f"{rel}: the licence section does not link NOTICE")
-        expect("LICENSE-MIT" not in text, f"{rel}: links LICENSE-MIT")
+        expect(f"({TEXT})" in lic, f"{rel}: the licence section does not link {TEXT}")
+        for old in OLD_FILES:
+            expect(f"({old})" not in text, f"{rel}: links {old}")
         # every licence line and badge in the whole file, not only the section
         for n, line in enumerate(text.splitlines(), 1):
             if LICENSE_LINE.match(line):
                 expect(line.strip().startswith(f"License: {SPDX}"),
                        f"{rel}:{n}: the licence line does not start with `License: {SPDX}`: {line.strip()!r}")
             for badge in LICENSE_BADGE.findall(line):
-                expect(badge.startswith("Apache--2.0") and "MIT" not in badge,
-                       f"{rel}:{n}: licence badge says {badge!r}")
+                expect(not OPEN.search(badge), f"{rel}:{n}: licence badge says {badge!r}")
 
     deny = root / "deny.toml"
     if deny.is_file():
         for n, line in enumerate(deny.read_text(encoding="utf-8").splitlines(), 1):
             comment = line.split("#", 1)[1] if "#" in line else ""
-            if re.search(r"\b(this|our) (crate|repository)\b.*\bMIT\b|\bMIT\b.*\b(this|our) (crate|repository)\b",
-                         comment, re.I):
-                problems.append(f"deny.toml:{n}: a comment describes this crate as MIT")
+            if re.search(r"\b(this|our) (crate|repository)\b.*\b(MIT|Apache|AGPL)\b"
+                         r"|\b(MIT|Apache|AGPL)\b.*\b(this|our) (crate|repository)\b", comment, re.I):
+                problems.append(f"deny.toml:{n}: a comment describes this crate as an open licence")
         compared += 1
 
     return problems + [compared]

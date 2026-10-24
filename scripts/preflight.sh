@@ -136,7 +136,8 @@ step "ci.yml / docs-lint + doc: licence agrees and its files are packaged"
 python3 scripts/test_license_check.py
 python3 scripts/license_check.py
 list=$(cargo package --list --allow-dirty)
-for f in LICENSE-APACHE NOTICE; do printf '%s\n' "$list" | grep -qx "$f" || { echo "the package lacks $f"; exit 1; }; done
+for f in LICENSE-Proprietary TRADEMARK_NOTICE; do printf '%s\n' "$list" | grep -qx "$f" || { echo "the package lacks $f"; exit 1; }; done
+for f in LICENSE-APACHE LICENSE-MIT NOTICE; do if printf '%s\n' "$list" | grep -qx "$f"; then echo "the package still carries $f"; exit 1; fi; done
 
 step "security-audit.yml / stub-guard"
 scripts/stub_guard.sh
