@@ -34,7 +34,6 @@ jobs:
         os: [macos-latest, ubuntu-24.04-arm, ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/alice-siblings
       # the toolchain itself comes from rust-toolchain.toml
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -79,7 +78,6 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/alice-siblings
       - uses: dtolnay/rust-toolchain@stable
       # installs the target for the toolchain pinned in rust-toolchain.toml
       - name: Add thumbv7em-none-eabihf
@@ -104,7 +102,6 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/alice-siblings
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Install cargo-hack
@@ -123,7 +120,6 @@ jobs:
         with:
           # the release tags: scripts/id_move_check.py compares with the newest one
           fetch-depth: 0
-      - uses: ./.github/actions/alice-siblings
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Clippy (default features, all targets)
@@ -189,7 +185,6 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/alice-siblings
       - uses: dtolnay/rust-toolchain@1.87
       - uses: Swatinem/rust-cache@v2
       - name: cargo check on MSRV (lib, default features)
@@ -203,7 +198,6 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/alice-siblings
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: cargo doc (no-deps, default features)
@@ -239,7 +233,6 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/alice-siblings
       - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
@@ -251,12 +244,15 @@ jobs:
         run: python scripts/test_deprecation_pin.py
       - name: Deprecation pin (privacy module)
         run: python scripts/deprecation_pin.py
-      # the ../ALICE-* path dependencies (alice-zip until 0.11 is on crates.io): the clones are the
-      # commits in .github/alice-siblings (the action above), and preflight runs the same check locally
+      # every ALICE dependency is taken by git at a pinned rev: the check asserts that no manifest
+      # names a ../ALICE-* path (0 path deps, nothing to pin); preflight runs the same check
       - name: ALICE sibling check (tests)
         run: python scripts/test_alice_siblings_check.py
-      - name: ALICE sibling check (the clones are .github/alice-siblings)
+      - name: ALICE sibling check (no path dependency on a sibling)
         run: python scripts/alice_siblings_check.py
+      # the owner's tests of the shared package_integrity.py (the packaging run itself is dormant)
+      - name: Package integrity (tests)
+        run: python scripts/test_package_integrity.py
       # the zero-test guard shared with ALICE-DB, on each OS's own bash
       - name: run_tests.sh (tests)
         run: python scripts/test_run_tests.py
@@ -316,7 +312,6 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/alice-siblings
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
@@ -329,7 +324,6 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/alice-siblings
       - name: Run actionlint
         uses: reviewdog/action-actionlint@v1
         with:

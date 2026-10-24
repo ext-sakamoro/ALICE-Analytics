@@ -44,10 +44,10 @@ path = "src/lib.rs"
 # `law::ResidualSummary::law_id` が法則の識別子と混ぜる) 0.3 には無いので、
 # 0.3 を解決する消費者と同じ graph に入ると「どの算術で出た数か」を言えない
 # version (`alice-zip` 0.8 / `alice-db` / `alice-physics` と同じ 0.4 系統に揃える)
-alice-det-math = { version = "0.5.1", default-features = false }
+alice-det-math = { git = "https://github.com/ext-sakamoro/ALICE-DetMath", rev = "6384856c8b00f1615e1cd6b5c74d88036c1a8706", version = "0.5.2", default-features = false }
 # no_std build の float 丸め / sqrt (src/math.rs、std build では未使用)
 libm = "0.2"
-alice-zip = { path = "../ALICE-Zip", version = ">=0.11, <0.12", default-features = false, optional = true }
+alice-zip = { git = "https://github.com/ext-sakamoro/ALICE-Zip", rev = "3d75fcf316684df07195f2edabc64c5921f2cf83", version = "0.11", default-features = false, optional = true }
 
 # The float lints that suggest re-fusing arithmetic are off as a property of
 # the crate, not case by case: every transcendental goes through

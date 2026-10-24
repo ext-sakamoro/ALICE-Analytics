@@ -17,8 +17,6 @@ on:
       - 'src/**'
       - 'fuzz/**'
       - '.github/workflows/fuzz.yml'
-      - '.github/alice-siblings'
-      - '.github/actions/alice-siblings/**'
       - 'scripts/changed_paths.py'
       - '.github/paths/fuzz.txt'
   schedule:
@@ -87,7 +85,6 @@ jobs:
           - fuzz_sketch_insert
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/alice-siblings
 
       - name: Install nightly toolchain
         uses: dtolnay/rust-toolchain@nightly

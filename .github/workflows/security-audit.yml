@@ -4,11 +4,10 @@ name: Security & Hygiene
 # - dependency licenses / sources (cargo-deny)
 # - unused dependencies (cargo-machete)
 # - stubs left in production code (todo! / unimplemented! / panic!(STUB) / dbg!)
-# - the packaged .crate builds on its own
 # - coverage (informational)
 #
-# The public API check against the latest crates.io release is semver-checks.yml,
-# which gates.
+# The packaged .crate (package-integrity.yml) and the public API check (semver-checks.yml)
+# are dormant: the crate is not published to crates.io, so they run only when dispatched.
 #
 # scripts/preflight.sh runs the same commands with the same arguments
 # (except the informational jobs and the packaged build).
@@ -30,8 +29,6 @@ on:
       - 'deny.toml'
       - '.github/workflows/security-audit.yml'
       - 'scripts/stub_guard.sh'
-      - '.github/alice-siblings'
-      - '.github/actions/alice-siblings/**'
       - 'scripts/package_integrity.py'
       - 'scripts/test_package_integrity.py'
       - 'scripts/alice_siblings_check.py'
@@ -90,7 +87,6 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/alice-siblings
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Install cargo-audit
@@ -111,7 +107,6 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/alice-siblings
       - uses: dtolnay/rust-toolchain@stable
       - name: Install cargo-deny
         uses: taiki-e/install-action@v2
@@ -128,7 +123,6 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/alice-siblings
       - name: Install cargo-machete
         uses: taiki-e/install-action@v2
         with:
@@ -144,31 +138,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/alice-siblings
       - name: Detect todo! / unimplemented! / panic!(STUB) / dbg! in src/**
         run: scripts/stub_guard.sh
-
-  package-integrity:
-    needs: changes
-    if: needs.changes.outputs.run == 'true'
-    name: Package integrity (the published .crate builds on its own)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/alice-siblings
-      - uses: dtolnay/rust-toolchain@stable
-      # A file the package needs but does not contain (include_str! across the
-      # package boundary, an over-broad exclude) builds fine in the repository
-      # and fails only for users of the published crate. scripts/package_integrity.py
-      # packages, unpacks and builds the .crate on its own (shipped lock, then a fresh
-      # resolution); a path dependency whose required version only an unpublished
-      # sibling in .github/alice-siblings satisfies (checked against the crates.io
-      # index) is patched in and reported as `blocked`, every other error fails
-      - name: Package integrity (tests)
-        run: python3 scripts/test_package_integrity.py
-      - name: Package integrity (package, unpack, build on its own)
-        run: python3 scripts/package_integrity.py --expect-in-lock alice-det-math
 
   coverage:
     needs: changes
@@ -179,7 +150,6 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/alice-siblings
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: llvm-tools-preview
@@ -205,7 +175,7 @@ jobs:
   gate:
     name: Gate
     if: always()
-    needs: [changes, audit, deny, unused-deps, stub-guard, package-integrity, coverage]
+    needs: [changes, audit, deny, unused-deps, stub-guard, coverage]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

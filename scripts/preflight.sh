@@ -52,11 +52,11 @@ step "ci.yml / actionlint: workflow-concurrency (branch runs cancel, main never)
 python3 scripts/test_workflow_concurrency.py
 python3 scripts/workflow_concurrency.py
 
-step "ci.yml / docs-lint: ALICE siblings (each ../ALICE-* is the commit in .github/alice-siblings)"
+step "ci.yml / docs-lint: ALICE siblings (no path dependency on a sibling)"
 python3 scripts/test_alice_siblings_check.py
 python3 scripts/alice_siblings_check.py
 
-step "security-audit.yml / package-integrity: tests (the packaging run itself is CI only)"
+step "ci.yml / docs-lint: package integrity tests (the packaging run itself is dormant)"
 python3 scripts/test_package_integrity.py
 
 step "ci.yml / fmt: cargo fmt --check"
@@ -222,9 +222,7 @@ cargo audit --db "${CARGO_TARGET_DIR:-target}/advisory-db" --deny yanked
 cargo deny --all-features check all
 cargo machete
 
-step "semver-checks.yml: semver gate tests + cargo semver-checks against the latest crates.io release"
-need cargo-semver-checks "cargo install cargo-semver-checks --version 0.50.0 --locked"
-python3 scripts/test_semver_gate.py
-python3 scripts/semver_gate.py --config .github/semver-gate.toml --target-dir "${CARGO_TARGET_DIR:-target}/semver"
+# dormant in CI (dispatch only: the crate is not published to crates.io): the semver gate
+echo 'PREFLIGHT-SKIP: semver-checks.yml: dormant, dispatch only' >&2
 
 echo; echo "preflight OK"
