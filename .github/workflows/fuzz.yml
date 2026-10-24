@@ -11,14 +11,6 @@ on:
     # with merge-base(origin/main) instead (patterns: .github/paths/fuzz.txt)
     # ci/**: the same checks on a branch before it is fast-forwarded to main
     branches: [main, 'ci/**']
-  pull_request:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - 'fuzz/**'
-      - '.github/workflows/fuzz.yml'
-      - 'scripts/changed_paths.py'
-      - '.github/paths/fuzz.txt'
   schedule:
     # every day 03:00 UTC
     - cron: '0 3 * * *'

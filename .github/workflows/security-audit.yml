@@ -19,21 +19,6 @@ on:
     # with merge-base(origin/main) instead (patterns: .github/paths/security-audit.txt)
     # ci/**: the same checks on a branch before it is fast-forwarded to main
     branches: [main, 'ci/**']
-  pull_request:
-    branches: [main]
-    paths:
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - 'src/**'
-      - 'examples/**'
-      - 'deny.toml'
-      - '.github/workflows/security-audit.yml'
-      - 'scripts/stub_guard.sh'
-      - 'scripts/package_integrity.py'
-      - 'scripts/test_package_integrity.py'
-      - 'scripts/alice_siblings_check.py'
-      - 'scripts/changed_paths.py'
-      - '.github/paths/security-audit.txt'
   schedule:
     # every Monday 09:00 UTC
     - cron: '0 9 * * 1'
