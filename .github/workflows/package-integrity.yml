@@ -1,0 +1,33 @@
+name: Package integrity
+
+# Dormant: the crate is not published to crates.io, so the packaged .crate is not a required check
+# and this runs only when dispatched (its own workflow, so the Security & Hygiene gate covers every
+# job it has). The shared script's own tests run in ci.yml.
+#
+# A file the package needs but does not contain (include_str! across the package boundary, an
+# over-broad exclude) builds fine in the repository and fails only for users of a published crate.
+# scripts/package_integrity.py packages, unpacks and builds the .crate on its own (shipped lock,
+# then a fresh resolution); every error fails.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_NET_RETRY: "5"
+
+jobs:
+  package-integrity:
+    name: Package integrity (the packaged .crate builds on its own)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Package integrity (tests)
+        run: python3 scripts/test_package_integrity.py
+      - name: Package integrity (package, unpack, build on its own)
+        run: python3 scripts/package_integrity.py --expect-in-lock alice-det-math

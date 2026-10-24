@@ -4,7 +4,5 @@
 src/**
 fuzz/**
 .github/workflows/fuzz.yml
-.github/alice-siblings
-.github/actions/alice-siblings/**
 scripts/changed_paths.py
 .github/paths/fuzz.txt
