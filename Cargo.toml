@@ -47,7 +47,7 @@ path = "src/lib.rs"
 alice-det-math = { git = "https://github.com/ext-sakamoro/ALICE-DetMath", rev = "6384856c8b00f1615e1cd6b5c74d88036c1a8706", version = "0.5.2", default-features = false }
 # no_std build の float 丸め / sqrt (src/math.rs、std build では未使用)
 libm = "0.2"
-alice-zip = { git = "https://github.com/ext-sakamoro/ALICE-Zip", rev = "3d75fcf316684df07195f2edabc64c5921f2cf83", version = "0.11", default-features = false, optional = true }
+alice-zip = { git = "https://github.com/ext-sakamoro/ALICE-Zip", rev = "226194131a524cc2a836a8c8049969a607427f72", version = "0.11", default-features = false, optional = true }
 
 # The float lints that suggest re-fusing arithmetic are off as a property of
 # the crate, not case by case: every transcendental goes through
