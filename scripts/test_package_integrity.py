@@ -670,5 +670,168 @@ class Workspace(unittest.TestCase):
         self.assertIn("blocked: alice-zip", out)
 
 
+ZIP_GIT = "https://github.com/ext-sakamoro/ALICE-Zip"
+ZIP_REV = "fec22a06eab879153a140b057f53f081876a2ff7"
+ZIP_SOURCE = f"git+{ZIP_GIT}?rev={ZIP_REV}#{ZIP_REV}"
+
+
+class GitPins(Fixture):
+    """A dependency taken by git at a 40-hex rev with a version (the end state of the ALICE
+    dependencies): while that version is not on crates.io it is blocked, packaged and built with
+    `patch.crates-io.<name>` at that git and rev, and the resolved lock must name exactly that rev."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        (self.root / ".github" / "alice-siblings").write_text("")
+        self.write_manifest(f'alice-zip = {{ git = "{ZIP_GIT}", rev = "{ZIP_REV}", version = "0.11", optional = true }}\n')
+        self.lock_text = (
+            '[[package]]\nname = "alice-det-math"\nversion = "0.5.1"\n'
+            'source = "registry+https://github.com/rust-lang/crates.io-index"\n\n'
+            f'[[package]]\nname = "alice-zip"\nversion = "0.11.0"\nsource = "{ZIP_SOURCE}"\n'
+        )
+
+    def write_manifest(self, deps: str) -> None:
+        (self.root / "Cargo.toml").write_text(
+            '[package]\nname = "alice-crate"\nversion = "0.6.0"\n\n[dependencies]\n' + deps
+        )
+
+    def runner(self, **kw):
+        inner = super().runner(**kw)
+
+        def run(cmd: list[str], cwd: Path) -> tuple[int, str, str]:
+            rc, out, err = inner(cmd, cwd)
+            if cmd[1] == "check" and "--locked" not in cmd and rc == 0:
+                (cwd / "Cargo.lock").write_text(self.lock_text)
+            return rc, out, err
+
+        return run
+
+    def test_unpublished_git_pin_is_blocked_patched_at_its_rev_and_verified(self) -> None:
+        rc, out = self.main()
+        self.assertEqual(rc, 0, out)
+        self.assertIn(f"blocked: alice-zip 0.11 unpublished (crates.io max 0.10.0), "
+                      f"satisfied only by git {ZIP_GIT} rev {ZIP_REV[:12]}", out)
+        self.assertIn("blocked 1", out)
+        self.assertIn("1 git pin(s) resolved at their rev", out)
+        for c in self.calls:
+            self.assertIn(f'patch.crates-io.alice-zip.git="{ZIP_GIT}"', c, c)
+            self.assertIn(f'patch.crates-io.alice-zip.rev="{ZIP_REV}"', c, c)
+
+    def test_a_lock_that_resolved_the_registry_is_red(self) -> None:
+        self.lock_text = ('[[package]]\nname = "alice-zip"\nversion = "0.11.0"\n'
+                          'source = "registry+https://github.com/rust-lang/crates.io-index"\n')
+        rc, out = self.main()
+        self.assertEqual(rc, 1, out)
+        self.assertIn("alice-zip: resolved from", out)
+        self.assertIn("patch not applied", out)
+
+    def test_a_lock_at_another_rev_is_red(self) -> None:
+        other = "0" * 40
+        self.lock_text = (f'[[package]]\nname = "alice-zip"\nversion = "0.11.0"\n'
+                          f'source = "git+{ZIP_GIT}?rev={other}#{other}"\n')
+        rc, out = self.main()
+        self.assertEqual(rc, 1, out)
+        self.assertIn("patch not applied", out)
+
+    def test_a_lock_without_the_pinned_crate_is_red(self) -> None:
+        self.lock_text = '[[package]]\nname = "alice-det-math"\nversion = "0.5.1"\n'
+        rc, out = self.main()
+        self.assertEqual(rc, 1, out)
+        self.assertIn("alice-zip: not in the resolved Cargo.lock", out)
+
+    def test_a_git_source_the_manifest_does_not_pin_is_red(self) -> None:
+        self.lock_text += ('\n[[package]]\nname = "stray"\nversion = "1.0.0"\n'
+                           'source = "git+https://example.invalid/stray?rev=abc#abc"\n')
+        rc, out = self.main()
+        self.assertEqual(rc, 1, out)
+        self.assertIn("stray: git source", out)
+        self.assertIn("that Cargo.toml does not pin", out)
+
+    def test_another_crate_of_the_pinned_repository_at_the_pinned_rev_is_pinned(self) -> None:
+        # a facade taken by git reaches the crates of its repository by path: the lock gives them its source
+        self.lock_text += f'\n[[package]]\nname = "alice-zip-core"\nversion = "0.11.0"\nsource = "{ZIP_SOURCE}"\n'
+        rc, out = self.main()
+        self.assertEqual(rc, 0, out)
+
+    def test_a_rev_that_is_not_40_hex_is_a_problem(self) -> None:
+        for rev in ("main", ZIP_REV[:12], ZIP_REV.upper()):
+            with self.subTest(rev=rev):
+                self.write_manifest(f'alice-zip = {{ git = "{ZIP_GIT}", rev = "{rev}", version = "0.11" }}\n')
+                rc, out = self.main()
+                self.assertEqual(rc, 1, out)
+                self.assertIn("rev is not 40 hex", out)
+        self.write_manifest(f'alice-zip = {{ git = "{ZIP_GIT}", branch = "main", version = "0.11" }}\n')
+        rc, out = self.main()
+        self.assertEqual(rc, 1, out)
+        self.assertIn("rev is not 40 hex", out)
+
+    def test_a_git_dependency_without_a_version_cannot_be_published(self) -> None:
+        self.write_manifest(f'alice-zip = {{ git = "{ZIP_GIT}", rev = "{ZIP_REV}" }}\n')
+        rc, out = self.main()
+        self.assertEqual(rc, 1, out)
+        self.assertIn("alice-zip: git dependency without a version cannot be published", out)
+        # a version-less git dev-dependency is left out of the package by cargo
+        (self.root / "Cargo.toml").write_text(
+            '[package]\nname = "alice-crate"\nversion = "0.6.0"\n\n[dev-dependencies]\n'
+            f'alice-zip = {{ git = "{ZIP_GIT}", rev = "{ZIP_REV}" }}\n'
+        )
+        self.lock_text = '[[package]]\nname = "alice-det-math"\nversion = "0.5.1"\n'
+        rc, out = self.main()
+        self.assertEqual(rc, 0, out)
+        self.assertIn("blocked 0", out)
+
+    def test_a_published_version_resolves_without_a_patch(self) -> None:
+        self.published["alice-zip"] = [(0, 11, 2)]
+        self.lock_text = ('[[package]]\nname = "alice-zip"\nversion = "0.11.2"\n'
+                          'source = "registry+https://github.com/rust-lang/crates.io-index"\n')
+        rc, out = self.main()
+        self.assertEqual(rc, 0, out)
+        self.assertIn("blocked 0", out)
+        self.assertFalse(any("patch.crates-io" in a for c in self.calls for a in c), self.calls)
+
+    def test_patches_prints_the_git_and_rev_of_each_blocked_pin(self) -> None:
+        buf, err = io.StringIO(), io.StringIO()
+        from contextlib import redirect_stderr
+        with redirect_stdout(buf), redirect_stderr(err):
+            rc = pi.main(["--root", str(self.root), "--patches"], versions_of=self.versions_of, runner=self.runner())
+        self.assertEqual(rc, 0, err.getvalue())
+        self.assertEqual(buf.getvalue().splitlines(), [
+            f'--config=patch.crates-io.alice-zip.git="{ZIP_GIT}"',
+            f'--config=patch.crates-io.alice-zip.rev="{ZIP_REV}"',
+        ])
+
+    def test_publish_gate_is_red_while_a_git_pin_is_blocked(self) -> None:
+        rc, out = self.main("--publish-gate")
+        self.assertEqual(rc, 1, out)
+        self.assertIn("publish gate: FAIL", out)
+
+    def test_one_name_pinned_to_two_sources_is_a_problem(self) -> None:
+        other = "1" * 40
+        (self.root / "Cargo.toml").write_text(
+            '[package]\nname = "alice-crate"\nversion = "0.6.0"\n\n[dependencies]\n'
+            f'alice-zip = {{ git = "{ZIP_GIT}", rev = "{ZIP_REV}", version = "0.11" }}\n'
+            f'[dev-dependencies]\nalice-zip = {{ git = "{ZIP_GIT}", rev = "{other}", version = "0.11" }}\n'
+        )
+        rc, out = self.main()
+        self.assertEqual(rc, 1, out)
+        self.assertIn("alice-zip: pinned twice with different sources", out)
+
+    def test_a_git_pin_and_a_path_sibling_together(self) -> None:
+        (self.root / ".github" / "alice-siblings").write_text(f"ALICE-DB {SHA}\n")
+        (self.root.parent / "ALICE-DB").mkdir()
+        (self.root.parent / "ALICE-DB" / "Cargo.toml").write_text('[package]\nname = "alice-db"\nversion = "0.6.0"\n')
+        self.published["alice-db"] = [(0, 5, 0)]
+        self.write_manifest(
+            f'alice-zip = {{ git = "{ZIP_GIT}", rev = "{ZIP_REV}", version = "0.11" }}\n'
+            'alice-db = { path = "../ALICE-DB", version = "0.6" }\n'
+        )
+        rc, out = self.main()
+        self.assertEqual(rc, 0, out)
+        self.assertIn("blocked 2", out)
+        for c in self.calls:
+            self.assertTrue(any("patch.crates-io.alice-db.path=" in a for a in c), c)
+            self.assertIn(f'patch.crates-io.alice-zip.rev="{ZIP_REV}"', c, c)
+
+
 if __name__ == "__main__":
     unittest.main()
