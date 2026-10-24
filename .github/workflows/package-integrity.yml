@@ -1,7 +1,6 @@
 name: Package integrity
 
-# Dormant: the crate is not published to crates.io, so the packaged .crate is not a required check
-# and this runs only when dispatched (its own workflow, so the Security & Hygiene gate covers every
+# Dormant: runs only when dispatched (its own workflow, so the Security & Hygiene gate covers every
 # job it has). The shared script's own tests run in ci.yml.
 #
 # A file the package needs but does not contain (include_str! across the package boundary, an

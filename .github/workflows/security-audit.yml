@@ -7,7 +7,7 @@ name: Security & Hygiene
 # - coverage (informational)
 #
 # The packaged .crate (package-integrity.yml) and the public API check (semver-checks.yml)
-# are dormant: the crate is not published to crates.io, so they run only when dispatched.
+# are dormant: they run only when dispatched.
 #
 # scripts/preflight.sh runs the same commands with the same arguments
 # (except the informational jobs and the packaged build).

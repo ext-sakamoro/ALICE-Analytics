@@ -222,7 +222,7 @@ cargo audit --db "${CARGO_TARGET_DIR:-target}/advisory-db" --deny yanked
 cargo deny --all-features check all
 cargo machete
 
-# dormant in CI (dispatch only: the crate is not published to crates.io): the semver gate
+# dormant in CI (dispatch only): the semver gate
 echo 'PREFLIGHT-SKIP: semver-checks.yml: dormant, dispatch only' >&2
 
 echo; echo "preflight OK"
