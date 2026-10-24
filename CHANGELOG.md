@@ -28,9 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `tests/float_environment.rs` (ALICE-DB と同一): round-to-nearest-even と subnormal が flush されないことを実行時に確かめる test test job (4 OS) と release profile で `scripts/run_tests.sh` を通して実行 `alice-law-conformance.toml` の G14 を fail-known から pass にした
 
 ### Changed
-- 依存: `alice-zip` を sibling の path (`../ALICE-Zip`) でなく git の rev (`3d75fcf3…`、version 0.11) で引き、`alice-det-math` も同じ形 (git の rev `6384856c…`、version 0.5.2、ALICE-Zip と同じ source) で引く ALICE の依存はすべて git + 40 桁の rev + version で識別し、sibling の checkout に依らずに build できる `.github/alice-siblings` と各 workflow の clone の step を外した (`scripts/alice_siblings_check.py` は「path 依存 0 件」を確かめる) `deny.toml` の allow-git に ALICE-DetMath と ALICE-Zip を足した (det-math を crates.io の 0.5.1 のままにすると、git の det-math を引く ALICE-Zip と並んで 2 つ link され型が合わない)
-- CI: semver gate (`semver-checks.yml`) と package integrity を休止にした (dispatch の時だけ走る) package integrity は `security-audit.yml` の job から dispatch 専用の `package-integrity.yml` に移し、Security & Hygiene の gate は残る全 job を必須にしたまま この crate は crates.io に公開しない 共有 file `scripts/package_integrity.py` の試験は ci.yml で走らせ続ける preflight の semver は `PREFLIGHT-SKIP`
-- Licence: from `Apache-2.0` to `LicenseRef-Proprietary` from this version (the source stays published for reading; using it needs a written agreement); published versions keep their licence
+- 依存: `alice-zip` を sibling の path (`../ALICE-Zip`) でなく git の rev (`3d75fcf3…`、version 0.11) で引き、`alice-det-math` も同じ形 (git の rev `6384856c…`、version 0.5.2、ALICE-Zip と同じ source) で引く `.github/alice-siblings` と各 workflow の clone の step を外した (`scripts/alice_siblings_check.py` は「path 依存 0 件」を確かめる) `deny.toml` の allow-git に ALICE-DetMath と ALICE-Zip を足した (det-math を crates.io の 0.5.1 のままにすると、git の det-math を引く ALICE-Zip と並んで 2 つ link され型が合わない)
+- CI: semver gate (`semver-checks.yml`) と package integrity を休止にした (dispatch の時だけ走る) package integrity は `security-audit.yml` の job から dispatch 専用の `package-integrity.yml` に移し、Security & Hygiene の gate は残る全 job を必須にしたまま 共有 file `scripts/package_integrity.py` の試験は ci.yml で走らせ続ける preflight の semver は `PREFLIGHT-SKIP`
+- Licence: `Apache-2.0` → `LicenseRef-Proprietary`
 - CI: `scripts/run_tests.sh` と試験 `scripts/test_run_tests.py` を ALICE-LLM と同じ bytes にし、`.github/shared-files-pin` を ALICE-Law の新しい版に移す 名前 `lib` を library の単体試験として数えるようになったが、この repository は `lib` を名指さないので各段の試験の名前と件数は変わらない 試験 `scripts/test_public_text.py` を ALICE-SDF と同じ版にした (公開する text の検査を pin の checker で走らせ、置いた note link を tree と commit message で検出すること、pin の 3 行目 `config-sha256` が設定を承認することを確かめる、network を使う) `scripts/public_text.sh` と public-text の pin は変えないので検査の結果は変わらない
 - CI: `.gitattributes` に `* text=auto eol=lf` を置き、text の file を保存も checkout も全 OS で LF にした (共有 file は ALICE-Law の表と byte で比べるので、Windows の CRLF の checkout ではずれになる) binary と既存の行はそのまま、`git add --renormalize` で commit 済みの中身は変わらない
 - CI: ALICE-SDF と共有する `scripts/api_boundary.py` / `scripts/test_api_boundary.py` を新しい版に揃えた (--document-private-items の 2 回目の rustdoc で private module の extern "C" も列挙、pyo3 の入口・wasm32 だけの fn の列挙、`pending:` の判定、`--skip-missing-targets`、1 つの OS でだけ compile される入口の `host` 表) この crate の一覧は変わらず、全件の判定はそのまま通る
@@ -103,11 +103,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `fuzz_metric_aggregate` が試験の側で panic していた (crate の欠陥ではない): sorted を前提とする API に渡す配列を `partial_cmp().unwrap_or(Equal)` で並べており、NaN を含むと全順序にならず標準の sort が「total order を実装していない」で panic する `f64::total_cmp` に替え、crash の入力を `fuzz/regressions/fuzz_metric_aggregate/` に置いた (修正後 846 万件で crash 無し) crate の `src/` に同じ比較は無い
 
 ### Changed
-- **license:** 0.4.0 から Apache-2.0 だけにする (`Cargo.toml` の `license = "Apache-2.0"`、`LICENSE-MIT` を削除、`NOTICE` を追加) 0.3.0 までの公開済の版は MIT OR Apache-2.0 のまま 再配布には `LICENSE-APACHE` と `NOTICE` を添える `scripts/license_check.py` (CI の全 OS と preflight) が manifest・file・README・`NOTICE` の文言が揃っていることを確かめ (比較 0 件は失敗)、CI は package に `LICENSE-APACHE` と `NOTICE` が入ることを確かめる この crate に依存する `alice-physics` / `alice-db` (どちらも AGPL-3.0-or-later OR 商用) と `alice-edge` (MIT OR Apache-2.0) は、いずれも Apache-2.0 の crate に依存できる (permissive な依存のまま)
+- **license:** 0.4.0 から Apache-2.0 だけに変更 (`Cargo.toml` の `license = "Apache-2.0"`、`LICENSE-MIT` を削除、`NOTICE` を追加) `scripts/license_check.py` (CI の全 OS と preflight) が manifest・file・README・`NOTICE` の文言の一致を確認 (比較 0 件は失敗)、CI は package に `LICENSE-APACHE` と `NOTICE` が入ることを確認
 - **破壊的変更 (`law` feature):** `alice-zip` を 0.7 から 0.9 に上げた `law::ResidualSummary` / `ResidualSketch` / `residual_summary` が受け渡す `alice_zip::law::SignalLaw` は依存先の版ごとに別の型なので、`law` を使う利用者が自分で `alice-zip` 0.7 / 0.8 の `SignalLaw` を作って渡している場合は compile できなくなる (利用者も `alice-zip` 0.9 に上げる) 値の意味は変わらない: `law_id` と推定値の digest は `tests/determinism_golden.rs` (9 件) / `tests/law_identity.rs` (8 件) の記録値のまま 0.9.0 で通る 0.8 / 0.9 の変更 (残差 container の codec の選択、container 形式) はこの crate が使う `SignalLaw` の評価と `law_id` に触れない `cargo semver-checks` はこの型の変化を検出しない (0.3.0 との比較を minor として判定させても 196 件すべて通る) ので、版は公開 API の型から決めた
 
 ### Removed
-- `src/db_bridge.rs` / `src/queue_bridge.rs` / `src/python.rs` / `pyproject.toml`: `lib.rs` から参照されず、要求する依存 (`alice-db` / `alice-queue` / `pyo3` / `numpy`) も `Cargo.toml` に無いためコンパイルされない 4 file 公開パッケージには同梱されていたが機能はしていなかった `pyproject.toml` は存在しない `pyo3` feature を指定しており、`pyproject.toml` と `queue_bridge.rs` の license 表記 (AGPL-3.0) は crate 本体 (`MIT OR Apache-2.0`) と矛盾していた Python バインディングと各ブリッジを再開する場合は、依存と feature と license 表記を揃えた上で改めて追加する (内容は履歴に残る)
+- `src/db_bridge.rs` / `src/queue_bridge.rs` / `src/python.rs` / `pyproject.toml` を削除 (`lib.rs` から参照されず、要求する依存 (`alice-db` / `alice-queue` / `pyo3` / `numpy`) も `Cargo.toml` に無い 4 file)
 
 ## [0.3.0] - 2026-10-08
 
@@ -143,8 +143,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 - `rust-version = "1.87"` を宣言 (1.86 では `is_multiple_of` が未安定でビルドできないことを実測)
 - CI: test を 4 OS (macOS / Linux x86_64 / Linux arm64 / Windows) に、`law` 有りの `no_std` ビルド、MSRV、rustdoc (既定 / 全 feature)、docs lint (3 OS)、example 実行を追加 security-audit は cargo audit の DB を `target/` 配下に置き、install を `taiki-e/install-action` に変更、`scripts/preflight.sh` を CI と同じ引数に揃え `--quick` で `cargo test --lib` を実行
-- 何もしない composite action を削除、deny.toml の license 許可を依存グラフに存在するもの (MIT / Apache-2.0) に限定し wildcard と未知の registry / git を deny
-- README を全面改稿 (ライセンス表記を Cargo.toml の `MIT OR Apache-2.0` に一致させ、存在しない bridge module の記述を削除)
+- 何もしない composite action を削除、deny.toml の license 許可を MIT / Apache-2.0 に限定し wildcard と未知の registry / git を deny
+- README を全面改稿 (ライセンス表記を `MIT OR Apache-2.0` に変更、存在しない bridge module の記述を削除)
 - `DDSketch` の範囲外の値に関するコメントの上端を `accurate_range()` に合わせて訂正
 - `Cargo.toml`: `std` feature が `alice-det-math/std` を伝播する `[lints.clippy]` に `suboptimal_flops` / `imprecise_flops` の `allow` を理由付きで追加 (det-math 経由の呼出を `mul_add` / platform `libm` の形に書き戻す提案を crate の性質として 1 箇所で止める、`alice-det-math` 自身と同じ形) `[dev-dependencies]` に `sha2` (golden ハッシュ用)
 - `tests/analytic_oracle.rs` / `tests/law_residual.rs` / `examples/residual_summary.rs`: 禁止した inherent メソッド (`powf` / `exp` / `powi`) の呼出を `alice_det_math` 経由と結合順固定の整数冪に置換 期待値は変わらない (`ipow64` は `powi` と bit 一致、実測)
