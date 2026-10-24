@@ -832,6 +832,26 @@ class GitPins(Fixture):
             self.assertTrue(any("patch.crates-io.alice-db.path=" in a for a in c), c)
             self.assertIn(f'patch.crates-io.alice-zip.rev="{ZIP_REV}"', c, c)
 
+    def test_a_blocked_path_sibling_may_bring_its_own_git_pin(self) -> None:
+        # the transition: this crate takes ALICE-DB by path, and ALICE-DB already takes alice-zip by git
+        (self.root / ".github" / "alice-siblings").write_text(f"ALICE-DB {SHA}\n")
+        (self.root.parent / "ALICE-DB").mkdir()
+        (self.root.parent / "ALICE-DB" / "Cargo.toml").write_text(
+            '[package]\nname = "alice-db"\nversion = "0.6.0"\n\n[dependencies]\n'
+            f'alice-zip = {{ git = "{ZIP_GIT}", rev = "{ZIP_REV}", version = "0.11" }}\n'
+        )
+        self.published["alice-db"] = [(0, 5, 0)]
+        self.write_manifest('alice-db = { path = "../ALICE-DB", version = "0.6" }\n')
+        rc, out = self.main()
+        self.assertEqual(rc, 0, out)
+        self.assertIn("0 git pin(s) resolved at their rev", out)
+        # a git source neither this crate nor a blocked sibling pins is still refused
+        self.lock_text += ('\n[[package]]\nname = "stray"\nversion = "1.0.0"\n'
+                           'source = "git+https://example.invalid/stray?rev=abc#abc"\n')
+        rc, out = self.main()
+        self.assertEqual(rc, 1, out)
+        self.assertIn("stray: git source", out)
+
 
 if __name__ == "__main__":
     unittest.main()
