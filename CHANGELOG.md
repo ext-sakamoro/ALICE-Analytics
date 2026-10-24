@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `tests/float_environment.rs` (ALICE-DB と同一): round-to-nearest-even と subnormal が flush されないことを実行時に確かめる test test job (4 OS) と release profile で `scripts/run_tests.sh` を通して実行 `alice-law-conformance.toml` の G14 を fail-known から pass にした
 
 ### Changed
+- CI: 共有の試験 `scripts/test_changed_paths.py` を ALICE-Law の表の target の bytes にした (fixture の repository は自動の gc と maintenance を止める、切り離された gc が一時 dir の削除と競合して `Directory not empty` で落ちることがあった) `.github/shared-files-pin` をその表の版 (185d38d) に移した
 - CI: `scripts/run_tests.sh` と試験 `scripts/test_run_tests.py` を ALICE-LLM と同じ bytes にし、`.github/shared-files-pin` を ALICE-Law の新しい版に移す 名前 `lib` を library の単体試験として数えるようになったが、この repository は `lib` を名指さないので各段の試験の名前と件数は変わらない 試験 `scripts/test_public_text.py` を ALICE-SDF と同じ版にした (公開する text の検査を pin の checker で走らせ、置いた note link を tree と commit message で検出すること、pin の 3 行目 `config-sha256` が設定を承認することを確かめる、network を使う) `scripts/public_text.sh` と public-text の pin は変えないので検査の結果は変わらない
 - CI: `.gitattributes` に `* text=auto eol=lf` を置き、text の file を保存も checkout も全 OS で LF にした (共有 file は ALICE-Law の表と byte で比べるので、Windows の CRLF の checkout ではずれになる) binary と既存の行はそのまま、`git add --renormalize` で commit 済みの中身は変わらない
 - CI: ALICE-SDF と共有する `scripts/api_boundary.py` / `scripts/test_api_boundary.py` を新しい版に揃えた (--document-private-items の 2 回目の rustdoc で private module の extern "C" も列挙、pyo3 の入口・wasm32 だけの fn の列挙、`pending:` の判定、`--skip-missing-targets`、1 つの OS でだけ compile される入口の `host` 表) この crate の一覧は変わらず、全件の判定はそのまま通る
