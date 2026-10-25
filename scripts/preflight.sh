@@ -56,6 +56,10 @@ step "ci.yml / docs-lint: ALICE siblings (no path dependency on a sibling)"
 python3 scripts/test_alice_siblings_check.py
 python3 scripts/alice_siblings_check.py
 
+step "ci.yml / docs-lint: ALICE sibling deploy keys"
+python3 scripts/test_alice_siblings_keys_check.py
+python3 scripts/alice_siblings_keys_check.py
+
 step "ci.yml / docs-lint: package integrity tests (the packaging run itself is dormant)"
 python3 scripts/test_package_integrity.py
 
