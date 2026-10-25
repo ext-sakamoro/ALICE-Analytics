@@ -250,6 +250,15 @@ jobs:
         run: python scripts/test_alice_siblings_check.py
       - name: ALICE sibling check (no path dependency on a sibling)
         run: python scripts/alice_siblings_check.py
+      # the private siblings' deploy keys: only the step that uses the action gets them, one per
+      # private sibling; the action's own script runs against local repositories, and on Linux
+      # an ssh connection to github.com shows that only the published host key is accepted
+      - name: ALICE sibling deploy keys (tests)
+        env:
+          ALICE_SIBLINGS_NET_TEST: ${{ runner.os == 'Linux' && '1' || '0' }}
+        run: python scripts/test_alice_siblings_keys_check.py
+      - name: ALICE sibling deploy keys
+        run: python scripts/alice_siblings_keys_check.py
       # the owner's tests of the shared package_integrity.py (the packaging run itself is dormant)
       - name: Package integrity (tests)
         run: python scripts/test_package_integrity.py
