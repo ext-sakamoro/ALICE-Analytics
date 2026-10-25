@@ -171,7 +171,20 @@ class Action(unittest.TestCase):
     def tearDown(self) -> None:
         shutil.rmtree(self.tmp, ignore_errors=True)
 
-    def run_action(self, siblings: list[str], private: list[str] | None, keys: dict[str, str]) -> subprocess.CompletedProcess:
+    def make_later(self) -> str:
+        """a later commit of ALICE-Zip's source, for a list that names another commit than the pins
+        (made after a clone, the clone does not have it)"""
+        zip_src = self.src / "ALICE-Zip"
+        (zip_src / "f").write_text("later")
+        git(zip_src, "commit", "-qam", "later")
+        self.later = git(zip_src, "rev-parse", "HEAD")
+        return self.later
+
+    def run_action(self, siblings: list[str], private: list[str] | None, keys: dict[str, str],
+                   extra: str | None = None, fresh: bool = True) -> subprocess.CompletedProcess:
+        """the action with .github/alice-siblings listing `siblings`; with `extra` (the text of
+        another list, written to extra-pins) the action is given `list: extra-pins`, and with
+        fresh=False the sibling checkouts of an earlier run stay"""
         gh = self.ws / "app/.github"
         (gh / "alice-siblings").write_text("".join(f"{r} {self.shas.get(r, SHA)}\n" for r in siblings))
         p = gh / "alice-siblings-private"
@@ -179,11 +192,15 @@ class Action(unittest.TestCase):
             p.unlink(missing_ok=True)
         else:
             p.write_text("".join(f"{r}\n" for r in private))
-        for r in ("ALICE-Zip", "ALICE-Bamboo"):
-            shutil.rmtree(self.ws / r, ignore_errors=True)
-        env = {k: v for k, v in os.environ.items() if not k.startswith("ALICE_DEPKEY_")}
+        if fresh:
+            for r in ("ALICE-Zip", "ALICE-Bamboo"):
+                shutil.rmtree(self.ws / r, ignore_errors=True)
+        env = {k: v for k, v in os.environ.items() if not k.startswith("ALICE_DEPKEY_") and k != "LIST"}
         env.update(GITHUB_WORKSPACE=str(self.ws), REPO_DIR="app", RUNNER_TEMP=str(self.rt),
                    ALICE_SIBLINGS_GIT_BASE=str(self.src), ALICE_SIBLINGS_PRIVATE_GIT_BASE=str(self.src), **keys)
+        if extra is not None:
+            (self.ws / "app/extra-pins").write_text(extra)
+            env["LIST"] = "extra-pins"
         return subprocess.run(["bash", str(self.script)], env=env, capture_output=True, text=True)
 
     def assertFails(self, r: subprocess.CompletedProcess, text: str) -> None:
@@ -223,6 +240,67 @@ class Action(unittest.TestCase):
 
     def test_empty_list(self) -> None:
         self.assertFails(self.run_action([], None, {}), "lists no repository")
+
+    def test_a_list_keeps_an_existing_checkout_and_makes_its_commit_present(self) -> None:
+        r = self.run_action(["ALICE-Zip"], None, {})
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        zip_ws = self.ws / "ALICE-Zip"
+        self.make_later()
+        # without a lazy fetch: a partial clone fetches a missing object when it is asked for one
+
+        def here() -> bool:
+            return subprocess.run(["git", "-C", str(zip_ws), "cat-file", "-e", f"{self.later}^{{commit}}"],
+                                  capture_output=True, env=dict(os.environ, GIT_NO_LAZY_FETCH="1")).returncode == 0
+        self.assertFalse(here(), "the later commit is already here")
+        r = self.run_action(["ALICE-Zip"], None, {}, extra=f"# base trees\nALICE-Zip {self.later}\n", fresh=False)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(git(zip_ws, "rev-parse", "HEAD"), self.shas["ALICE-Zip"], "the checkout moved")
+        self.assertTrue(here(), "the listed commit is not present")
+        self.assertIn("1 commit(s) present", r.stdout)
+
+    def test_a_list_clones_a_repository_not_yet_cloned_at_its_commit(self) -> None:
+        self.make_later()
+        r = self.run_action(["ALICE-Bamboo"], ["ALICE-Bamboo"], {"ALICE_DEPKEY_BAMBOO": "k"},
+                            extra=f"ALICE-Zip {self.later}\n")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(git(self.ws / "ALICE-Zip", "rev-parse", "HEAD"), self.later)
+        # a private repository that the list does not name is not an error there
+        self.assertFalse((self.ws / "ALICE-Bamboo").exists())
+
+    def test_a_list_names_the_same_repository_at_two_commits(self) -> None:
+        self.make_later()
+        r = self.run_action(["ALICE-Zip"], None, {},
+                            extra=f"ALICE-Zip {self.shas['ALICE-Zip']}\nALICE-Zip {self.later}\n")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        zip_ws = self.ws / "ALICE-Zip"
+        self.assertEqual(git(zip_ws, "rev-parse", "HEAD"), self.shas["ALICE-Zip"])
+        git(zip_ws, "cat-file", "-e", f"{self.later}^{{commit}}")
+        self.assertIn("2 commit(s) present", r.stdout)
+
+    def test_an_empty_list_clones_nothing(self) -> None:
+        r = self.run_action(["ALICE-Zip"], None, {}, extra="# nothing\n")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("0 commit(s) present", r.stdout)
+        self.assertFalse((self.ws / "ALICE-Zip").exists())
+
+    def test_a_missing_list_fails(self) -> None:
+        r = self.run_action(["ALICE-Zip"], None, {}, extra="")
+        (self.ws / "app/extra-pins").unlink()
+        env = {k: v for k, v in os.environ.items() if not k.startswith("ALICE_DEPKEY_")}
+        env.update(GITHUB_WORKSPACE=str(self.ws), REPO_DIR="app", RUNNER_TEMP=str(self.rt), LIST="extra-pins",
+                   ALICE_SIBLINGS_GIT_BASE=str(self.src), ALICE_SIBLINGS_PRIVATE_GIT_BASE=str(self.src))
+        r = subprocess.run(["bash", str(self.script)], env=env, capture_output=True, text=True)
+        self.assertFails(r, "list: extra-pins is not a file")
+
+    def test_a_list_commit_that_is_nowhere_fails(self) -> None:
+        r = self.run_action(["ALICE-Zip"], None, {})
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        r = self.run_action(["ALICE-Zip"], None, {}, extra=f"ALICE-Zip {SHA}\n", fresh=False)
+        self.assertNotEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_a_malformed_list_line_fails(self) -> None:
+        self.assertFails(self.run_action(["ALICE-Zip"], None, {}, extra="ALICE-Zip main\n"),
+                         "not '<ALICE-Repo> <40-hex SHA>'")
 
 
 class HostKey(unittest.TestCase):
