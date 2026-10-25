@@ -254,7 +254,7 @@ ALICE-Law の `scripts/gen-law-readme-block.py` が ALICE-Law `0a5de013ca12` と
 | G8 persisted-semantics-id | 対象外 | ruling (2026-10-17): the JSON and Prometheus exports are monitoring output, not a durable format of this crate, because nothing in the crate reads them back; … |
 | G9 persisted-meaning-change-is-major | 適合 | definition: ANALYTICS_SEMANTICS_ID (the crate's own identifier, [[id]] in scripts/id_move.toml with PREVIOUS_ANALYTICS_SEMANTICS_IDS) may move only with a … |
 | G10 no-run-varying-artifacts | 適合 | the clock-seeded constructors of the deprecated privacy module (XorShift64::from_entropy, impl Default for XorShift64, LaplaceNoise::new, Rappor::new, … |
-| G11 gate-self-tests | 未達 | fail-known on (c), naming the rows: (a) and (b) hold for every pass gate (conformance/g11.toml, 0 findings) and both are checked by machine … |
+| G11 gate-self-tests | 適合 | pass: (a) and (b) hold for every pass gate and are checked by machine (conformance/g11.toml, scripts/g11_table.sh: 17 rows, 0 findings), and (c) every shared … |
 | G12 public-repo-text-rules | 適合 | the CI job fetches ALICE-Law's own scripts/public_text_check.py at the revision named in .github/public-text-pin and refuses it unless its SHA-256 is the one … |
 | G13 no-unspecified-order | 適合 | no parallel reduction over floats exists, so the ordered-reduction test with two thread counts has nothing to test; the lint keeps it that way. … |
 | G14 float-environment-invariants | 適合 | the static scan covers the files of this repository and the dynamic check covers the builds CI runs on ubuntu and macOS; a flag passed by a build outside this … |
