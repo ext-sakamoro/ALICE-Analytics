@@ -114,6 +114,10 @@ step "ci.yml / docs-lint: Shared files equal ALICE-Law's table"
 python3 scripts/test_shared_files.py
 scripts/shared_files.sh
 
+step "ci.yml / docs-lint: G11 table matches the declared gates"
+python3 scripts/test_g11_table.py
+scripts/g11_table.sh
+
 step "ci.yml / docs-lint: run_tests.sh (zero-test guard) tests"
 python3 scripts/test_run_tests.py
 
