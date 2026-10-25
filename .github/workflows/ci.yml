@@ -174,6 +174,11 @@ jobs:
         with:
           path: ~/.cargo/registry/cache/*/${{ steps.id-base.outputs.crate }}.crate
           key: id-move-${{ steps.id-base.outputs.crate }}
+      # the base is built against the siblings its .github/alice-siblings pins (0.6.0: ../ALICE-Zip);
+      # scripts/id_move_check.py fetches the pinned commit into this clone and fails, naming the
+      # repository, when a pinned sibling is not checked out next to this one
+      - name: Identifier moves (the base's sibling checkouts)
+        run: git clone -q --filter=blob:none https://github.com/ext-sakamoro/ALICE-Zip ../ALICE-Zip
       - name: Identifier moves (against the published release)
         run: python3 scripts/id_move_check.py
 
