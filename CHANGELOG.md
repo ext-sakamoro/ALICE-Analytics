@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `tests/float_environment.rs` (ALICE-DB と同一): round-to-nearest-even と subnormal が flush されないことを実行時に確かめる test test job (4 OS) と release profile で `scripts/run_tests.sh` を通して実行 `alice-law-conformance.toml` の G14 を fail-known から pass にした
 
 ### Changed
+- CI (ALICE-Law G11 (c)): ALICE-Law の pin (`.github/shared-files-pin`・`.github/public-text-pin`・`.github/g11-table-pin`) と README の block の版を `0e8c14ec` にし、`scripts/id_move_check.py` とその試験を表の目標の bytes にした
 - 依存: `alice-zip` を sibling の path (`../ALICE-Zip`) でなく git の rev (`22619413…`、version 0.11) で引き、`alice-det-math` も同じ形 (git の rev `6384856c…`、version 0.5.2、ALICE-Zip と同じ source) で引く `.github/alice-siblings` と各 workflow の clone の step を外した (`scripts/alice_siblings_check.py` は「path 依存 0 件」を確かめる) `deny.toml` の allow-git に ALICE-DetMath と ALICE-Zip を足した (det-math を crates.io の 0.5.1 のままにすると、git の det-math を引く ALICE-Zip と並んで 2 つ link され型が合わない)
 - CI: semver gate (`semver-checks.yml`) と package integrity を休止にした (dispatch の時だけ走る) package integrity は `security-audit.yml` の job から dispatch 専用の `package-integrity.yml` に移し、Security & Hygiene の gate は残る全 job を必須にしたまま 共有 file `scripts/package_integrity.py` の試験は ci.yml で走らせ続ける preflight の semver は `PREFLIGHT-SKIP`
 - Licence: `Apache-2.0` → `LicenseRef-Proprietary`
