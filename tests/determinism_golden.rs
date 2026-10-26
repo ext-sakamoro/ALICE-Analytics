@@ -652,8 +652,12 @@ fn golden_law() {
 /// identifier without changing the bits of any function 0.5.0 had, and keeps
 /// `135c407d…` in `PREVIOUS_SEMANTICS_IDS`. Every scenario hash above is
 /// unchanged under 0.5.1.
+///
+/// Re-recorded for `alice-det-math` 0.5.2 at 39507d1b (`85e08846…` → `a2e46794…`): its clamp
+/// follows the G2 order; this crate calls only `exp64` / `ln64`, so every scenario hash above is
+/// unchanged.
 const GOLDEN_SEMANTICS_ID: &str =
-    "85e0884623b154a3b2b264374907b6cbac09307ca3f9a08339e48c567d3cb315";
+    "a2e46794a49b62730d8eb75d10e6dbfdd59d6562a985ae94c716fc637a57e3cf";
 
 #[test]
 fn golden_semantics_id() {
@@ -700,8 +704,17 @@ fn golden_semantics_id() {
 /// the same law under the 0.5.0 identifier (`135c407d…`, kept in
 /// `PREVIOUS_SEMANTICS_IDS`) still gives `c8bc7356…`
 /// (`law_id_under_the_previous_identifier_is_unchanged` below).
+///
+/// Re-recorded for `alice-det-math` 0.5.2 at 39507d1b (`c32f77f9…` → `795d4520…`): the same law
+/// under the 0.5.1 identifier (`85e08846…`) still gives `c32f77f9…`
+/// (`law_id_under_the_det_math_0_5_1_identifier_is_unchanged` below).
 #[cfg(feature = "law")]
-const GOLDEN_LAW_ID: &str = "c32f77f9376baddaf827059b1efd9cf7f38933f217aae64b070e748e758679d4";
+const GOLDEN_LAW_ID: &str = "795d45206c54831c7f48bb110ddd79e3d87d8625db5c6f09e5af2cc6a7200183";
+
+/// The law identifier recorded with `alice-det-math` 0.5.1
+#[cfg(feature = "law")]
+const GOLDEN_LAW_ID_DET_MATH_0_5_1: &str =
+    "c32f77f9376baddaf827059b1efd9cf7f38933f217aae64b070e748e758679d4";
 
 /// The law identifier recorded before `alice-det-math` 0.5.1
 #[cfg(feature = "law")]
@@ -767,16 +780,9 @@ fn law_id_under_the_previous_identifier_is_unchanged() {
     use alice_analytics::law::residual_summary;
 
     let law = law_fixture();
-    let previous = alice_det_math::PREVIOUS_SEMANTICS_IDS
-        .iter()
-        .find(|id| {
-            let mut hex = String::with_capacity(64);
-            for b in *id {
-                write!(hex, "{b:02x}").expect("writing to a String cannot fail");
-            }
-            hex == "135c407d4249c1c200e4d1be79a12e848ce5c355fc3a918da965849e697ef000"
-        })
-        .expect("alice-det-math keeps the identifier of 0.5.0 as a previous one");
+    // alice-det-math's own previous list no longer has 0.5.0's identifier (its clamp changed), so
+    // the identifier is named here
+    let previous = &unhex("135c407d4249c1c200e4d1be79a12e848ce5c355fc3a918da965849e697ef000");
 
     let mut hex = String::with_capacity(64);
     for b in law.law_id(previous) {
@@ -786,6 +792,30 @@ fn law_id_under_the_previous_identifier_is_unchanged() {
 
     let summary = residual_summary(&law, &[(0.0, 1.5), (4.0, 1.75), (8.0, 3.0)]);
     assert_eq!(summary.law_id, law.law_id(&alice_analytics::SEMANTICS_ID));
+}
+
+/// Re-recording `GOLDEN_LAW_ID` for `alice-det-math` 0.5.2 at 39507d1b moved the identifier input
+/// only: the same law under the 0.5.1 identifier gives the value recorded before
+#[cfg(feature = "law")]
+#[test]
+fn law_id_under_the_det_math_0_5_1_identifier_is_unchanged() {
+    let law = law_fixture();
+    let previous = unhex("85e0884623b154a3b2b264374907b6cbac09307ca3f9a08339e48c567d3cb315");
+    let mut hex = String::with_capacity(64);
+    for b in law.law_id(&previous) {
+        write!(hex, "{b:02x}").expect("writing to a String cannot fail");
+    }
+    assert_eq!(hex, GOLDEN_LAW_ID_DET_MATH_0_5_1);
+}
+
+/// 64 lower-case hex digits as 32 bytes
+#[cfg(feature = "law")]
+fn unhex(s: &str) -> [u8; 32] {
+    let mut out = [0u8; 32];
+    for (i, o) in out.iter_mut().enumerate() {
+        *o = u8::from_str_radix(&s[2 * i..2 * i + 2], 16).expect("hex");
+    }
+    out
 }
 
 // ---------------------------------------------------------------------------
