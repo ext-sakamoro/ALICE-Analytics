@@ -12,7 +12,7 @@
 //! # Hex form
 //!
 //! ```text
-//! f8ded5961a8ef8be2d79ea4bfafd68f494c2443d725fb926cf9775824e043d4d
+//! 2def9a114cb31abd2918f95a57f5ad084917006a9c95810a41db197fffebdfa0
 //! ```
 //!
 //! # Entries
@@ -105,19 +105,25 @@ pub const ANALYTICS_SEMANTICS_PINS: [(&str, [u8; 32]); 9] = [
     ),
     (
         "alice-det-math",
-        hex32("85e0884623b154a3b2b264374907b6cbac09307ca3f9a08339e48c567d3cb315"),
+        hex32("a2e46794a49b62730d8eb75d10e6dbfdd59d6562a985ae94c716fc637a57e3cf"),
     ),
     (
         "alice-zip",
-        hex32("51ffeb079769ea34bd3cb3df756b6cb940b8d2d6a6a0f1e1115ab8139415935e"),
+        hex32("50a40cf64625018acc99c940e544353b901457b4a7a80bf903544ed4ef9af406"),
     ),
 ];
 
 /// The semantics identifier of this crate: the fold of
 /// [`ANALYTICS_SEMANTICS_PINS`] (see the module documentation).
 pub const ANALYTICS_SEMANTICS_ID: [u8; 32] =
-    hex32("f8ded5961a8ef8be2d79ea4bfafd68f494c2443d725fb926cf9775824e043d4d");
+    hex32("2def9a114cb31abd2918f95a57f5ad084917006a9c95810a41db197fffebdfa0");
 
 /// Earlier values of [`ANALYTICS_SEMANTICS_ID`] whose pinned bits this
-/// release still reproduces (none yet: this is the first identifier).
-pub const PREVIOUS_ANALYTICS_SEMANTICS_IDS: &[[u8; 32]] = &[];
+/// release still reproduces, newest first
+///
+/// `f8ded596…` is the identifier with alice-det-math 0.5.1 and alice-zip 0.11 at
+/// `51ffeb07…`: the move to det-math 0.5.2 at 39507d1b (whose clamp follows the G2 order)
+/// changed no function this crate calls, so every scenario golden is unchanged.
+pub const PREVIOUS_ANALYTICS_SEMANTICS_IDS: &[[u8; 32]] = &[hex32(
+    "f8ded5961a8ef8be2d79ea4bfafd68f494c2443d725fb926cf9775824e043d4d",
+)];

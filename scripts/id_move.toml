@@ -11,3 +11,6 @@ SEMANTICS_ID = "alice-det-math's identifier, re-exported for reference: it is fo
 [[id]]
 path = "alice_analytics::semantics::ANALYTICS_SEMANTICS_ID"
 previous = "alice_analytics::semantics::PREVIOUS_ANALYTICS_SEMANTICS_IDS"
+previous-tests = [
+    "tests/analytics_semantics_id.rs::the_previous_identifier_is_the_fold_under_the_previous_upstream_identifiers",
+]
