@@ -159,3 +159,37 @@ fn the_previous_identifier_is_the_fold_under_the_previous_upstream_identifiers()
         "the identifier of the previous generation is not in PREVIOUS_ANALYTICS_SEMANTICS_IDS"
     );
 }
+
+/// The previous identifier `2def9a11…` is this crate's fold with the upstream identifiers of the
+/// generation before (alice-det-math at 39507d1b `a2e46794…`, alice-zip `50a40cf6…`): the same
+/// scenario goldens, so data stamped with it is reproduced here; removing it from the previous
+/// list fails this test
+#[test]
+fn the_previous_identifier_before_det_math_2d01c63f_is_the_fold_under_its_upstream_identifiers() {
+    let unhex = |s: &str| -> [u8; 32] {
+        core::array::from_fn(|i| u8::from_str_radix(&s[2 * i..2 * i + 2], 16).unwrap())
+    };
+    let before: Vec<(&str, [u8; 32])> = ANALYTICS_SEMANTICS_PINS
+        .iter()
+        .map(|&(n, d)| match n {
+            "alice-det-math" => (
+                n,
+                unhex("a2e46794a49b62730d8eb75d10e6dbfdd59d6562a985ae94c716fc637a57e3cf"),
+            ),
+            "alice-zip" => (
+                n,
+                unhex("50a40cf64625018acc99c940e544353b901457b4a7a80bf903544ed4ef9af406"),
+            ),
+            _ => (n, d),
+        })
+        .collect();
+    let previous = fold(&before);
+    assert_eq!(
+        hex(&previous),
+        "2def9a114cb31abd2918f95a57f5ad084917006a9c95810a41db197fffebdfa0"
+    );
+    assert!(
+        alice_analytics::semantics::PREVIOUS_ANALYTICS_SEMANTICS_IDS.contains(&previous),
+        "the identifier before det-math 2d01c63f is not in PREVIOUS_ANALYTICS_SEMANTICS_IDS"
+    );
+}

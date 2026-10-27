@@ -656,8 +656,13 @@ fn golden_law() {
 /// Re-recorded for `alice-det-math` 0.5.2 at 39507d1b (`85e08846…` → `a2e46794…`): its clamp
 /// follows the G2 order; this crate calls only `exp64` / `ln64`, so every scenario hash above is
 /// unchanged.
+///
+/// Re-recorded for `alice-det-math` 0.5.2 at 2d01c63f (`a2e46794…` → `a2a11b9b…`): sin / cos at
+/// |x| ≥ 2^13, powf of a negative base, powf64 and hypot of two subnormals change and erf is
+/// added; this crate calls only `exp64` / `ln64` / `max64` / `min64`, so every scenario hash above
+/// is unchanged.
 const GOLDEN_SEMANTICS_ID: &str =
-    "a2e46794a49b62730d8eb75d10e6dbfdd59d6562a985ae94c716fc637a57e3cf";
+    "a2a11b9b826227fa7a9ed8ab2c1ce63dbb07ad4c39aa2c46a363ddea6b47dbe9";
 
 #[test]
 fn golden_semantics_id() {
@@ -708,8 +713,17 @@ fn golden_semantics_id() {
 /// Re-recorded for `alice-det-math` 0.5.2 at 39507d1b (`c32f77f9…` → `795d4520…`): the same law
 /// under the 0.5.1 identifier (`85e08846…`) still gives `c32f77f9…`
 /// (`law_id_under_the_det_math_0_5_1_identifier_is_unchanged` below).
+///
+/// Re-recorded for `alice-det-math` 0.5.2 at 2d01c63f (`795d4520…` → `b2e9802d…`): the same law
+/// under the 39507d1b identifier (`a2e46794…`) still gives `795d4520…`
+/// (`law_id_under_the_det_math_39507d1b_identifier_is_unchanged` below).
 #[cfg(feature = "law")]
-const GOLDEN_LAW_ID: &str = "795d45206c54831c7f48bb110ddd79e3d87d8625db5c6f09e5af2cc6a7200183";
+const GOLDEN_LAW_ID: &str = "b2e9802d5f65a4478bb2529a52204e4e676a8bf481c4622a5406bae689c567c0";
+
+/// The law identifier recorded with `alice-det-math` 0.5.2 at 39507d1b
+#[cfg(feature = "law")]
+const GOLDEN_LAW_ID_DET_MATH_39507D1B: &str =
+    "795d45206c54831c7f48bb110ddd79e3d87d8625db5c6f09e5af2cc6a7200183";
 
 /// The law identifier recorded with `alice-det-math` 0.5.1
 #[cfg(feature = "law")]
@@ -806,6 +820,20 @@ fn law_id_under_the_det_math_0_5_1_identifier_is_unchanged() {
         write!(hex, "{b:02x}").expect("writing to a String cannot fail");
     }
     assert_eq!(hex, GOLDEN_LAW_ID_DET_MATH_0_5_1);
+}
+
+/// Re-recording `GOLDEN_LAW_ID` for `alice-det-math` 0.5.2 at 2d01c63f moved the identifier input
+/// only: the same law under the 39507d1b identifier gives the value recorded before
+#[cfg(feature = "law")]
+#[test]
+fn law_id_under_the_det_math_39507d1b_identifier_is_unchanged() {
+    let law = law_fixture();
+    let previous = unhex("a2e46794a49b62730d8eb75d10e6dbfdd59d6562a985ae94c716fc637a57e3cf");
+    let mut hex = String::with_capacity(64);
+    for b in law.law_id(&previous) {
+        write!(hex, "{b:02x}").expect("writing to a String cannot fail");
+    }
+    assert_eq!(hex, GOLDEN_LAW_ID_DET_MATH_39507D1B);
 }
 
 /// 64 lower-case hex digits as 32 bytes

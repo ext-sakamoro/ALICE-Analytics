@@ -12,7 +12,7 @@
 //! # Hex form
 //!
 //! ```text
-//! 2def9a114cb31abd2918f95a57f5ad084917006a9c95810a41db197fffebdfa0
+//! 38e4dba4aeda3ea1a291d620c0183470aaffb9c9d3cd9a101b1435b0d93909df
 //! ```
 //!
 //! # Entries
@@ -105,25 +105,31 @@ pub const ANALYTICS_SEMANTICS_PINS: [(&str, [u8; 32]); 9] = [
     ),
     (
         "alice-det-math",
-        hex32("a2e46794a49b62730d8eb75d10e6dbfdd59d6562a985ae94c716fc637a57e3cf"),
+        hex32("a2a11b9b826227fa7a9ed8ab2c1ce63dbb07ad4c39aa2c46a363ddea6b47dbe9"),
     ),
     (
         "alice-zip",
-        hex32("50a40cf64625018acc99c940e544353b901457b4a7a80bf903544ed4ef9af406"),
+        hex32("17d0df1d7c0a6e63d1a7380129f12386b677ac96e7ac193dece546805f4fe84c"),
     ),
 ];
 
 /// The semantics identifier of this crate: the fold of
 /// [`ANALYTICS_SEMANTICS_PINS`] (see the module documentation).
 pub const ANALYTICS_SEMANTICS_ID: [u8; 32] =
-    hex32("2def9a114cb31abd2918f95a57f5ad084917006a9c95810a41db197fffebdfa0");
+    hex32("38e4dba4aeda3ea1a291d620c0183470aaffb9c9d3cd9a101b1435b0d93909df");
 
 /// Earlier values of [`ANALYTICS_SEMANTICS_ID`] whose pinned bits this
 /// release still reproduces, newest first
 ///
+/// `2def9a11…` is the identifier with alice-det-math 0.5.2 at 39507d1b (`a2e46794…`) and
+/// alice-zip at `50a40cf6…`: the move to det-math 2d01c63f (sin / cos at |x| ≥ 2^13, powf of a
+/// negative base, powf64, hypot of two subnormals, erf added) changed no function this crate
+/// calls (`exp64` / `ln64` / `max64` / `min64`), so every scenario golden is unchanged.
+///
 /// `f8ded596…` is the identifier with alice-det-math 0.5.1 and alice-zip 0.11 at
 /// `51ffeb07…`: the move to det-math 0.5.2 at 39507d1b (whose clamp follows the G2 order)
 /// changed no function this crate calls, so every scenario golden is unchanged.
-pub const PREVIOUS_ANALYTICS_SEMANTICS_IDS: &[[u8; 32]] = &[hex32(
-    "f8ded5961a8ef8be2d79ea4bfafd68f494c2443d725fb926cf9775824e043d4d",
-)];
+pub const PREVIOUS_ANALYTICS_SEMANTICS_IDS: &[[u8; 32]] = &[
+    hex32("2def9a114cb31abd2918f95a57f5ad084917006a9c95810a41db197fffebdfa0"),
+    hex32("f8ded5961a8ef8be2d79ea4bfafd68f494c2443d725fb926cf9775824e043d4d"),
+];
