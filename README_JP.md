@@ -252,7 +252,7 @@ ALICE-Law の `scripts/gen-law-readme-block.py` が ALICE-Law `913ca26aeb0f` と
 | G6 semantics-id | 適合 | the identifier is a constant of this crate version: a dependency bump or a toolchain change that moved any pinned bits fails a golden, and re-recording a … |
 | G7 handshake-carries-id | 対象外 | n/a while the enumerated boundary has no entry point that receives another crate's Law-bearing value: every enumerated item is decided local. A new reader, … |
 | G8 persisted-semantics-id | 対象外 | ruling (2026-10-17): the JSON and Prometheus exports are monitoring output, not a durable format of this crate, because nothing in the crate reads them back; … |
-| G9 persisted-meaning-change-is-major | 適合 | [Unreleased] (Breaking): with alice-det-math at 39507d1b and alice-zip at 8065587c, ANALYTICS_SEMANTICS_ID moves f8ded596... -> 2def9a11..., f8ded596... in … |
+| G9 persisted-meaning-change-is-major | 適合 | [Unreleased] (Breaking): with alice-det-math at 2d01c63f and alice-zip at 19f6f2c1, ANALYTICS_SEMANTICS_ID moves 2def9a11... -> 38e4dba4..., 2def9a11... in … |
 | G10 no-run-varying-artifacts | 適合 | the clock-seeded constructors of the deprecated privacy module (XorShift64::from_entropy, impl Default for XorShift64, LaplaceNoise::new, Rappor::new, … |
 | G11 gate-self-tests | 適合 | pass: (a) and (b) hold for every pass gate and are checked by machine (conformance/g11.toml, scripts/g11_table.sh: 17 rows, 0 findings), and (c) every shared … |
 | G12 public-repo-text-rules | 適合 | the CI job fetches ALICE-Law's own scripts/public_text_check.py at the revision named in .github/public-text-pin and refuses it unless its SHA-256 is the one … |
