@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- CI (ALICE-Law G11): pin を ALICE-Law 443c633b に上げ、`scripts/test_shared_files.py` を表の目標 (ALICE-DetMath の main の bytes、表の行から試験を組む版) にした README の ALICE-Law の block を再生成
 - clippy canary: 依存の crate を Cargo.lock の解決どおりに植える (registry は版、git は lock した commit、path は root の Cargo.toml が宣言する directory) git / path の crate の禁止 path は skip の行でなく植える行になる (この repo の data file は不変、191 植え 0 skip)
 - CI (ALICE-Law G11): shared-files と G11 の表の pin を ALICE-Law 1dd039c7 に上げる (clippy canary の 4 file の新しい bytes を表が計画した版)
 - CI (ALICE-Law G11): pin を ALICE-Law 37f5f1e8 に上げ、共有 file を表の目標の bytes にした (`scripts/package_integrity.py` と試験、`scripts/shared_files.sh`、`scripts/test_shared_files.py`) CI と preflight に G11 の自己検査 (ALICE-Law `scripts/g11_self_check.py`、自分の copy がすべて保留の行の目標にあること) を足した
