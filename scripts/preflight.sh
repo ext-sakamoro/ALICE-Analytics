@@ -83,7 +83,8 @@ python3 scripts/test_reader_guard.py
 python3 scripts/reader_guard.py
 
 step "ci.yml / clippy: Identifier moves (tests, then against the published release)"
-python3 scripts/test_id_move_check.py
+# CI sets CARGO_TERM_COLOR=always for the whole workflow: the probe reads rustc's coloured stderr there
+CARGO_TERM_COLOR=always python3 scripts/test_id_move_check.py
 python3 scripts/id_move_check.py
 
 step "ci.yml / clippy: API boundary (rustdoc JSON, G7 / G8)"
