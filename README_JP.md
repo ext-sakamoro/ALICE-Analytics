@@ -229,10 +229,10 @@ scripts/preflight.sh --quick  # static checks, clippy, builds, docs, cargo test 
   残差統計、出典、oracle ケースを伴う fit 済みの law `law` feature はその残差分布を
   要約する
 
-<!-- law-integration:begin law=443c633b140645ffdd99ce305699be96e9c59790 -->
+<!-- law-integration:begin law=7f5f4cbde8343a061051bb1addd30f1f0b3bea1e -->
 ## ALICE-Law との統合
 
-ALICE-Law の `scripts/gen-law-readme-block.py` が ALICE-Law `443c633b1406` とこの repository の `alice-law-conformance.toml` から生成する 手で編集しない
+ALICE-Law の `scripts/gen-law-readme-block.py` が ALICE-Law `7f5f4cbde834` とこの repository の `alice-law-conformance.toml` から生成する 手で編集しない
 
 | | |
 |---|---|
@@ -258,6 +258,7 @@ ALICE-Law の `scripts/gen-law-readme-block.py` が ALICE-Law `443c633b1406` と
 | G12 public-repo-text-rules | 適合 | the CI job fetches ALICE-Law's own scripts/public_text_check.py at the revision named in .github/public-text-pin and refuses it unless its SHA-256 is the one … |
 | G13 no-unspecified-order | 適合 | no parallel reduction over floats exists, so the ordered-reduction test with two thread counts has nothing to test; the lint keeps it that way. … |
 | G14 float-environment-invariants | 適合 | the static scan covers the files of this repository and the dynamic check covers the builds CI runs on ubuntu and macOS; a flag passed by a build outside this … |
+| G15 surface-claims | 未申告 |  |
 
 ### feature と保証の範囲
 
