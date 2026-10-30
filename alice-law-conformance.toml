@@ -138,7 +138,7 @@ evidence = [
     "scripts/shared_files.sh with .github/shared-files-pin (clause (c): ALICE-Law's conformance/shared-files.toml and scripts/shared_files_check.py at the pinned revision, both SHA-256 pinned; the committed tree against the table, ci.yml docs-lint on each OS and preflight; a flipped byte in a shared copy, a wrong pin or nothing compared fails, scripts/test_shared_files.py)",
 ]
 mutant = "measured 2026-10-16, each reverted: deleting the libm::sincosf entry from clippy.toml makes the generator's --check exit 1 ('clippy_canary_calls.tsv is out of date: 1 line(s) differ'); deleting the f64::exp2 row from the data file makes --check exit 1 the same way"
-note = "pass: (a) and (b) hold for every pass gate and are checked by machine (conformance/g11.toml, scripts/g11_table.sh: 17 rows, 0 findings), and (c) every shared file this crate carries holds the bytes ALICE-Law's table records for it, its target where the row is pending (scripts/shared_files.sh: 103 copies, 0 findings at ALICE-Law 7f5f4cbd). Rows still pending on other repositories' mains do not change this crate's copies."
+note = "pass: (a) and (b) hold for every pass gate and are checked by machine (conformance/g11.toml, scripts/g11_table.sh: 17 rows, 0 findings), and (c) every shared file this crate carries holds the bytes ALICE-Law's table records for it, its target where the row is pending (scripts/shared_files.sh: 103 copies, 0 findings at ALICE-Law 40973a8a). Rows still pending on other repositories' mains do not change this crate's copies."
 
 [G12]
 status = "pass"
