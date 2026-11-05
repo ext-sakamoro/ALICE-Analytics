@@ -31,7 +31,7 @@ need() { command -v "$1" >/dev/null 2>&1 || { echo "missing tool: $1 ($2)" >&2; 
 # `cargo clippy` reuses fresh `cargo check` artifacts and then lints nothing;
 # touching the crate root invalidates only this crate's fingerprints.
 relint() { touch src/lib.rs; }
-add_target() { rustup target list --installed | grep -qx "$1" || rustup target add "$1"; }
+add_target() { grep -qx "$1" <<<"$(rustup target list --installed)" || rustup target add "$1"; }
 PEDANTIC=(-W clippy::pedantic -D warnings)
 
 need actionlint "brew install actionlint"
@@ -53,6 +53,8 @@ python3 scripts/test_workflow_concurrency.py
 python3 scripts/workflow_concurrency.py
 python3 scripts/test_workflow_pipefail.py
 python3 scripts/workflow_pipefail.py
+python3 scripts/test_check_pipe_grep_q.py
+python3 scripts/check_pipe_grep_q.py
 
 step "ci.yml / docs-lint: ALICE siblings (no path dependency on a sibling)"
 python3 scripts/test_alice_siblings_check.py
@@ -158,8 +160,8 @@ step "ci.yml / docs-lint + doc: licence agrees and its files are packaged"
 python3 scripts/test_license_check.py
 python3 scripts/license_check.py
 list=$(cargo package --list --allow-dirty)
-for f in LICENSE-Proprietary TRADEMARK_NOTICE; do printf '%s\n' "$list" | grep -qx "$f" || { echo "the package lacks $f"; exit 1; }; done
-for f in LICENSE-APACHE LICENSE-MIT NOTICE; do if printf '%s\n' "$list" | grep -qx "$f"; then echo "the package still carries $f"; exit 1; fi; done
+for f in LICENSE-Proprietary TRADEMARK_NOTICE; do grep -qx "$f" <<<"$list" || { echo "the package lacks $f"; exit 1; }; done
+for f in LICENSE-APACHE LICENSE-MIT NOTICE; do if grep -qx "$f" <<<"$list"; then echo "the package still carries $f"; exit 1; fi; done
 
 step "security-audit.yml / stub-guard"
 scripts/stub_guard.sh
@@ -186,7 +188,7 @@ RUSTDOCFLAGS="-Dwarnings" cargo doc --lib --no-deps
 RUSTDOCFLAGS="-Dwarnings" cargo doc --lib --no-deps --all-features
 
 step "fuzz.yml / build every fuzz target (nightly; the runs need the runner)"
-if rustup toolchain list | grep -q '^nightly' && cargo +nightly fuzz --version >/dev/null 2>&1; then
+if grep -q '^nightly' <<<"$(rustup toolchain list)" && cargo +nightly fuzz --version >/dev/null 2>&1; then
   (cd fuzz && cargo +nightly fuzz build)
 else
   echo "skip: nightly / cargo-fuzz not installed" >&2
@@ -228,7 +230,7 @@ need cargo-hack "cargo install cargo-hack --locked"
 cargo hack check --lib --feature-powerset --depth 2
 
 step "ci.yml / msrv: rust-version = $MSRV"
-if rustup toolchain list | grep -q "^$MSRV"; then
+if grep -q "^$MSRV" <<<"$(rustup toolchain list)"; then
   cargo +"$MSRV" check --lib
   cargo +"$MSRV" check --lib --all-features
 else

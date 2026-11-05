@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- CI: `scripts/check_pipe_grep_q.py` を CI と `scripts/preflight.sh` で走らせる `scripts/preflight.sh` の該当 5 行は pipe をやめて here-string で読む
 - CI: `scripts/workflow_pipefail.py` (試験 `scripts/test_workflow_pipefail.py`、ALICE-Law と同じ中身) が、pipe する `run` step が pipefail で走るかを全 workflow で確かめる coverage と ALICE-Law の block の step を `shell: bash` にした package の licence file の確認は pipe をやめた (`grep -q` が先に終わると前段が SIGPIPE で落ち、pipefail の下で結果が反転するため)
 - CI (ALICE-Law G11): shared-files と G11 の表の pin を ALICE-Law 40973a8a に上げる (`scripts/id_move_check.py` と試験の新しい bytes を表が計画した版)
 - CI (ALICE-Law G9): `scripts/id_move_check.py` は、新しく足した associated const の識別子 (`Type::NAME`) を base に無いもの (新しい識別子) として受ける これまでは base の probe が rustc の E0599 で落ちると error にしていた (path の解決 error だけを「無い」と見ていた) E0599 は、message から読んだ item 名が path の最後の段と、型名 (path と generics を除く) が型の段と一致し、他の compile error が無い時だけ「無い」と見る (message は端末の色の escape を除いて読む、CI は CARGO_TERM_COLOR=always) preflight もこの試験を CARGO_TERM_COLOR=always で走らせ、CI と同じ条件にした 別の item・別の型・名前の部分一致・他の error と並ぶ E0599・probe 以外の失敗は従来どおり error 試験 `ProbeAbsent` 5 本と end-to-end 1 本、変異 9 件 red
