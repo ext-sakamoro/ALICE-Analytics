@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- CI: 共有の `scripts/test_release_baseline.py` の subprocess に `encoding="utf-8"` を明示した (text mode は既定で locale の符号化で読むため)
 - CI: `scripts/check_pipe_grep_q.py` を CI と `scripts/preflight.sh` で走らせる `scripts/preflight.sh` の該当 5 行は pipe をやめて here-string で読む
 - CI: `scripts/workflow_pipefail.py` (試験 `scripts/test_workflow_pipefail.py`、ALICE-Law と同じ中身) が、pipe する `run` step が pipefail で走るかを全 workflow で確かめる coverage と ALICE-Law の block の step を `shell: bash` にした package の licence file の確認は pipe をやめた (`grep -q` が先に終わると前段が SIGPIPE で落ち、pipefail の下で結果が反転するため)
 - CI (ALICE-Law G11): shared-files と G11 の表の pin を ALICE-Law 40973a8a に上げる (`scripts/id_move_check.py` と試験の新しい bytes を表が計画した版)
