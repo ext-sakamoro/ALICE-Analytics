@@ -159,6 +159,7 @@ jobs:
         with:
           tool: cargo-llvm-cov
       - name: Run coverage
+        shell: bash
         run: cargo llvm-cov --all-features --summary-only 2>&1 | tee coverage-summary.txt
       - name: Upload coverage summary
         uses: actions/upload-artifact@v6

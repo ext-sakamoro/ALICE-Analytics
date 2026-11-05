@@ -219,10 +219,10 @@ jobs:
         run: |
           list=$(cargo package --list --allow-dirty)
           for f in LICENSE-Proprietary TRADEMARK_NOTICE; do
-            printf '%s\n' "$list" | grep -qx "$f" || { echo "::error::the package lacks $f"; exit 1; }
+            grep -qx "$f" <<<"$list" || { echo "::error::the package lacks $f"; exit 1; }
           done
           for f in LICENSE-APACHE LICENSE-MIT NOTICE; do
-            if printf '%s\n' "$list" | grep -qx "$f"; then echo "::error::the package still carries $f"; exit 1; fi
+            if grep -qx "$f" <<<"$list"; then echo "::error::the package still carries $f"; exit 1; fi
           done
           echo "LICENSE-Proprietary and TRADEMARK_NOTICE packaged, no previous licence file"
 
@@ -375,3 +375,8 @@ jobs:
         run: |
           python3 scripts/test_workflow_concurrency.py
           python3 scripts/workflow_concurrency.py
+      # every step that pipes runs with pipefail; the checker's own tests run first
+      - name: workflow-pipefail
+        run: |
+          python3 scripts/test_workflow_pipefail.py
+          python3 scripts/workflow_pipefail.py

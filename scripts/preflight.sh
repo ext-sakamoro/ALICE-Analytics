@@ -51,6 +51,8 @@ python3 scripts/workflow_timeouts.py
 step "ci.yml / actionlint: workflow-concurrency (branch runs cancel, main never)"
 python3 scripts/test_workflow_concurrency.py
 python3 scripts/workflow_concurrency.py
+python3 scripts/test_workflow_pipefail.py
+python3 scripts/workflow_pipefail.py
 
 step "ci.yml / docs-lint: ALICE siblings (no path dependency on a sibling)"
 python3 scripts/test_alice_siblings_check.py
