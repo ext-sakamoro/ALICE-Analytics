@@ -15,7 +15,7 @@
 //! | `outside_accuracy` | non-zero residuals whose magnitude lies outside `accurate_range` |
 //! | `out_of_range` | points whose `x` lies outside the law's valid range (or is not finite) |
 //! | `non_finite` | points inside the range whose `y − f(x)` is NaN or infinite |
-//! | `law_id` | [`alice_zip::law::SignalLaw::law_id`] of the law under [`crate::SEMANTICS_ID`]: which `f(x)`, under which arithmetic |
+//! | `law_id` | [`alice_zip::law::SignalLaw::law_id`] of the law under [`crate::ANALYTICS_SEMANTICS_ID`]: which `f(x)`, under which arithmetic |
 //!
 //! Points outside the valid range are counted and **not** summarised: the law
 //! is never evaluated there, so nothing is extrapolated. Points with a
@@ -136,7 +136,7 @@ pub struct ResidualSummary {
     /// the arithmetic this crate computes with
     ///
     /// [`alice_zip::law::SignalLaw::law_id`] of the summarised law, mixed with
-    /// [`crate::SEMANTICS_ID`]. It covers exactly what `f(x)` reads — the
+    /// [`crate::ANALYTICS_SEMANTICS_ID`]. It covers exactly what `f(x)` reads — the
     /// domain and the coefficients — plus the arithmetic, and deliberately not
     /// the law's evidence, residual or provenance: two laws fitted from
     /// different measurements that evaluate identically share one identifier.
@@ -291,7 +291,7 @@ impl<'a> ResidualSketch<'a> {
     /// identifier covers.
     #[must_use]
     pub fn law_id(&self) -> [u8; 32] {
-        self.law.law_id(&crate::SEMANTICS_ID)
+        self.law.law_id(&crate::ANALYTICS_SEMANTICS_ID)
     }
 
     /// The summary of everything pushed so far

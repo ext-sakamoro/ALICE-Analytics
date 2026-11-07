@@ -1,34 +1,27 @@
 //! Content hash of this crate's Law-bearing semantics: [`ANALYTICS_SEMANTICS_ID`].
 //!
-//! [`crate::SEMANTICS_ID`] is the arithmetic identifier of `alice-det-math`,
-//! re-exported; it names the transcendental functions, not this crate's own
-//! rules. This module folds the crate's own Law pins, the cross-platform
-//! goldens of `tests/determinism_golden.rs` (one per estimator family), with
-//! the identifiers of the Law-bearing crates it depends on, into one 32-byte
-//! value. Two builds with the same identifier produce the same bits on every
+//! This module folds the crate's own Law pins, the cross-platform goldens of
+//! `tests/determinism_golden.rs` (one per estimator family), with
+//! [`DET_MATH_PINS`], the identifier of each `alice-det-math` function this
+//! crate calls ([`DET_MATH_FUNCTIONS`]), and the identifier of `alice-zip`,
+//! into one 32-byte value. Two builds with the same identifier produce the same bits on every
 //! pinned scenario; a build that changes any of them, or that resolves an
 //! upstream crate with a different identifier, has a different value.
 //!
 //! # Hex form
 //!
 //! ```text
-//! 38e4dba4aeda3ea1a291d620c0183470aaffb9c9d3cd9a101b1435b0d93909df
+//! 54cbe6e9c9a3aa1170f2b9cdb22c2a9503fa78be5e079aad5b42795fee6cbf53
 //! ```
 //!
 //! # Entries
 //!
 //! [`ANALYTICS_SEMANTICS_PINS`]: one entry per scenario golden (`"sketch"`,
 //! `"stats"`, `"window"`, `"anomaly"`, `"privacy"`, `"streaming_ops"`, and
-//! `"law"`, the last run with the `law` feature), plus `"alice-det-math"`
-//! (its `SEMANTICS_ID`) and `"alice-zip"` (its `law::SEMANTICS_ID`, the
-//! `law` feature). The identifier goldens (`GOLDEN_SEMANTICS_ID`,
+//! `"law"`, the last run with the `law` feature), plus `"alice-zip"` (its
+//! `law::SEMANTICS_ID`, the `law` feature). Each [`DET_MATH_PINS`] entry goes in
+//! under the name `det-math <function>`. The identifier goldens (`GOLDEN_SEMANTICS_ID`,
 //! `GOLDEN_LAW_ID`) are not pins: they are functions of the entries.
-//!
-//! `alice-zip` 0.11 defines its own `law::SEMANTICS_ID` (a fold of its own
-//! Law pins with the arithmetic identifier), so its entry differs from the
-//! `"alice-det-math"` entry. Under 0.10 the two entries were equal (0.10
-//! re-exported `alice-det-math`'s identifier); the `"law"` golden and every
-//! scenario golden are unchanged between the two, only this entry moved.
 //!
 //! # Fold
 //!
@@ -74,7 +67,7 @@ pub(crate) const fn hex32(s: &str) -> [u8; 32] {
 }
 
 /// The pins folded into [`ANALYTICS_SEMANTICS_ID`], as `(name, digest)`.
-pub const ANALYTICS_SEMANTICS_PINS: [(&str, [u8; 32]); 9] = [
+pub const ANALYTICS_SEMANTICS_PINS: [(&str, [u8; 32]); 8] = [
     (
         "sketch",
         hex32("49078f4c720eedc79aab35ba79d55f18f6f923fca3069fa3fdb08b264e3719b4"),
@@ -104,22 +97,50 @@ pub const ANALYTICS_SEMANTICS_PINS: [(&str, [u8; 32]); 9] = [
         hex32("f017cc3eb4e268c47f52d045607ee0d82d256cc9813805fe9e051469dc2c907d"),
     ),
     (
-        "alice-det-math",
-        hex32("a2a11b9b826227fa7a9ed8ab2c1ce63dbb07ad4c39aa2c46a363ddea6b47dbe9"),
-    ),
-    (
         "alice-zip",
-        hex32("17d0df1d7c0a6e63d1a7380129f12386b677ac96e7ac193dece546805f4fe84c"),
+        hex32("65f48962c757ebb619d252f8784f830aca5f3698fbd22f34150f9887863f38dd"),
     ),
 ];
+
+/// The functions of `alice-det-math` this crate calls (ALICE-Law's
+/// `scripts/fold_set_check.py` compares this with the calls in the source and
+/// writes it).
+pub const DET_MATH_FUNCTIONS: &[&str] = &["exp64", "ln64", "max64", "min64"];
+
+/// The identifier of each function of [`DET_MATH_FUNCTIONS`], in that order, as
+/// recorded when [`ANALYTICS_SEMANTICS_ID`] was computed. A function whose
+/// identifier moves in the resolved `alice-det-math` stops the compile.
+pub const DET_MATH_PINS: &[(&str, [u8; 32])] = &[
+    (
+        "exp64",
+        hex32("f87502b37c757ae5ea59a3cc991d02c3fe19ff3c75c9edd294216055372bf2a8"),
+    ),
+    (
+        "ln64",
+        hex32("51c11488d360bb972761d2cecf192c173249f846f8127ef950e580b99a590cdc"),
+    ),
+    (
+        "max64",
+        hex32("aac586eacc9acd69cf5988ffe736283c71fad8146027e86034d3e9b881db28b6"),
+    ),
+    (
+        "min64",
+        hex32("1bef418073152f5e1e76f41718aa29b2517de8966a8c8ea8c1c2b5ba92fab3cb"),
+    ),
+];
+
+const _: () = alice_det_math::assert_function_pins(DET_MATH_PINS);
 
 /// The semantics identifier of this crate: the fold of
 /// [`ANALYTICS_SEMANTICS_PINS`] (see the module documentation).
 pub const ANALYTICS_SEMANTICS_ID: [u8; 32] =
-    hex32("38e4dba4aeda3ea1a291d620c0183470aaffb9c9d3cd9a101b1435b0d93909df");
+    hex32("54cbe6e9c9a3aa1170f2b9cdb22c2a9503fa78be5e079aad5b42795fee6cbf53");
 
 /// Earlier values of [`ANALYTICS_SEMANTICS_ID`] whose pinned bits this
 /// release still reproduces, newest first
+///
+/// `38e4dba4…` is the identifier that folded alice-det-math's whole identifier (`a2a11b9b…`) and
+/// alice-zip at `17d0df1d…`: every scenario golden is unchanged.
 ///
 /// `2def9a11…` is the identifier with alice-det-math 0.5.2 at 39507d1b (`a2e46794…`) and
 /// alice-zip at `50a40cf6…`: the move to det-math 2d01c63f (sin / cos at |x| ≥ 2^13, powf of a
@@ -130,6 +151,7 @@ pub const ANALYTICS_SEMANTICS_ID: [u8; 32] =
 /// `51ffeb07…`: the move to det-math 0.5.2 at 39507d1b (whose clamp follows the G2 order)
 /// changed no function this crate calls, so every scenario golden is unchanged.
 pub const PREVIOUS_ANALYTICS_SEMANTICS_IDS: &[[u8; 32]] = &[
+    hex32("38e4dba4aeda3ea1a291d620c0183470aaffb9c9d3cd9a101b1435b0d93909df"),
     hex32("2def9a114cb31abd2918f95a57f5ad084917006a9c95810a41db197fffebdfa0"),
     hex32("f8ded5961a8ef8be2d79ea4bfafd68f494c2443d725fb926cf9775824e043d4d"),
 ];

@@ -6,7 +6,7 @@
 //! whether two summaries describe the same law, nor whether they were computed
 //! with the same transcendental implementations. `law_id` closes both: it is
 //! `alice_zip::law::SignalLaw::law_id` taken under this crate's own
-//! [`alice_analytics::SEMANTICS_ID`], so it changes when the law changes *and*
+//! [`alice_analytics::ANALYTICS_SEMANTICS_ID`], so it changes when the law changes *and*
 //! when the arithmetic changes.
 //!
 //! Every expected value here is built from the encoding published in
@@ -93,24 +93,18 @@ fn the_published_tags_are_the_ones_this_oracle_encodes() {
     );
 }
 
-/// The crate re-exports the arithmetic identifier of the kernels it actually
-/// calls, so a consumer can record it next to the numbers
-#[test]
-fn the_re_exported_arithmetic_identifier_is_the_one_the_kernels_come_from() {
-    assert_eq!(
-        alice_analytics::SEMANTICS_ID,
-        alice_det_math::SEMANTICS_ID,
-        "the re-export must name the arithmetic that ln / exp / powf go through"
-    );
-}
-
 /// A summary says which law it summarises, under which arithmetic
 #[test]
 fn a_summary_carries_the_identity_of_its_law_and_arithmetic() {
     let law = line_law(1.0, 2.0, points(), "run 1");
     let summary = residual_summary(&law, &points());
 
-    let expected = expected_id(&[1.0, 2.0], 0.0, 8.0, &alice_analytics::SEMANTICS_ID);
+    let expected = expected_id(
+        &[1.0, 2.0],
+        0.0,
+        8.0,
+        &alice_analytics::ANALYTICS_SEMANTICS_ID,
+    );
     assert_eq!(
         summary.law_id, expected,
         "the summary's identifier must be the law's identifier under this crate's arithmetic"
@@ -179,7 +173,7 @@ fn the_arithmetic_identifier_participates() {
     let law = line_law(1.0, 2.0, points(), "run 1");
     let actual = residual_summary(&law, &points()).law_id;
 
-    let mut other_arithmetic = alice_analytics::SEMANTICS_ID;
+    let mut other_arithmetic = alice_analytics::ANALYTICS_SEMANTICS_ID;
     other_arithmetic[0] ^= 0x01;
     let under_other = expected_id(&[1.0, 2.0], 0.0, 8.0, &other_arithmetic);
 

@@ -173,14 +173,10 @@ merge され、テレメトリは再生され、監査は生イベントから�
 **どの算術で出た数かを言えること** — ある `ln` の実装で計算した分位点と、別の実装で
 計算した分位点は、どれだけ近く見えても 2 つの数である
 
-`alice_analytics::SEMANTICS_ID` がその名前で、`alice-det-math` が自身の数値的な
-振る舞いに付ける 32 byte の識別子を再 export したもの 保存・転送・merge される
-推定値の隣に記録する 2 つの結果が数として比較可能なのは、この識別子が一致する時
-だけ `golden_semantics_id` が hex で固定するので、算術の変更がリリースまで
-気付かれずに届くことはない
+`alice_analytics::ANALYTICS_SEMANTICS_ID` がその名前で、この crate の推定器と、それが呼ぶ `alice-det-math` の関数ごとの識別子を束ねた 32 byte の値です 保存・送信・統合する推定値にはこの値を一緒に記録します この値が一致する時だけ、数値として比べられます `golden_semantics_id` が hex で固定するので、算術の変更が気付かれずに release に届くことはありません
 
 `law` feature では `law::ResidualSummary::law_id` が両方の半分を一度に名指す
-要約した法則自身の識別子を `SEMANTICS_ID` の下で取った値で、`f(x)` が変わった時も
+要約した法則自身の識別子を `ANALYTICS_SEMANTICS_ID` の下で取った値で、`f(x)` が変わった時も
 算術が変わった時も変化する 覆うのは `f(x)` が読むもの (定義域と係数) だけで、
 法則の得られ方は覆わない ⇒ 別の測定から fit した同じ `f(x)` は同じ識別子を共有する
 
@@ -201,7 +197,7 @@ merge され、テレメトリは再生され、監査は生イベントから�
 32-bit x86)、fast-math 系のフラグを付けたビルド、エントロピー由来のプライバシー
 機構のコンストラクタ 本 crate や `alice-det-math` の **バージョンを跨いだ** 一致も
 保証しない (保証するのは、あるバージョンにおけるプラットフォーム間の一致)
-`SEMANTICS_ID` が足すのは「算術が変わらない」という約束ではなく、**変わったことを
+`ANALYTICS_SEMANTICS_ID` が足すのは「算術が変わらない」という約束ではなく、**変わったことを
 言える**ようにすることである
 
 ## 最小サポート Rust バージョン
@@ -237,7 +233,7 @@ ALICE-Law の `scripts/gen-law-readme-block.py` が ALICE-Law `edcfc174bf82` と
 | | |
 |---|---|
 | release train | alice-analytics 0.6.0 (published)、Law への依存: あり |
-| 算術 | train の alice-det-math 0.5.1、算術の識別子 `85e0884623b154a3b2b264374907b6cbac09307ca3f9a08339e48c567d3cb315` この crate の要求は `alice-det-math = "0.6.0"` |
+| 算術 | train の alice-det-math 0.5.1、算術の識別子 `85e0884623b154a3b2b264374907b6cbac09307ca3f9a08339e48c567d3cb315` この crate の要求は `alice-det-math = "0.6"` |
 | end to end 検査 | 対象 (`alice-analytics = ">=0.5, <0.7"`)、digest `9f7cf676708a272e3817ebbf0727c610f391e1547747af4307ee44d5523267c2`、aarch64 と x86_64 で同じ |
 
 ### 適合 (G1-G14)
@@ -252,7 +248,7 @@ ALICE-Law の `scripts/gen-law-readme-block.py` が ALICE-Law `edcfc174bf82` と
 | G6 semantics-id | 適合 | the identifier is a constant of this crate version: a dependency bump or a toolchain change that moved any pinned bits fails a golden, and re-recording a … |
 | G7 handshake-carries-id | 対象外 | n/a while the enumerated boundary has no entry point that receives another crate's Law-bearing value: every enumerated item is decided local. A new reader, … |
 | G8 persisted-semantics-id | 対象外 | ruling (2026-10-17): the JSON and Prometheus exports are monitoring output, not a durable format of this crate, because nothing in the crate reads them back; … |
-| G9 persisted-meaning-change-is-major | 適合 | [Unreleased] (Breaking): with alice-det-math at 2d01c63f and alice-zip at 19f6f2c1, ANALYTICS_SEMANTICS_ID moves 2def9a11... -> 38e4dba4..., 2def9a11... in … |
+| G9 persisted-meaning-change-is-major | 適合 | [Unreleased] (Breaking): folding each alice-det-math function, ANALYTICS_SEMANTICS_ID moves 38e4dba4... -> 54cbe6e9..., 38e4dba4... in … |
 | G10 no-run-varying-artifacts | 適合 | the clock-seeded constructors of the deprecated privacy module (XorShift64::from_entropy, impl Default for XorShift64, LaplaceNoise::new, Rappor::new, … |
 | G11 gate-self-tests | 適合 | pass: (a) and (b) hold for every pass gate and are checked by machine (conformance/g11.toml, scripts/g11_table.sh: 17 rows, 0 findings), and (c) every shared … |
 | G12 public-repo-text-rules | 適合 | the CI job fetches ALICE-Law's own scripts/public_text_check.py at the revision named in .github/public-text-pin and refuses it unless its SHA-256 is the one … |

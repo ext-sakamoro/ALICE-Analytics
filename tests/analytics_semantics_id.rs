@@ -8,7 +8,8 @@
 //! own constants.
 
 use alice_analytics::semantics::{
-    ANALYTICS_SEMANTICS_ID, ANALYTICS_SEMANTICS_PINS, PREVIOUS_ANALYTICS_SEMANTICS_IDS,
+    ANALYTICS_SEMANTICS_ID, ANALYTICS_SEMANTICS_PINS, DET_MATH_FUNCTIONS, DET_MATH_PINS,
+    PREVIOUS_ANALYTICS_SEMANTICS_IDS,
 };
 use sha2::{Digest, Sha256};
 
@@ -50,7 +51,7 @@ fn pin(name: &str) -> [u8; 32] {
 fn the_identifier_is_the_fold_of_its_pins() {
     assert_eq!(
         hex(&ANALYTICS_SEMANTICS_ID),
-        hex(&fold(&ANALYTICS_SEMANTICS_PINS)),
+        hex(&fold_entries(&entries())),
         "ANALYTICS_SEMANTICS_ID is not the fold of its pins"
     );
     let doc = include_str!("../src/semantics.rs");
@@ -88,16 +89,75 @@ fn golden_pins_are_the_recorded_goldens() {
     }
     let names: Vec<_> = ANALYTICS_SEMANTICS_PINS.iter().map(|(n, _)| *n).collect();
     let mut expected: Vec<_> = goldens.iter().map(|(n, _)| *n).collect();
-    expected.extend(["alice-det-math", "alice-zip"]);
+    expected.extend(["alice-zip"]);
     assert_eq!(names, expected);
 }
 
 #[test]
-fn det_math_pin_is_the_resolved_arithmetic_identifier() {
-    assert_eq!(
-        hex(&pin("alice-det-math")),
-        hex(&alice_analytics::SEMANTICS_ID)
+fn every_det_math_entry_is_the_resolved_function() {
+    assert!(!DET_MATH_PINS.is_empty());
+    assert_eq!(DET_MATH_FUNCTIONS.len(), DET_MATH_PINS.len());
+    for (want, (name, digest)) in DET_MATH_FUNCTIONS.iter().zip(DET_MATH_PINS) {
+        assert_eq!(want, name);
+        assert_eq!(
+            hex(digest),
+            hex(&alice_det_math::function_pin(name)),
+            "{name}"
+        );
+    }
+}
+
+/// The fold's entries: a det-math entry goes in under `det-math <function>`
+fn entries() -> Vec<(String, [u8; 32])> {
+    ANALYTICS_SEMANTICS_PINS
+        .iter()
+        .map(|&(n, d)| (n.to_string(), d))
+        .chain(
+            DET_MATH_PINS
+                .iter()
+                .map(|&(n, d)| (format!("det-math {n}"), d)),
+        )
+        .collect()
+}
+
+fn fold_entries(e: &[(String, [u8; 32])]) -> [u8; 32] {
+    let named: Vec<(&str, [u8; 32])> = e.iter().map(|(n, d)| (n.as_str(), *d)).collect();
+    fold(&named)
+}
+
+/// The fold of an earlier generation: this table's goldens, with the whole identifier of alice-det-math and
+/// the identifier of alice-zip of then
+fn fold_of_generation(det_math: &str, zip: &str) -> [u8; 32] {
+    let unhex = |s: &str| -> [u8; 32] {
+        core::array::from_fn(|i| u8::from_str_radix(&s[2 * i..2 * i + 2], 16).unwrap())
+    };
+    let mut before: Vec<(&str, [u8; 32])> = ANALYTICS_SEMANTICS_PINS
+        .iter()
+        .map(|&(n, d)| {
+            if n == "alice-zip" {
+                (n, unhex(zip))
+            } else {
+                (n, d)
+            }
+        })
+        .collect();
+    before.push(("alice-det-math", unhex(det_math)));
+    fold(&before)
+}
+
+/// `38e4dba4…` folded alice-det-math's whole identifier: the same scenario goldens, so data stamped with it is
+/// reproduced here; removing it from the previous list fails this test
+#[test]
+fn the_previous_identifier_is_the_fold_before_the_function_identifiers() {
+    let previous = fold_of_generation(
+        "a2a11b9b826227fa7a9ed8ab2c1ce63dbb07ad4c39aa2c46a363ddea6b47dbe9",
+        "17d0df1d7c0a6e63d1a7380129f12386b677ac96e7ac193dece546805f4fe84c",
     );
+    assert_eq!(
+        hex(&previous),
+        "38e4dba4aeda3ea1a291d620c0183470aaffb9c9d3cd9a101b1435b0d93909df"
+    );
+    assert!(PREVIOUS_ANALYTICS_SEMANTICS_IDS.contains(&previous));
 }
 
 #[cfg(feature = "law")]
@@ -132,24 +192,10 @@ fn the_previous_list_does_not_contain_the_current_identifier() {
 /// data stamped with it is reproduced here; removing it from the previous list fails this test
 #[test]
 fn the_previous_identifier_is_the_fold_under_the_previous_upstream_identifiers() {
-    let unhex = |s: &str| -> [u8; 32] {
-        core::array::from_fn(|i| u8::from_str_radix(&s[2 * i..2 * i + 2], 16).unwrap())
-    };
-    let before: Vec<(&str, [u8; 32])> = ANALYTICS_SEMANTICS_PINS
-        .iter()
-        .map(|&(n, d)| match n {
-            "alice-det-math" => (
-                n,
-                unhex("85e0884623b154a3b2b264374907b6cbac09307ca3f9a08339e48c567d3cb315"),
-            ),
-            "alice-zip" => (
-                n,
-                unhex("51ffeb079769ea34bd3cb3df756b6cb940b8d2d6a6a0f1e1115ab8139415935e"),
-            ),
-            _ => (n, d),
-        })
-        .collect();
-    let previous = fold(&before);
+    let previous = fold_of_generation(
+        "85e0884623b154a3b2b264374907b6cbac09307ca3f9a08339e48c567d3cb315",
+        "51ffeb079769ea34bd3cb3df756b6cb940b8d2d6a6a0f1e1115ab8139415935e",
+    );
     assert_eq!(
         hex(&previous),
         "f8ded5961a8ef8be2d79ea4bfafd68f494c2443d725fb926cf9775824e043d4d"
@@ -166,24 +212,10 @@ fn the_previous_identifier_is_the_fold_under_the_previous_upstream_identifiers()
 /// list fails this test
 #[test]
 fn the_previous_identifier_before_det_math_2d01c63f_is_the_fold_under_its_upstream_identifiers() {
-    let unhex = |s: &str| -> [u8; 32] {
-        core::array::from_fn(|i| u8::from_str_radix(&s[2 * i..2 * i + 2], 16).unwrap())
-    };
-    let before: Vec<(&str, [u8; 32])> = ANALYTICS_SEMANTICS_PINS
-        .iter()
-        .map(|&(n, d)| match n {
-            "alice-det-math" => (
-                n,
-                unhex("a2e46794a49b62730d8eb75d10e6dbfdd59d6562a985ae94c716fc637a57e3cf"),
-            ),
-            "alice-zip" => (
-                n,
-                unhex("50a40cf64625018acc99c940e544353b901457b4a7a80bf903544ed4ef9af406"),
-            ),
-            _ => (n, d),
-        })
-        .collect();
-    let previous = fold(&before);
+    let previous = fold_of_generation(
+        "a2e46794a49b62730d8eb75d10e6dbfdd59d6562a985ae94c716fc637a57e3cf",
+        "50a40cf64625018acc99c940e544353b901457b4a7a80bf903544ed4ef9af406",
+    );
     assert_eq!(
         hex(&previous),
         "2def9a114cb31abd2918f95a57f5ad084917006a9c95810a41db197fffebdfa0"

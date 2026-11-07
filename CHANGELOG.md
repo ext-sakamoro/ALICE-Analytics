@@ -45,6 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `tests/float_environment.rs` (ALICE-DB と同一): round-to-nearest-even と subnormal が flush されないことを実行時に確かめる test test job (4 OS) と release profile で `scripts/run_tests.sh` を通して実行 `alice-law-conformance.toml` の G14 を fail-known から pass にした
 
 ### Changed
+- **Breaking:** `ANALYTICS_SEMANTICS_ID` は `alice-det-math` 全体の識別子でなく、この crate が呼ぶ 4 関数の識別子 (`semantics::DET_MATH_FUNCTIONS` / `DET_MATH_PINS`) と `alice-zip` の識別子を畳む (`38e4dba4` から `54cbe6e9`、記録 bit は全部不変、`38e4dba4` は `PREVIOUS_ANALYTICS_SEMANTICS_IDS` に) 呼ばない関数が動いても識別子は動かず、呼ぶ関数が動けば compile が止まる
+- **Breaking:** `ResidualSummary::law_id` は `ANALYTICS_SEMANTICS_ID` の下で取る (golden `b2e9802d` から `2ead4993`、同じ法則を前の識別子で取ると `b2e9802d`) 再公開の `alice_analytics::SEMANTICS_ID` は削除 (`alice-det-math` 全体の値で、同じ名前のまま別の値になるより compile で止まる方を選ぶ)
+- `alice-det-math` と `alice-zip` を rev から `branch = "main"` + version に
 - `alice-det-math` を 0.6.0 (rev b4e3d946)、`alice-zip` を 495fffaf (同じ det-math 0.6.0) にした 0.6.0 は 2d01c63f と同じ算術と識別子に版の名前を付けた版で、`ANALYTICS_SEMANTICS_ID` と評価の bit は変わらない (build 全体で alice-det-math は 1 世代)
 - CI (ALICE-Law G11 (c)): `.github/shared-files-pin` と `.github/g11-table-pin` を ALICE-Law 913ca26a (共有の file の表で `.github/actions/alice-siblings/action.yml` の目標がこの版の bytes dbf112b3 になった版) に上げ、README の ALICE-Law の節を作り直した 共有の写しは 103 件で指摘 0、G11 の表は 17 行で指摘 0
 - CI (ALICE-Law G11 (c)): `.github/shared-files-pin` と `.github/g11-table-pin` を ALICE-Law 3cfbbc59 (共有の file の表で `scripts/id_move_check.py` と試験の目標がこの版の bytes になった版) に上げ、README の ALICE-Law の節を作り直した 共有の写しは 103 件で指摘 0、G11 の表は 17 行で指摘 0

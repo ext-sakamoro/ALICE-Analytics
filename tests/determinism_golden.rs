@@ -632,7 +632,7 @@ fn golden_law() {
 //    computed with, and the law identifier that mixes it in
 // ---------------------------------------------------------------------------
 
-/// `alice_analytics::SEMANTICS_ID` as hex
+/// `alice_analytics::ANALYTICS_SEMANTICS_ID` as hex
 ///
 /// Unlike the scenarios above, this is not a hash of this crate's output: it
 /// is the constant `alice-det-math` publishes to name its own numeric
@@ -661,20 +661,23 @@ fn golden_law() {
 /// |x| ≥ 2^13, powf of a negative base, powf64 and hypot of two subnormals change and erf is
 /// added; this crate calls only `exp64` / `ln64` / `max64` / `min64`, so every scenario hash above
 /// is unchanged.
+///
+/// Since the identifier of each alice-det-math function is folded, this is `ANALYTICS_SEMANTICS_ID`, which the
+/// law identifier is taken under.
 const GOLDEN_SEMANTICS_ID: &str =
-    "a2a11b9b826227fa7a9ed8ab2c1ce63dbb07ad4c39aa2c46a363ddea6b47dbe9";
+    "54cbe6e9c9a3aa1170f2b9cdb22c2a9503fa78be5e079aad5b42795fee6cbf53";
 
 #[test]
 fn golden_semantics_id() {
     let mut s = Sink::default();
-    for b in alice_analytics::SEMANTICS_ID {
+    for b in alice_analytics::ANALYTICS_SEMANTICS_ID {
         s.byte(b);
     }
     let bytes = s.len();
     assert_eq!(bytes, 32, "the identifier is 32 bytes, got {bytes}");
 
     let mut hex = String::with_capacity(64);
-    for b in alice_analytics::SEMANTICS_ID {
+    for b in alice_analytics::ANALYTICS_SEMANTICS_ID {
         write!(hex, "{b:02x}").expect("writing to a String cannot fail");
     }
     assert_eq!(
@@ -718,7 +721,7 @@ fn golden_semantics_id() {
 /// under the 39507d1b identifier (`a2e46794…`) still gives `795d4520…`
 /// (`law_id_under_the_det_math_39507d1b_identifier_is_unchanged` below).
 #[cfg(feature = "law")]
-const GOLDEN_LAW_ID: &str = "b2e9802d5f65a4478bb2529a52204e4e676a8bf481c4622a5406bae689c567c0";
+const GOLDEN_LAW_ID: &str = "2ead49935cd163d4de565f9e2892224d2270688be873bd8ff1b04bcb4293e7c1";
 
 /// The law identifier recorded with `alice-det-math` 0.5.2 at 39507d1b
 #[cfg(feature = "law")]
@@ -805,7 +808,10 @@ fn law_id_under_the_previous_identifier_is_unchanged() {
     assert_eq!(hex, PREVIOUS_GOLDEN_LAW_ID);
 
     let summary = residual_summary(&law, &[(0.0, 1.5), (4.0, 1.75), (8.0, 3.0)]);
-    assert_eq!(summary.law_id, law.law_id(&alice_analytics::SEMANTICS_ID));
+    assert_eq!(
+        summary.law_id,
+        law.law_id(&alice_analytics::ANALYTICS_SEMANTICS_ID)
+    );
 }
 
 /// Re-recording `GOLDEN_LAW_ID` for `alice-det-math` 0.5.2 at 39507d1b moved the identifier input
@@ -879,4 +885,20 @@ fn checker_rejects_a_too_short_sink() {
 fn checker_rejects_a_wrong_hash() {
     let wrong = "0".repeat(64);
     assert_golden("canary", eight_zero_bytes(), 8, &wrong);
+}
+
+/// `GOLDEN_LAW_ID` moved when the law identifier came to be taken under `ANALYTICS_SEMANTICS_ID`, not
+/// alice-det-math's whole identifier: the same law under the identifier of then gives the value recorded then
+#[cfg(feature = "law")]
+#[test]
+fn law_id_under_the_whole_det_math_identifier_is_unchanged() {
+    let whole = unhex("a2a11b9b826227fa7a9ed8ab2c1ce63dbb07ad4c39aa2c46a363ddea6b47dbe9");
+    let mut hex = String::with_capacity(64);
+    for b in law_fixture().law_id(&whole) {
+        write!(hex, "{b:02x}").expect("writing to a String cannot fail");
+    }
+    assert_eq!(
+        hex,
+        "b2e9802d5f65a4478bb2529a52204e4e676a8bf481c4622a5406bae689c567c0"
+    );
 }
