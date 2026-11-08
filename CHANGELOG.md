@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `tests/float_environment.rs` (ALICE-DB と同一): round-to-nearest-even と subnormal が flush されないことを実行時に確かめる test test job (4 OS) と release profile で `scripts/run_tests.sh` を通して実行 `alice-law-conformance.toml` の G14 を fail-known から pass にした
 
 ### Changed
+- CI (ALICE-Law G11): `.github/shared-files-pin` と `.github/g11-table-pin` を ALICE-Law 5261d18e (`scripts/id_move_check.py` と試験の新しい bytes を計画した表) に上げる
 - CI: `scripts/id_move_check.py` (共有、この repository が owner): re-export した前の識別子の一覧を `git` 依存から辿る時、`rev` の無い依存 (`branch` / `tag` / 既定の branch) は Cargo.lock が解決した 40 桁の commit で読む Cargo.lock が無い、その url の package が無い、source に 40 桁の commit が無い、2 つの commit を名指す、は理由つきで失敗 `rev` がある依存は従来どおり (40 桁でなければ失敗) 試験 `scripts/test_id_move_check.py` に `GitDependencyCommit` (8 本) と branch 依存の通し試験を足した
 - **Breaking:** `ANALYTICS_SEMANTICS_ID` は `alice-det-math` 全体の識別子でなく、この crate が呼ぶ 4 関数の識別子 (`semantics::DET_MATH_FUNCTIONS` / `DET_MATH_PINS`) と `alice-zip` の識別子を畳む (`38e4dba4` から `54cbe6e9`、記録 bit は全部不変、`38e4dba4` は `PREVIOUS_ANALYTICS_SEMANTICS_IDS` に) 呼ばない関数が動いても識別子は動かず、呼ぶ関数が動けば compile が止まる
 - **Breaking:** `ResidualSummary::law_id` は `ANALYTICS_SEMANTICS_ID` の下で取る (golden `b2e9802d` から `2ead4993`、同じ法則を前の識別子で取ると `b2e9802d`) 再公開の `alice_analytics::SEMANTICS_ID` は削除 (`alice-det-math` 全体の値で、同じ名前のまま別の値になるより compile で止まる方を選ぶ)
