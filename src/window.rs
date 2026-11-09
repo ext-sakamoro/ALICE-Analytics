@@ -325,6 +325,9 @@ impl HierarchicalRollup {
     ///
     /// 典型例: `new(60_000, 300_000, 3_600_000, 0.05)` → 1分/5分/1時間
     #[must_use]
+    // three TumblingWindow (each a DDSketch with its exact sum) pass 16 KiB together; the rollup is
+    // built once and its size is fixed by the type, as for the sketches' own constructors
+    #[allow(clippy::large_stack_arrays)]
     pub fn new(level0_ms: u64, level1_ms: u64, level2_ms: u64, alpha: f64) -> Self {
         Self {
             levels: [

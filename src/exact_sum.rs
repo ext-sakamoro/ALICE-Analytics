@@ -188,33 +188,36 @@ mod tests {
     // oracle: sums of doubles whose exact value is known by hand
     #[test]
     fn exact_sums() {
-        assert_eq!(sum(&[]), 0.0);
-        assert_eq!(sum(&[1e16, 1.0, -1e16]), 1.0);
-        assert_eq!(sum(&[1e308, 1e308, -1e308]), 1e308);
-        assert_eq!(sum(&[1e308, 1e308]), f64::INFINITY);
-        assert_eq!(sum(&[-1e308, -1e308]), f64::NEG_INFINITY);
+        assert_eq!(sum(&[]).to_bits(), f64::to_bits(0.0));
+        assert_eq!(sum(&[1e16, 1.0, -1e16]).to_bits(), f64::to_bits(1.0));
+        assert_eq!(sum(&[1e308, 1e308, -1e308]).to_bits(), f64::to_bits(1e308));
+        assert_eq!(sum(&[1e308, 1e308]).to_bits(), f64::to_bits(f64::INFINITY));
         assert_eq!(
-            sum(&[f64::MIN_POSITIVE / 4.0, f64::MIN_POSITIVE / 4.0]),
-            f64::MIN_POSITIVE / 2.0
+            sum(&[-1e308, -1e308]).to_bits(),
+            (f64::NEG_INFINITY).to_bits()
+        );
+        assert_eq!(
+            sum(&[f64::MIN_POSITIVE / 4.0, f64::MIN_POSITIVE / 4.0]).to_bits(),
+            f64::to_bits(f64::MIN_POSITIVE / 2.0)
         );
         assert_eq!(sum(&[5e-324, 5e-324, 5e-324]).to_bits(), 3);
-        assert_eq!(sum(&[-2.5, 1.25]), -1.25);
-        assert_eq!(sum(&[f64::MAX, -f64::MAX]), 0.0);
-        assert_eq!(sum(&[f64::MAX]), f64::MAX);
+        assert_eq!(sum(&[-2.5, 1.25]).to_bits(), f64::to_bits(-1.25));
+        assert_eq!(sum(&[f64::MAX, -f64::MAX]).to_bits(), f64::to_bits(0.0));
+        assert_eq!(sum(&[f64::MAX]).to_bits(), f64::to_bits(f64::MAX));
         // 2^53 + 1 is a tie between 2^53 and 2^53 + 2: to even (2^53)
         assert_eq!(
-            sum(&[9_007_199_254_740_992.0, 1.0]),
-            9_007_199_254_740_992.0
+            sum(&[9_007_199_254_740_992.0, 1.0]).to_bits(),
+            f64::to_bits(9_007_199_254_740_992.0)
         );
         // 2^53 + 3 ties between 2^53 + 2 and 2^53 + 4: to even (2^53 + 4)
         assert_eq!(
-            sum(&[9_007_199_254_740_992.0, 3.0]),
-            9_007_199_254_740_996.0
+            sum(&[9_007_199_254_740_992.0, 3.0]).to_bits(),
+            f64::to_bits(9_007_199_254_740_996.0)
         );
         // just above the tie goes up
         assert_eq!(
-            sum(&[9_007_199_254_740_992.0, 1.0, 1e-300]),
-            9_007_199_254_740_994.0
+            sum(&[9_007_199_254_740_992.0, 1.0, 1e-300]).to_bits(),
+            f64::to_bits(9_007_199_254_740_994.0)
         );
         assert_eq!(sum(&[0.1, 0.2]).to_bits(), 0x3FD3_3333_3333_3334);
     }
@@ -232,19 +235,30 @@ mod tests {
             -f64::from_bits(0x7830_0000_0000_0000),
         ];
         let mut fwd = ExactSum::ZERO;
-        vs.iter().for_each(|&v| fwd.add(v));
+        for &v in &vs {
+            fwd.add(v);
+        }
         let mut rev = ExactSum::ZERO;
-        vs.iter().rev().for_each(|&v| rev.add(v));
+        for &v in vs.iter().rev() {
+            rev.add(v);
+        }
         assert_eq!(fwd, rev);
         let (mut a, mut b) = (ExactSum::ZERO, ExactSum::ZERO);
-        vs[..3].iter().for_each(|&v| a.add(v));
-        vs[3..].iter().for_each(|&v| b.add(v));
+        for &v in &vs[..3] {
+            a.add(v);
+        }
+        for &v in &vs[3..] {
+            b.add(v);
+        }
         b.merge(&a);
         assert_eq!(b, fwd);
     }
 
     #[test]
     fn non_finite_values_are_not_added() {
-        assert_eq!(sum(&[1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY]), 1.0);
+        assert_eq!(
+            sum(&[1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY]).to_bits(),
+            f64::to_bits(1.0)
+        );
     }
 }

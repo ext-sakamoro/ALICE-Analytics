@@ -6,8 +6,19 @@
 //! `sketch::bytes` (`ALAS`, version 1, kind, parameters, little-endian
 //! fields); "the sketch of the union" is built by inserting every item into
 //! one sketch, independently of the merge; the error bounds are the ones the
-//! sketches state (HyperLogLog 1.04/sqrt(m), Count-Min e/w of the total,
-//! DDSketch relative alpha), checked against exact counts and sorted values.
+//! sketches state (`HyperLogLog` 1.04/sqrt(m), Count-Min e/w of the total,
+//! `DDSketch` relative alpha), checked against exact counts and sorted values.
+
+// test arithmetic on counts and exact float values, and sketches built on the stack as the
+// crate's own constructors do
+#![allow(
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_lossless,
+    clippy::float_cmp,
+    clippy::large_stack_arrays
+)]
 
 use alice_analytics::sketch::{
     CountMinSketch1024x5, DDSketch512, HyperLogLog12, HyperLogLog14, MergeError, Mergeable,
@@ -18,7 +29,7 @@ use alice_analytics::ANALYTICS_SEMANTICS_ID;
 /// The header: `ALAS`, version 1, kind, two parameter bytes, then the crate's
 /// meaning identifier (32 bytes).
 const HEADER: usize = 8 + 32;
-/// The exact sum of a DDSketch: 34 little-endian `u64` limbs, two's complement,
+/// The exact sum of a `DDSketch`: 34 little-endian `u64` limbs, two's complement,
 /// holding the sum times 2^1074.
 const SUM_LIMBS: usize = 34;
 
@@ -406,7 +417,7 @@ fn merging_ddsketches_of_different_alpha_is_refused_and_changes_nothing() {
     assert_eq!(bytes_dd(&a), before);
 }
 
-/// A sketch of `n` zeros, written as bytes (count = zero_count = n), read back.
+/// A sketch of `n` zeros, written as bytes (`count` = `zero_count` = n), read back.
 fn dd_of_zeros(n: u64) -> DDSketch512 {
     let mut b = bytes_dd(&DDSketch512::new(0.02));
     b[HEADER + 12..HEADER + 20].copy_from_slice(&n.to_le_bytes());
