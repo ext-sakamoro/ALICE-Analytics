@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `tests/float_environment.rs` (ALICE-DB と同一): round-to-nearest-even と subnormal が flush されないことを実行時に確かめる test test job (4 OS) と release profile で `scripts/run_tests.sh` を通して実行 `alice-law-conformance.toml` の G14 を fail-known から pass にした
 
 ### Changed
+- CI (ALICE-Law G11 (c)): `.github/shared-files-pin` と `.github/g11-table-pin` を ALICE-Law 99dd3df4 (release_baseline / test_id_move_check / entropy_guard の目標をこの版の bytes に付け替えた表) に上げ、README の ALICE-Law の節をその版で生成し直した
 - CI (共有 `scripts/entropy_guard.py` と試験): 許可する呼び出し箇所は共有 bytes に持たず、repo ごとの `scripts/entropy_guard.toml` (`[[allow]]` に path / pattern / 件数 / 理由) から読む 件数のずれは上下とも red、何にも当たらない entry・同じ箇所の重複・未知の pattern や key・読めない file も red、file が無い時は許可 0 件 (検査を飛ばさない) この repo は許可 0 件なので file を置かない
 - CI (共有 `scripts/release_baseline.py` と試験、`scripts/test_id_move_check.py`): ci/** で版を上げる commit は、早送りで着地した後の main と同じ base (その版上げの直前の commit) で判定する CHANGELOG に書かない識別子の移動は ci/** の段で red になる (着地後に初めて red になっていた)
 - CI (ALICE-Law G11 (c)): `.github/shared-files-pin` と `.github/g11-table-pin` を ALICE-Law 5c33e32e (package_integrity と試験の目標をこの版の bytes に付け替えた表) に上げ、README の ALICE-Law の節をその版で生成し直した
