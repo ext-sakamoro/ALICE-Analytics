@@ -83,6 +83,7 @@ jobs:
           - fuzz_event_parse
           - fuzz_metric_aggregate
           - fuzz_sketch_insert
+          - fuzz_sketch_decode
     steps:
       - uses: actions/checkout@v5
 

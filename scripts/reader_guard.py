@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
-"""The crate has no reader of external bytes and no type-erasing entry point
-(ALICE-Law G7 and G8, both n/a while this holds).
+"""The crate reads external bytes only in the decided readers below, and has no
+type-erasing entry point (ALICE-Law G7 n/a, G8 pass).
+
+The decided readers (READERS) are the sketches' `decode` (src/sketch.rs) and
+the two little-endian helpers it reads fields with: the byte form of a sketch
+carries ANALYTICS_SEMANTICS_ID and `decode` refuses any other identifier, which
+is G8's handshake (tests/sketch_bytes.rs
+`every_sketch_decode_checks_the_meaning_identifier`; scripts/api_boundary.toml
+lists each decode as that handshake). Any other reader fails here, and so does a
+READERS entry that matches no line (stale).
 
 alice-analytics writes text for monitoring (src/export.rs: JSON and the
 Prometheus exposition format) and reads nothing back: no decoder, no file or
@@ -35,6 +43,16 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from entropy_guard import production_lines  # noqa: E402
 
+# (file, pattern name, line text) -> why this reader is decided; each must match at least one line
+READERS = {
+    ("src/sketch.rs", "decode function", "pub fn decode(bytes: &[u8]) -> Result<Self, SketchBytesError> {"):
+        "a sketch's decode: refuses bytes stamped with another ANALYTICS_SEMANTICS_ID (G8 handshake)",
+    ("src/sketch.rs", "bytes to number", "u32::from_le_bytes(b)"):
+        "get_u32: reads a field of a sketch's byte form, after decode checked the identifier",
+    ("src/sketch.rs", "bytes to number", "u64::from_le_bytes(b)"):
+        "get_u64: reads a field of a sketch's byte form, after decode checked the identifier",
+}
+
 # name -> regex over production code (string literals are reduced to "")
 PATTERNS = {
     "serde Deserialize": r"\bDeserialize\b",
@@ -57,16 +75,24 @@ PATTERNS = {
 
 
 
-def check(root: Path) -> tuple[list[str], int]:
+def check(root: Path, readers: dict | None = None) -> tuple[list[str], int]:
+    readers = READERS if readers is None else readers
     problems: list[str] = []
     files = sorted((root / "src").rglob("*.rs")) if (root / "src").exists() else []
     rxs = {name: re.compile(rx) for name, rx in PATTERNS.items()}
+    used: set[tuple[str, str, str]] = set()
     for path in files:
         rel = path.relative_to(root).as_posix()
         for n, code in production_lines(path.read_text(encoding="utf-8")):
             for name, rx in rxs.items():
                 if rx.search(code):
-                    problems.append(f"{rel}:{n}: {name}: `{code.strip()}`")
+                    key = (rel, name, code.strip())
+                    if key in readers:
+                        used.add(key)
+                    else:
+                        problems.append(f"{rel}:{n}: {name}: `{code.strip()}`")
+    for key in sorted(set(readers) - used):
+        problems.append(f"READERS entry matches no line (stale): {key}")
     if (root / "build.rs").exists():
         problems.append("build.rs: a build script can compute values at build time (G7)")
     cargo = root / "Cargo.toml"
@@ -88,10 +114,12 @@ def main(argv: list[str] | None = None) -> int:
         print("reader_guard: no src file read (compared nothing)", file=sys.stderr)
         return 1
     if problems:
-        print("reader_guard: a reader or type-erasing entry point appeared; G7 / G8 of "
-              "alice-law-conformance.toml are n/a only while there is none", file=sys.stderr)
+        print("reader_guard: a reader or type-erasing entry point outside READERS appeared (or a "
+              "READERS entry is stale); G7 of alice-law-conformance.toml is n/a and G8 pass only "
+              "while the readers are exactly the decided ones", file=sys.stderr)
         return 1
-    print(f"reader_guard: {files} files, {len(PATTERNS)} patterns, no reader or boundary")
+    print(f"reader_guard: {files} files, {len(PATTERNS)} patterns, {len(READERS)} decided readers, "
+          "no other reader or boundary")
     return 0
 
 

@@ -159,7 +159,7 @@ fn golden_sketch() {
     for id in 2_000..6_000u64 {
         b.insert(&id);
     }
-    a.merge(&b);
+    a.merge(&b).unwrap();
     s.f64(a.cardinality());
 
     // DDSketch: bucket_index uses ln, bucket_representative an integer power
@@ -284,7 +284,7 @@ fn golden_stats() {
 // 3. window — tumbling / sliding / hierarchical aggregates
 // ---------------------------------------------------------------------------
 
-const GOLDEN_WINDOW: &str = "a0930b7ef27cd7b0ae96c9e31dd85b5e0963ced9dfb837da7d535d79e9d05a7b";
+const GOLDEN_WINDOW: &str = "5f8fe58f25070514326759ff28497c7f5cd1221ad680ac10c4d092c1d461c147";
 
 #[test]
 fn golden_window() {
@@ -557,7 +557,7 @@ fn golden_streaming_ops() {
 // ---------------------------------------------------------------------------
 
 #[cfg(feature = "law")]
-const GOLDEN_LAW: &str = "f017cc3eb4e268c47f52d045607ee0d82d256cc9813805fe9e051469dc2c907d";
+const GOLDEN_LAW: &str = "8dd341a44001b19a881e1879faf09f0bb58df759761d8333897f7f21da6b57b6";
 
 #[cfg(feature = "law")]
 #[test]
@@ -665,7 +665,7 @@ fn golden_law() {
 /// Since the identifier of each alice-det-math function is folded, this is `ANALYTICS_SEMANTICS_ID`, which the
 /// law identifier is taken under.
 const GOLDEN_SEMANTICS_ID: &str =
-    "54cbe6e9c9a3aa1170f2b9cdb22c2a9503fa78be5e079aad5b42795fee6cbf53";
+    "847535174fa305517aa11fe8b98f604d1b1ec48abaa23d2b1dce9ccc8aa8884f";
 
 #[test]
 fn golden_semantics_id() {
@@ -721,7 +721,11 @@ fn golden_semantics_id() {
 /// under the 39507d1b identifier (`a2e46794…`) still gives `795d4520…`
 /// (`law_id_under_the_det_math_39507d1b_identifier_is_unchanged` below).
 #[cfg(feature = "law")]
-const GOLDEN_LAW_ID: &str = "2ead49935cd163d4de565f9e2892224d2270688be873bd8ff1b04bcb4293e7c1";
+const GOLDEN_LAW_ID: &str = "a8b76115965ed692b16be3ba4cb064d62198b9c55402efd6a9656baaa126556a";
+/// `GOLDEN_LAW_ID` under `ANALYTICS_SEMANTICS_ID` `54cbe6e9…`, before the `DDSketch` sum became exact
+#[cfg(feature = "law")]
+const GOLDEN_LAW_ID_ANALYTICS_54CBE6E9: &str =
+    "2ead49935cd163d4de565f9e2892224d2270688be873bd8ff1b04bcb4293e7c1";
 
 /// The law identifier recorded with `alice-det-math` 0.5.2 at 39507d1b
 #[cfg(feature = "law")]
@@ -901,4 +905,18 @@ fn law_id_under_the_whole_det_math_identifier_is_unchanged() {
         hex,
         "b2e9802d5f65a4478bb2529a52204e4e676a8bf481c4622a5406bae689c567c0"
     );
+}
+
+/// Re-recording `GOLDEN_LAW_ID` for the exact `DDSketch` sum moved the identifier input only: the
+/// same law under the previous analytics identifier (`54cbe6e9…`) gives the value recorded before
+#[cfg(feature = "law")]
+#[test]
+fn law_id_under_the_analytics_identifier_before_the_exact_sum_is_unchanged() {
+    let law = law_fixture();
+    let previous = unhex("54cbe6e9c9a3aa1170f2b9cdb22c2a9503fa78be5e079aad5b42795fee6cbf53");
+    let mut hex = String::with_capacity(64);
+    for b in law.law_id(&previous) {
+        write!(hex, "{b:02x}").expect("writing to a String cannot fail");
+    }
+    assert_eq!(hex, GOLDEN_LAW_ID_ANALYTICS_54CBE6E9);
 }

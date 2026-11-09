@@ -58,7 +58,8 @@ fuzz_target!(|input: Input| {
         hll_b.insert_bytes(item);
     }
     // merge (Mergeable trait) は sibling sketch の register max 統合
-    hll_a.merge(&hll_b);
+    // a HyperLogLog merge never fails
+    hll_a.merge(&hll_b).unwrap();
     let _ = hll_a.cardinality();
 
     // 2. DDSketch insert + merge + quantile
@@ -76,7 +77,12 @@ fuzz_target!(|input: Input| {
     for bits in &input.dd_values_b {
         dd_b.insert(f64::from_bits(*bits));
     }
-    dd_a.merge(&dd_b);
+    // same alpha on both sides: only a count past u64::MAX could refuse, and
+    // a refused merge leaves dd_a as it was
+    let before = dd_a.clone();
+    if dd_a.merge(&dd_b).is_err() {
+        assert_eq!(dd_a.count(), before.count());
+    }
 
     // quantile 3 サンプル (NaN / <0 / >1 攻撃を bits で網羅)
     let _ = dd_a.quantile(f64::from_bits(input.q_bits_1));

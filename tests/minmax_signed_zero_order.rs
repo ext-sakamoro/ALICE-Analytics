@@ -66,7 +66,7 @@ fn merged_sketch_minmax(values: &[f64]) -> (f64, f64) {
     for &v in values {
         let mut one = DDSketch::new(0.01);
         one.insert(black_box(v));
-        acc.merge(&one);
+        acc.merge(&one).unwrap();
     }
     (acc.min(), acc.max())
 }

@@ -37,5 +37,10 @@ name = "fuzz_sketch_insert"
 path = "fuzz_targets/fuzz_sketch_insert.rs"
 doc = false
 
+[[bin]]
+name = "fuzz_sketch_decode"
+path = "fuzz_targets/fuzz_sketch_decode.rs"
+doc = false
+
 [workspace]
 members = ["."]

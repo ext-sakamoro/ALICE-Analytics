@@ -43,6 +43,7 @@
 pub(crate) mod math;
 
 pub mod anomaly;
+pub mod exact_sum;
 pub mod export;
 pub mod pipeline;
 pub mod privacy;

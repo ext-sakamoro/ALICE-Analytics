@@ -290,16 +290,24 @@ impl MetricSlot {
 }
 
 impl Mergeable for MetricSlot {
-    fn merge(&mut self, other: &Self) {
-        self.counter += other.counter;
+    /// Counters and sketches add, the gauge takes the latest update. Built on a
+    /// copy and kept only when every part merged, so an error leaves `self` as it was.
+    fn merge(&mut self, other: &Self) -> Result<(), crate::sketch::MergeError> {
+        let mut next = self.clone();
+        next.event_count = next
+            .event_count
+            .checked_add(other.event_count)
+            .ok_or(crate::sketch::MergeError::Overflow)?;
+        next.counter += other.counter;
         // For gauge, take the latest
-        if other.last_update > self.last_update {
-            self.gauge = other.gauge;
-            self.last_update = other.last_update;
+        if other.last_update > next.last_update {
+            next.gauge = other.gauge;
+            next.last_update = other.last_update;
         }
-        self.hll.merge(&other.hll);
-        self.ddsketch.merge(&other.ddsketch);
-        self.event_count += other.event_count;
+        next.hll.merge(&other.hll)?;
+        next.ddsketch.merge(&other.ddsketch)?;
+        *self = next;
+        Ok(())
     }
 }
 
@@ -828,7 +836,7 @@ mod tests {
         let mut s2 = MetricSlot::new(1, 0.05);
         s1.process(&MetricEvent::counter(1, 10.0));
         s2.process(&MetricEvent::counter(1, 20.0));
-        s1.merge(&s2);
+        s1.merge(&s2).unwrap();
         assert_eq!(s1.counter, 30.0);
     }
 
