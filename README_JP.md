@@ -246,9 +246,9 @@ ALICE-Law の `scripts/gen-law-readme-block.py` が ALICE-Law `5261d18eaf6c` と
 | G4 debug-release-arch-goldens | 適合 | the outer-negated fma rewrite of G3's mutant reaches these sites only through mul_add, which the release legs compile with the target's codegen; the G3 checker … |
 | G5 release-profile-test-leg | 適合 | the release legs build the Law-bearing goldens with opt-level 3; an aarch64 release-only divergence (contraction into fma, reassociation) fails macos-latest. |
 | G6 semantics-id | 適合 | the identifier is a constant of this crate version: a dependency bump or a toolchain change that moved any pinned bits fails a golden, and re-recording a … |
-| G7 handshake-carries-id | 対象外 | n/a while the enumerated boundary has no entry point that receives another crate's Law-bearing value: every enumerated item is decided local. A new reader, … |
-| G8 persisted-semantics-id | 対象外 | ruling (2026-10-17): the JSON and Prometheus exports are monitoring output, not a durable format of this crate, because nothing in the crate reads them back; … |
-| G9 persisted-meaning-change-is-major | 適合 | [Unreleased] (Breaking): folding each alice-det-math function, ANALYTICS_SEMANTICS_ID moves 38e4dba4... -> 54cbe6e9..., 38e4dba4... in … |
+| G7 handshake-carries-id | 対象外 | The sketches' decode (2026-11-09) reads this crate's own byte form, not another crate's Law-bearing value; it is G8's reader and is listed as a handshake in … |
+| G8 persisted-semantics-id | 適合 | ruling (2026-11-09): the sketches' byte form is a durable format of this crate (a store keeps it and merges parts later), so G8 applies: the format carries the … |
+| G9 persisted-meaning-change-is-major | 適合 | [Unreleased] (Breaking): the DDSketch sum became exact (src/exact_sum.rs), which moved the window and law scenario goldens (both read DDSketch::mean), so … |
 | G10 no-run-varying-artifacts | 適合 | the clock-seeded constructors of the deprecated privacy module (XorShift64::from_entropy, impl Default for XorShift64, LaplaceNoise::new, Rappor::new, … |
 | G11 gate-self-tests | 適合 | pass: (a) and (b) hold for every pass gate and are checked by machine (conformance/g11.toml, scripts/g11_table.sh: 17 rows, 0 findings), and (c) every shared … |
 | G12 public-repo-text-rules | 適合 | the CI job fetches ALICE-Law's own scripts/public_text_check.py at the revision named in .github/public-text-pin and refuses it unless its SHA-256 is the one … |
