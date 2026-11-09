@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `tests/float_environment.rs` (ALICE-DB と同一): round-to-nearest-even と subnormal が flush されないことを実行時に確かめる test test job (4 OS) と release profile で `scripts/run_tests.sh` を通して実行 `alice-law-conformance.toml` の G14 を fail-known から pass にした
 
 ### Changed
+- CI (共有 `scripts/release_baseline.py` と試験、`scripts/test_id_move_check.py`): ci/** で版を上げる commit は、早送りで着地した後の main と同じ base (その版上げの直前の commit) で判定する CHANGELOG に書かない識別子の移動は ci/** の段で red になる (着地後に初めて red になっていた)
 - CI (ALICE-Law G11 (c)): `.github/shared-files-pin` と `.github/g11-table-pin` を ALICE-Law 5c33e32e (package_integrity と試験の目標をこの版の bytes に付け替えた表) に上げ、README の ALICE-Law の節をその版で生成し直した
 - CI (package integrity): 共有の `scripts/package_integrity.py` の新規解決は、`branch` / `tag` / 既定の branch で取る git 依存を `cargo update -p <name> --precise <この repo の Cargo.lock の commit>` で lock の commit に戻してから `cargo check --locked` で照合する (上流の main が進んでも検査は red にならない、crates.io の依存は新規解決のまま、commit が取れない時は red) `cargo test` の集計は escape code を除いて読む (`CARGO_OUTPUT_PARSER = True`、色付きの試料と 0 件の試験)
 - **Breaking:** `Mergeable::merge` は `Result<(), MergeError>` を返す 数が `u64::MAX` を超える合算 (`MergeError::Overflow`) と alpha の違う `DDSketch` の合算 (`MergeError::Alpha`) は何も変えずに断る (これまでは debug で panic、release で wrap、alpha の違いは黙って混ぜていた) Count-Min の合算は飽和でなく検査付きの加算 `MetricSlot::merge` は全部の部分が合算できた時だけ変わる
