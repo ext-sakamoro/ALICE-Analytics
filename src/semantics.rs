@@ -11,7 +11,7 @@
 //! # Hex form
 //!
 //! ```text
-//! 54cbe6e9c9a3aa1170f2b9cdb22c2a9503fa78be5e079aad5b42795fee6cbf53
+//! 847535174fa305517aa11fe8b98f604d1b1ec48abaa23d2b1dce9ccc8aa8884f
 //! ```
 //!
 //! # Entries
@@ -78,7 +78,7 @@ pub const ANALYTICS_SEMANTICS_PINS: [(&str, [u8; 32]); 8] = [
     ),
     (
         "window",
-        hex32("a0930b7ef27cd7b0ae96c9e31dd85b5e0963ced9dfb837da7d535d79e9d05a7b"),
+        hex32("5f8fe58f25070514326759ff28497c7f5cd1221ad680ac10c4d092c1d461c147"),
     ),
     (
         "anomaly",
@@ -94,7 +94,7 @@ pub const ANALYTICS_SEMANTICS_PINS: [(&str, [u8; 32]); 8] = [
     ),
     (
         "law",
-        hex32("f017cc3eb4e268c47f52d045607ee0d82d256cc9813805fe9e051469dc2c907d"),
+        hex32("8dd341a44001b19a881e1879faf09f0bb58df759761d8333897f7f21da6b57b6"),
     ),
     (
         "alice-zip",
@@ -134,24 +134,14 @@ const _: () = alice_det_math::assert_function_pins(DET_MATH_PINS);
 /// The semantics identifier of this crate: the fold of
 /// [`ANALYTICS_SEMANTICS_PINS`] (see the module documentation).
 pub const ANALYTICS_SEMANTICS_ID: [u8; 32] =
-    hex32("54cbe6e9c9a3aa1170f2b9cdb22c2a9503fa78be5e079aad5b42795fee6cbf53");
+    hex32("847535174fa305517aa11fe8b98f604d1b1ec48abaa23d2b1dce9ccc8aa8884f");
 
 /// Earlier values of [`ANALYTICS_SEMANTICS_ID`] whose pinned bits this
 /// release still reproduces, newest first
 ///
-/// `38e4dba4…` is the identifier that folded alice-det-math's whole identifier (`a2a11b9b…`) and
-/// alice-zip at `17d0df1d…`: every scenario golden is unchanged.
-///
-/// `2def9a11…` is the identifier with alice-det-math 0.5.2 at 39507d1b (`a2e46794…`) and
-/// alice-zip at `50a40cf6…`: the move to det-math 2d01c63f (sin / cos at |x| ≥ 2^13, powf of a
-/// negative base, powf64, hypot of two subnormals, erf added) changed no function this crate
-/// calls (`exp64` / `ln64` / `max64` / `min64`), so every scenario golden is unchanged.
-///
-/// `f8ded596…` is the identifier with alice-det-math 0.5.1 and alice-zip 0.11 at
-/// `51ffeb07…`: the move to det-math 0.5.2 at 39507d1b (whose clamp follows the G2 order)
-/// changed no function this crate calls, so every scenario golden is unchanged.
-pub const PREVIOUS_ANALYTICS_SEMANTICS_IDS: &[[u8; 32]] = &[
-    hex32("38e4dba4aeda3ea1a291d620c0183470aaffb9c9d3cd9a101b1435b0d93909df"),
-    hex32("2def9a114cb31abd2918f95a57f5ad084917006a9c95810a41db197fffebdfa0"),
-    hex32("f8ded5961a8ef8be2d79ea4bfafd68f494c2443d725fb926cf9775824e043d4d"),
-];
+/// Empty: `54cbe6e9…` and the generations before it (`38e4dba4…`, `2def9a11…`,
+/// `f8ded596…`) folded the `window` and `law` goldens of a `DDSketch` whose sum
+/// was a running float sum; the sum is now exact (see
+/// [`ExactSum`](crate::exact_sum::ExactSum)), so `mean` and `sum` of those
+/// scenarios have other bits and no earlier identifier's pinned bits are reproduced.
+pub const PREVIOUS_ANALYTICS_SEMANTICS_IDS: &[[u8; 32]] = &[];

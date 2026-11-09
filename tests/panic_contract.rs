@@ -224,7 +224,7 @@ fn a_non_finite_sample_is_counted_on_its_own_and_touches_nothing_else() {
     a.insert(1.0);
     b.insert(f64::INFINITY);
     b.insert(2.0);
-    a.merge(&b);
+    a.merge(&b).unwrap();
     assert_eq!((a.count(), a.non_finite()), (2, 2));
     a.clear();
     assert_eq!((a.count(), a.non_finite()), (0, 0));

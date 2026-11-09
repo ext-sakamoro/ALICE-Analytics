@@ -10,7 +10,8 @@ sketches. With the `law` feature it also summarises how a set of points deviates
 from a fitted `alice_zip::law::SignalLaw`.
 
 It is not a time-series database, a metrics backend or a dashboard: it keeps
-summaries in memory and leaves storage and transport to the caller. Sketches
+summaries in memory and leaves storage and transport to the caller (each
+sketch has a fixed-length byte form, `encode` / `decode`, to store and merge later). Sketches
 answer approximate queries; when exact quantiles or exact distinct counts are
 needed, keep the raw values.
 

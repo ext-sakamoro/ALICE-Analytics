@@ -115,8 +115,153 @@ fn fast_log2_approx(x: f64) -> f64 {
 
 /// Trait for mergeable probabilistic data structures
 pub trait Mergeable {
-    /// Merge another sketch into this one
-    fn merge(&mut self, other: &Self);
+    /// Merge another sketch into this one.
+    ///
+    /// # Errors
+    ///
+    /// A [`MergeError`] when the two cannot be merged (a count would pass
+    /// `u64::MAX`, or the sketches were made with different parameters); then
+    /// `self` is left exactly as it was.
+    fn merge(&mut self, other: &Self) -> Result<(), MergeError>;
+}
+
+/// Why two sketches were not merged; the merge changed nothing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MergeError {
+    /// A count would pass `u64::MAX`.
+    Overflow,
+    /// The two `DDSketch`es have different `alpha` (their bins are different buckets).
+    Alpha,
+}
+
+// ============================================================================
+// Bytes - a fixed-length, versioned form of each sketch
+// ============================================================================
+
+/// Why bytes are not a sketch of the type asked for.
+///
+/// The byte form of every sketch here is: the magic `ALAS`, the format
+/// version (`1`), the kind (`1` `HyperLogLog`, `2` `DDSketch`, `3` Count-Min),
+/// two parameter bytes, this build's
+/// [`ANALYTICS_SEMANTICS_ID`](crate::ANALYTICS_SEMANTICS_ID) (32 bytes), then
+/// the sketch's fields in little-endian order (see each type's `encode`). The length is fixed per type (`ENCODED_LEN`), so a
+/// store can keep it in a fixed column and merge parts after decoding them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SketchBytesError {
+    /// The bytes or the output buffer do not have the type's length.
+    Length {
+        /// The type's `ENCODED_LEN`.
+        expected: usize,
+        /// The length given.
+        found: usize,
+    },
+    /// The first four bytes are not `ALAS`.
+    Magic,
+    /// A format version this crate does not read.
+    Version(u8),
+    /// Written under another meaning identifier than this build's
+    /// [`ANALYTICS_SEMANTICS_ID`](crate::ANALYTICS_SEMANTICS_ID) (an earlier
+    /// one included): the hash or the buckets may differ, so the values do not
+    /// mean the same thing and are not read.
+    Semantics {
+        /// The identifier in the bytes.
+        found: [u8; 32],
+    },
+    /// The bytes are another kind of sketch.
+    Kind {
+        /// The kind of the type asked for.
+        expected: u8,
+        /// The kind in the bytes.
+        found: u8,
+    },
+    /// The same kind of sketch, but another size (registers, bins, width or depth).
+    Shape,
+    /// A field no sequence of inserts and merges can produce.
+    Invalid(&'static str),
+}
+
+const BYTES_MAGIC: [u8; 4] = *b"ALAS";
+const BYTES_VERSION: u8 = 1;
+const KIND_HLL: u8 = 1;
+const KIND_DDSKETCH: u8 = 2;
+const KIND_COUNTMIN: u8 = 3;
+/// Header length: magic, version, kind, two parameter bytes, the identifier.
+const HEADER_LEN: usize = 8 + 32;
+
+fn bytes_header(out: &mut [u8], kind: u8, params: [u8; 2]) {
+    out[..4].copy_from_slice(&BYTES_MAGIC);
+    out[4] = BYTES_VERSION;
+    out[5] = kind;
+    out[6] = params[0];
+    out[7] = params[1];
+    out[8..HEADER_LEN].copy_from_slice(&crate::ANALYTICS_SEMANTICS_ID);
+}
+
+/// The checks every decode starts with: length, magic, version, kind. Returns
+/// the two parameter bytes.
+fn bytes_check(bytes: &[u8], expected_len: usize, kind: u8) -> Result<[u8; 2], SketchBytesError> {
+    if bytes.len() < 4 {
+        return Err(SketchBytesError::Length {
+            expected: expected_len,
+            found: bytes.len(),
+        });
+    }
+    if bytes[..4] != BYTES_MAGIC {
+        return Err(SketchBytesError::Magic);
+    }
+    if bytes.len() < HEADER_LEN {
+        return Err(SketchBytesError::Length {
+            expected: expected_len,
+            found: bytes.len(),
+        });
+    }
+    if bytes[4] != BYTES_VERSION {
+        return Err(SketchBytesError::Version(bytes[4]));
+    }
+    if bytes[5] != kind {
+        return Err(SketchBytesError::Kind {
+            expected: kind,
+            found: bytes[5],
+        });
+    }
+    if bytes[8..HEADER_LEN] != crate::ANALYTICS_SEMANTICS_ID {
+        let mut found = [0u8; 32];
+        found.copy_from_slice(&bytes[8..HEADER_LEN]);
+        return Err(SketchBytesError::Semantics { found });
+    }
+    Ok([bytes[6], bytes[7]])
+}
+
+const fn bytes_len_check(found: usize, expected: usize) -> Result<(), SketchBytesError> {
+    if found == expected {
+        Ok(())
+    } else {
+        Err(SketchBytesError::Length { expected, found })
+    }
+}
+
+fn put_u32(out: &mut [u8], at: &mut usize, v: u32) {
+    out[*at..*at + 4].copy_from_slice(&v.to_le_bytes());
+    *at += 4;
+}
+
+fn put_u64(out: &mut [u8], at: &mut usize, v: u64) {
+    out[*at..*at + 8].copy_from_slice(&v.to_le_bytes());
+    *at += 8;
+}
+
+fn get_u32(bytes: &[u8], at: &mut usize) -> u32 {
+    let mut b = [0u8; 4];
+    b.copy_from_slice(&bytes[*at..*at + 4]);
+    *at += 4;
+    u32::from_le_bytes(b)
+}
+
+fn get_u64(bytes: &[u8], at: &mut usize) -> u64 {
+    let mut b = [0u8; 8];
+    b.copy_from_slice(&bytes[*at..*at + 8]);
+    *at += 8;
+    u64::from_le_bytes(b)
 }
 
 // ============================================================================
@@ -231,6 +376,45 @@ macro_rules! impl_hyperloglog {
                 }
             }
 
+            /// Length of [`encode`](Self::encode)'s output: the 40 header bytes, then one byte per register.
+            pub const ENCODED_LEN: usize = HEADER_LEN + $m;
+
+            /// Write the sketch to `out` (exactly [`ENCODED_LEN`](Self::ENCODED_LEN) bytes):
+            /// the header (kind `1`, parameters `P`, `0`), then the `M` registers.
+            ///
+            /// # Errors
+            ///
+            /// [`SketchBytesError::Length`] when `out` is not `ENCODED_LEN` long.
+            pub fn encode(&self, out: &mut [u8]) -> Result<(), SketchBytesError> {
+                bytes_len_check(out.len(), Self::ENCODED_LEN)?;
+                #[allow(clippy::cast_possible_truncation)]
+                let p = $p as u8;
+                bytes_header(out, KIND_HLL, [p, 0]);
+                out[HEADER_LEN..].copy_from_slice(&self.registers);
+                Ok(())
+            }
+
+            /// The sketch written by [`encode`](Self::encode).
+            ///
+            /// # Errors
+            ///
+            /// A [`SketchBytesError`] when the bytes are not this type's: wrong
+            /// length, magic, version, kind or identifier, another `P`, or a register above
+            /// `64 - P + 1` (no insert writes one).
+            pub fn decode(bytes: &[u8]) -> Result<Self, SketchBytesError> {
+                let params = bytes_check(bytes, Self::ENCODED_LEN, KIND_HLL)?;
+                if usize::from(params[0]) != $p || params[1] != 0 {
+                    return Err(SketchBytesError::Shape);
+                }
+                bytes_len_check(bytes.len(), Self::ENCODED_LEN)?;
+                let mut out = Self::new();
+                out.registers.copy_from_slice(&bytes[HEADER_LEN..]);
+                if out.registers.iter().any(|&r| usize::from(r) > 64 - $p + 1) {
+                    return Err(SketchBytesError::Invalid("a register above 64 - P + 1"));
+                }
+                Ok(out)
+            }
+
             /// Insert an already-hashed value
             #[inline]
             pub const fn insert_hash(&mut self, hash: u64) {
@@ -318,12 +502,13 @@ macro_rules! impl_hyperloglog {
         }
 
         impl Mergeable for $name {
-            fn merge(&mut self, other: &Self) {
+            fn merge(&mut self, other: &Self) -> Result<(), MergeError> {
                 for (dst, &src) in self.registers.iter_mut().zip(other.registers.iter()) {
                     if src > *dst {
                         *dst = src;
                     }
                 }
+                Ok(())
             }
         }
     };
@@ -374,7 +559,7 @@ macro_rules! impl_ddsketch {
             non_finite: u64,
             min: f64,
             max: f64,
-            sum: f64,
+            sum: crate::exact_sum::ExactSum,
             gamma: f64,
             ln_gamma: f64,
             inv_ln_gamma: f64,
@@ -401,13 +586,103 @@ macro_rules! impl_ddsketch {
                     non_finite: 0,
                     min: f64::INFINITY,
                     max: f64::NEG_INFINITY,
-                    sum: 0.0,
+                    sum: crate::exact_sum::ExactSum::ZERO,
                     gamma,
                     ln_gamma,
                     inv_ln_gamma: 1.0 / ln_gamma,
                     alpha,
                     offset,
                 }
+            }
+
+            /// Length of [`encode`](Self::encode)'s output.
+            pub const ENCODED_LEN: usize =
+                HEADER_LEN + 4 + 8 * 6 + 8 * crate::exact_sum::LIMBS + 16 * $bins;
+
+            /// Write the sketch to `out` (exactly [`ENCODED_LEN`](Self::ENCODED_LEN) bytes):
+            /// the header (kind `2`, parameters `0`, `0`), then (little-endian) the
+            /// bin count (`u32`), `alpha`, `count`, `zero_count`, `non_finite`,
+            /// `min`, `max` (`f64` as bits, `u64` counts), the exact sum (its
+            /// [`LIMBS`](crate::exact_sum::LIMBS) limbs, see
+            /// [`ExactSum`](crate::exact_sum::ExactSum)), the positive bins and the
+            /// negative bins (`u64` each). `gamma` and the offset are not
+            /// stored: [`decode`](Self::decode) derives them from `alpha` as
+            /// [`new`](Self::new) does.
+            ///
+            /// # Errors
+            ///
+            /// [`SketchBytesError::Length`] when `out` is not `ENCODED_LEN` long.
+            pub fn encode(&self, out: &mut [u8]) -> Result<(), SketchBytesError> {
+                bytes_len_check(out.len(), Self::ENCODED_LEN)?;
+                bytes_header(out, KIND_DDSKETCH, [0, 0]);
+                let mut at = HEADER_LEN;
+                #[allow(clippy::cast_possible_truncation)]
+                put_u32(out, &mut at, $bins as u32);
+                put_u64(out, &mut at, self.alpha.to_bits());
+                put_u64(out, &mut at, self.count);
+                put_u64(out, &mut at, self.zero_count);
+                put_u64(out, &mut at, self.non_finite);
+                put_u64(out, &mut at, self.min.to_bits());
+                put_u64(out, &mut at, self.max.to_bits());
+                for &limb in self.sum.limbs() {
+                    put_u64(out, &mut at, limb);
+                }
+                for &b in self.positive_bins.iter().chain(self.negative_bins.iter()) {
+                    put_u64(out, &mut at, b);
+                }
+                Ok(())
+            }
+
+            /// The sketch written by [`encode`](Self::encode).
+            ///
+            /// # Errors
+            ///
+            /// A [`SketchBytesError`] when the bytes are not this type's: wrong
+            /// length, magic, version, kind or identifier, another bin count, an `alpha`
+            /// outside `(0, 1)`, or a `count` that is not the zeros plus every bin.
+            pub fn decode(bytes: &[u8]) -> Result<Self, SketchBytesError> {
+                bytes_check(bytes, Self::ENCODED_LEN, KIND_DDSKETCH)?;
+                if bytes.len() < HEADER_LEN + 4 {
+                    return Err(SketchBytesError::Length {
+                        expected: Self::ENCODED_LEN,
+                        found: bytes.len(),
+                    });
+                }
+                let mut at = HEADER_LEN;
+                if get_u32(bytes, &mut at) as usize != $bins {
+                    return Err(SketchBytesError::Shape);
+                }
+                bytes_len_check(bytes.len(), Self::ENCODED_LEN)?;
+                let alpha = f64::from_bits(get_u64(bytes, &mut at));
+                if !(alpha > 0.0 && alpha < 1.0) {
+                    return Err(SketchBytesError::Invalid("alpha outside (0, 1)"));
+                }
+                let mut out = Self::new(alpha);
+                out.count = get_u64(bytes, &mut at);
+                out.zero_count = get_u64(bytes, &mut at);
+                out.non_finite = get_u64(bytes, &mut at);
+                out.min = f64::from_bits(get_u64(bytes, &mut at));
+                out.max = f64::from_bits(get_u64(bytes, &mut at));
+                let mut limbs = [0u64; crate::exact_sum::LIMBS];
+                for limb in &mut limbs {
+                    *limb = get_u64(bytes, &mut at);
+                }
+                out.sum = crate::exact_sum::ExactSum::from_limbs(limbs);
+                let mut filed = u128::from(out.zero_count);
+                for b in out
+                    .positive_bins
+                    .iter_mut()
+                    .chain(out.negative_bins.iter_mut())
+                {
+                    *b = get_u64(bytes, &mut at);
+                    filed += u128::from(*b);
+                }
+                if filed != u128::from(out.count) {
+                    return Err(SketchBytesError::Invalid(
+                        "count is not the zeros plus every bin",
+                    ));
+                }
+                Ok(out)
             }
 
             /// Add one observation.
@@ -442,7 +717,7 @@ macro_rules! impl_ddsketch {
                 }
 
                 self.count += 1;
-                self.sum += value;
+                self.sum.add(value);
 
                 self.min = alice_det_math::min64(self.min, value);
                 self.max = alice_det_math::max64(self.max, value);
@@ -569,8 +844,8 @@ macro_rules! impl_ddsketch {
             ///
             /// Finite in, finite out: a `NaN` sample can no longer poison it.
             #[inline]
-            pub const fn sum(&self) -> f64 {
-                self.sum
+            pub fn sum(&self) -> f64 {
+                self.sum.value()
             }
 
             /// Mean of the summarised (finite) samples, `0.0` when there are
@@ -580,7 +855,7 @@ macro_rules! impl_ddsketch {
                 if self.count == 0 {
                     0.0
                 } else {
-                    self.sum * (1.0 / u64_f64(self.count))
+                    self.sum.value() * (1.0 / u64_f64(self.count))
                 }
             }
 
@@ -625,12 +900,35 @@ macro_rules! impl_ddsketch {
                 self.non_finite = 0;
                 self.min = f64::INFINITY;
                 self.max = f64::NEG_INFINITY;
-                self.sum = 0.0;
+                self.sum = crate::exact_sum::ExactSum::ZERO;
             }
         }
 
         impl Mergeable for $name {
-            fn merge(&mut self, other: &Self) {
+            /// Bins, counts and the exact sum add; `min` and `max` combine.
+            /// Merging in any order gives the same sketch, bit for bit.
+            fn merge(&mut self, other: &Self) -> Result<(), MergeError> {
+                if self.alpha.to_bits() != other.alpha.to_bits() {
+                    return Err(MergeError::Alpha);
+                }
+                // every count is checked before anything changes
+                let fits = |a: u64, b: u64| a.checked_add(b).is_some();
+                let ok = fits(self.count, other.count)
+                    && fits(self.zero_count, other.zero_count)
+                    && fits(self.non_finite, other.non_finite)
+                    && self
+                        .positive_bins
+                        .iter()
+                        .zip(other.positive_bins.iter())
+                        .all(|(&a, &b)| fits(a, b))
+                    && self
+                        .negative_bins
+                        .iter()
+                        .zip(other.negative_bins.iter())
+                        .all(|(&a, &b)| fits(a, b));
+                if !ok {
+                    return Err(MergeError::Overflow);
+                }
                 for (dst, &src) in self
                     .positive_bins
                     .iter_mut()
@@ -648,10 +946,10 @@ macro_rules! impl_ddsketch {
                 self.zero_count += other.zero_count;
                 self.count += other.count;
                 self.non_finite += other.non_finite;
-                self.sum += other.sum;
-
+                self.sum.merge(&other.sum);
                 self.min = alice_det_math::min64(self.min, other.min);
                 self.max = alice_det_math::max64(self.max, other.max);
+                Ok(())
             }
         }
     };
@@ -692,6 +990,74 @@ macro_rules! impl_countmin {
                     counters: [[0u64; $w]; $d],
                     total: 0,
                 }
+            }
+
+            /// Length of [`encode`](Self::encode)'s output.
+            pub const ENCODED_LEN: usize = HEADER_LEN + 4 + 4 + 8 + 8 * $w * $d;
+
+            /// Write the sketch to `out` (exactly [`ENCODED_LEN`](Self::ENCODED_LEN) bytes):
+            /// the header (kind `3`, parameters `0`, `0`), then (little-endian) the
+            /// width and depth (`u32`), `total` (`u64`), and the counters row by
+            /// row (`u64` each).
+            ///
+            /// # Errors
+            ///
+            /// [`SketchBytesError::Length`] when `out` is not `ENCODED_LEN` long.
+            pub fn encode(&self, out: &mut [u8]) -> Result<(), SketchBytesError> {
+                bytes_len_check(out.len(), Self::ENCODED_LEN)?;
+                bytes_header(out, KIND_COUNTMIN, [0, 0]);
+                let mut at = HEADER_LEN;
+                #[allow(clippy::cast_possible_truncation)]
+                {
+                    put_u32(out, &mut at, $w as u32);
+                    put_u32(out, &mut at, $d as u32);
+                }
+                put_u64(out, &mut at, self.total);
+                for row in &self.counters {
+                    for &c in row {
+                        put_u64(out, &mut at, c);
+                    }
+                }
+                Ok(())
+            }
+
+            /// The sketch written by [`encode`](Self::encode).
+            ///
+            /// # Errors
+            ///
+            /// A [`SketchBytesError`] when the bytes are not this type's: wrong
+            /// length, magic, version, kind or identifier, another width or depth,
+            /// or a row whose counters do not add up to `total` (every insert and
+            /// every merge adds the same count once to each row).
+            pub fn decode(bytes: &[u8]) -> Result<Self, SketchBytesError> {
+                bytes_check(bytes, Self::ENCODED_LEN, KIND_COUNTMIN)?;
+                if bytes.len() < HEADER_LEN + 8 {
+                    return Err(SketchBytesError::Length {
+                        expected: Self::ENCODED_LEN,
+                        found: bytes.len(),
+                    });
+                }
+                let mut at = HEADER_LEN;
+                if get_u32(bytes, &mut at) as usize != $w || get_u32(bytes, &mut at) as usize != $d
+                {
+                    return Err(SketchBytesError::Shape);
+                }
+                bytes_len_check(bytes.len(), Self::ENCODED_LEN)?;
+                let mut out = Self::new();
+                out.total = get_u64(bytes, &mut at);
+                for row in &mut out.counters {
+                    let mut sum = 0u128;
+
+                    for c in row.iter_mut() {
+                        *c = get_u64(bytes, &mut at);
+                        sum += u128::from(*c);
+                    }
+                    let total = u128::from(out.total);
+                    if sum != total {
+                        return Err(SketchBytesError::Invalid("a row does not add up to total"));
+                    }
+                }
+                Ok(out)
             }
 
             #[inline]
@@ -778,14 +1144,22 @@ macro_rules! impl_countmin {
         }
 
         impl Mergeable for $name {
-            fn merge(&mut self, other: &Self) {
-                self.total += other.total;
-                for row in 0..$d {
-                    for col in 0..$w {
-                        self.counters[row][col] =
-                            self.counters[row][col].saturating_add(other.counters[row][col]);
+            /// Totals and counters add; a count that would pass `u64::MAX` is
+            /// refused before anything changes.
+            fn merge(&mut self, other: &Self) -> Result<(), MergeError> {
+                let Some(total) = self.total.checked_add(other.total) else {
+                    return Err(MergeError::Overflow);
+                };
+                // every counter is at most its row's sum, which is total (decode checks
+                // it, inserts and merges keep it), so a total that fits keeps every
+                // counter in range
+                self.total = total;
+                for (row, other_row) in self.counters.iter_mut().zip(other.counters.iter()) {
+                    for (c, &o) in row.iter_mut().zip(other_row.iter()) {
+                        *c += o;
                     }
                 }
+                Ok(())
             }
         }
     };
@@ -959,7 +1333,7 @@ mod tests {
             hll2.insert_hash(FnvHasher::hash_u64(i));
         }
 
-        hll1.merge(&hll2);
+        hll1.merge(&hll2).unwrap();
         let estimate = hll1.cardinality();
         assert!(
             estimate > 800.0 && estimate < 1200.0,
@@ -1035,7 +1409,7 @@ mod tests {
             cms2.insert_hash(1, 1);
         }
 
-        cms1.merge(&cms2);
+        cms1.merge(&cms2).unwrap();
         assert!(cms1.estimate_hash(1) >= 100);
     }
 
@@ -1228,7 +1602,7 @@ mod tests {
         for v in [40.0, 50.0] {
             s2.insert(v);
         }
-        s1.merge(&s2);
+        s1.merge(&s2).unwrap();
         assert_eq!(s1.count(), 5);
         assert!((s1.sum() - 150.0).abs() < 0.001);
         assert_eq!(s1.min(), 10.0);

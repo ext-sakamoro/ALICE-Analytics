@@ -41,26 +41,51 @@ class ReaderGuardTest(unittest.TestCase):
 
     def test_clean_tree_passes(self):
         d = self.tree({"src/export.rs": "pub fn snapshot_to_json(s: &S) -> String { String::new() }\n"})
-        self.assertEqual(reader_guard.check(d), ([], 1))
+        self.assertEqual(reader_guard.check(d, {}), ([], 1))
 
     def test_every_pattern_is_found(self):
         self.assertEqual(set(PLANTS), set(reader_guard.PATTERNS), "a pattern has no plant")
         for name, line in PLANTS.items():
-            problems, _ = reader_guard.check(self.tree({"src/lib.rs": line + "\n"}))
+            problems, _ = reader_guard.check(self.tree({"src/lib.rs": line + "\n"}), {})
             self.assertTrue(any(f": {name}:" in p for p in problems), (name, problems))
 
     def test_test_modules_comments_and_strings_are_not_production(self):
         text = ('#[cfg(test)]\nmod tests {\n    fn from_json() {}\n}\n'
                 '// let v = serde_json::from_str(s);\n'
                 'pub const DOC: &str = "fn from_bytes( File::open";\n')
-        self.assertEqual(reader_guard.check(self.tree({"src/lib.rs": text}))[0], [])
+        self.assertEqual(reader_guard.check(self.tree({"src/lib.rs": text}), {})[0], [])
 
     def test_build_script_and_proc_macro_fail(self):
         d = self.tree({"src/lib.rs": "\n", "build.rs": "fn main() {}\n",
                        "Cargo.toml": '[package]\nname = "x"\n[lib]\nproc-macro = true\n'})
-        problems, _ = reader_guard.check(d)
+        problems, _ = reader_guard.check(d, {})
         self.assertTrue(any(p.startswith("build.rs") for p in problems), problems)
         self.assertTrue(any("proc-macro" in p for p in problems), problems)
+
+    def test_a_decided_reader_passes_and_any_other_still_fails(self):
+        readers = {("src/sketch.rs", "decode function", "pub fn decode(b: &[u8]) -> S {"): "decided"}
+        d = self.tree({"src/sketch.rs": "pub fn decode(b: &[u8]) -> S {\n}\n"})
+        self.assertEqual(reader_guard.check(d, readers), ([], 1))
+        d = self.tree({"src/sketch.rs": "pub fn decode(b: &[u8]) -> S {\n}\npub fn from_json(s: &str) {}\n"})
+        problems, _ = reader_guard.check(d, readers)
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("from_json", problems[0])
+        # the same line in another file is not the decided reader
+        d = self.tree({"src/other.rs": "pub fn decode(b: &[u8]) -> S {\n}\n", "src/sketch.rs": "pub fn decode(b: &[u8]) -> S {\n}\n"})
+        problems, _ = reader_guard.check(d, readers)
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("src/other.rs", problems[0])
+
+    def test_a_stale_decided_reader_fails(self):
+        readers = {("src/sketch.rs", "decode function", "pub fn decode(b: &[u8]) -> S {"): "decided"}
+        problems, _ = reader_guard.check(self.tree({"src/sketch.rs": "\n"}), readers)
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("stale", problems[0])
+
+    def test_the_decided_readers_of_this_crate_are_exactly_the_sketch_decoders(self):
+        self.assertEqual({k[0] for k in reader_guard.READERS}, {"src/sketch.rs"})
+        root = Path(__file__).resolve().parents[1]
+        self.assertEqual(reader_guard.check(root)[0], [])
 
     def test_no_source_file_fails(self):
         d = Path(tempfile.mkdtemp())
