@@ -28,3 +28,20 @@ checker = ".github/workflows/ci.yml#- name: Test (unit + integration + doc, ever
 canary = "tests/analytics_semantics_id.rs::every_pin_moves_the_identifier"
 zero = "scripts/test_run_tests.py::RunTests.test_a_named_file_that_ran_zero_fails"
 shared = ["scripts/run_tests.sh", "scripts/test_run_tests.py"]
+
+# G8: the sketches' byte form carries ANALYTICS_SEMANTICS_ID and every decode refuses another one;
+# the handshake test runs in the test legs (scripts/run_tests.sh names sketch_bytes, so a run of 0 tests
+# fails), and reader_guard.py keeps the readers to the decided ones
+[[row]]
+gate = "G8"
+checker = ".github/workflows/ci.yml#- name: Test (unit + integration + doc, every feature)>scripts/run_tests.sh"
+canary = "tests/sketch_bytes.rs::every_sketch_decode_checks_the_meaning_identifier"
+zero = "scripts/test_run_tests.py::RunTests.test_a_named_file_that_ran_zero_fails"
+shared = ["scripts/run_tests.sh", "scripts/test_run_tests.py"]
+
+[[row]]
+gate = "G8"
+checker = ".github/workflows/ci.yml#run: python scripts/reader_guard.py"
+canary = "scripts/test_reader_guard.py::ReaderGuardTest.test_a_decided_reader_passes_and_any_other_still_fails"
+zero = "scripts/test_reader_guard.py::ReaderGuardTest.test_no_source_file_fails"
+shared = "n/a: scripts/reader_guard.py and its READERS are this crate's own checker (its decided readers are this crate's), not a copy shared across crates"

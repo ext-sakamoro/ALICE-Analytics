@@ -67,6 +67,27 @@ zero = "scripts/test_run_tests.py::RunTests.test_a_named_file_that_ran_zero_fail
 shared = ["scripts/run_tests.sh", "scripts/test_run_tests.py"]
 
 [[row]]
+gate = "G8"
+checker = ".github/workflows/ci.yml#- name: Test (unit + integration + doc, every feature)>scripts/run_tests.sh"
+canary = "tests/sketch_bytes.rs::every_sketch_decode_checks_the_meaning_identifier"
+zero = "scripts/test_run_tests.py::RunTests.test_a_named_file_that_ran_zero_fails"
+shared = ["scripts/run_tests.sh", "scripts/test_run_tests.py"]
+
+[[row]]
+gate = "G8"
+checker = ".github/workflows/ci.yml#run: python scripts/reader_guard.py"
+canary = "scripts/test_reader_guard.py::ReaderGuardTest.test_a_decided_reader_passes_and_any_other_still_fails"
+zero = "scripts/test_reader_guard.py::ReaderGuardTest.test_no_source_file_fails"
+shared = "n/a: scripts/reader_guard.py and its READERS are this crate's own checker (its decided readers are this crate's), not a copy shared across crates"
+
+[[row]]
+gate = "G8"
+checker = "scripts/api_boundary.py"
+canary = "scripts/test_api_boundary.py::CheckTest.test_listed_items_pass_and_drift_fails"
+zero = "scripts/test_api_boundary.py::CheckTest.test_nothing_enumerated_fails"
+shared = ["scripts/api_boundary.py", "scripts/test_api_boundary.py"]
+
+[[row]]
 gate = "G9"
 checker = "scripts/id_move_check.py"
 canary = "scripts/test_id_move_check.py::Rules.test_no_bump_and_the_old_value_not_kept_fails"

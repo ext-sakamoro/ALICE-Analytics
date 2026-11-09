@@ -43,11 +43,11 @@ jobs:
       # as an empty run); the full suite still runs
       - name: Test (unit + integration + doc, every feature)
         shell: bash
-        run: scripts/run_tests.sh determinism_golden,float_edge_golden,float_environment=2,analytics_semantics_id -- cargo test --all-features
+        run: scripts/run_tests.sh determinism_golden,float_edge_golden,float_environment=2,analytics_semantics_id,sketch_bytes -- cargo test --all-features
 
       - name: Test (unit + integration + doc, default features)
         shell: bash
-        run: scripts/run_tests.sh determinism_golden,float_edge_golden,float_environment=2,analytics_semantics_id -- cargo test
+        run: scripts/run_tests.sh determinism_golden,float_edge_golden,float_environment=2,analytics_semantics_id,sketch_bytes -- cargo test
 
       # The library is no_std, so its unit tests must also compile and run
       # without the `std` feature: that is the only lane that executes the
@@ -317,7 +317,7 @@ jobs:
         run: python scripts/test_entropy_guard.py
       - name: Entropy guard (no OS entropy / wall clock in production code)
         run: python scripts/entropy_guard.py
-      # G7 / G8: no reader of external bytes and no type-erasing entry point (both n/a while this holds)
+      # G7 / G8: the only readers of external bytes are the decided ones (the sketches' decode, G8 pass), no type-erasing entry point (G7 n/a)
       - name: Reader guard (tests)
         run: python scripts/test_reader_guard.py
       - name: Reader guard
