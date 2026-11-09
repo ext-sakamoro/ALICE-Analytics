@@ -191,8 +191,8 @@ REV = "2d01c63ff0849cf0ab82eafb89f87f1b729bd2a8"
 PINNED = f"git+{GIT}?rev={REV}#{REV}"
 
 
-class GitPinned(Fixture):
-    """A dependency taken from git at a pinned rev while its version is not on crates.io"""
+class GitBase(Fixture):
+    """the manifest, locks and runner of the git dependency tests"""
 
     def setUp(self) -> None:
         super().setUp()
@@ -221,6 +221,17 @@ class GitPinned(Fixture):
 
         return run
 
+    def write_dep(self, spec: str) -> None:
+        (self.root / "Cargo.toml").write_text(
+            '[package]\nname = "alice-crate"\nversion = "0.6.0"\n\n[dependencies]\n'
+            f'alice-det-math = {{ {spec} }}\n'
+        )
+
+
+
+class GitPinned(GitBase):
+    """A dependency taken from git at a pinned rev while its version is not on crates.io"""
+
     def test_unpublished_git_dep_is_blocked_patched_and_its_lock_source_checked(self) -> None:
         rc, out = self.main(runner=self.git_runner(shipped=PINNED))
         self.assertEqual(rc, 0, out)
@@ -247,18 +258,114 @@ class GitPinned(Fixture):
         self.assertEqual(rc, 1, out)
         self.assertIn("the shipped Cargo.lock takes alice-det-math from", out)
 
-    def test_git_dep_not_pinned_to_a_full_rev_is_a_problem(self) -> None:
-        for spec in (f'git = "{GIT}", branch = "main", version = "0.5.2"',
-                     f'git = "{GIT}", rev = "{REV[:12]}", version = "0.5.2"',
-                     f'git = "{GIT}", rev = "{REV.upper()}", version = "0.5.2"',
-                     f'git = "{GIT}", version = "0.5.2"'):
-            (self.root / "Cargo.toml").write_text(
-                '[package]\nname = "alice-crate"\nversion = "0.6.0"\n\n[dependencies]\n'
-                f'alice-det-math = {{ {spec} }}\n'
-            )
+    def test_a_rev_that_is_not_40_lowercase_hex_is_a_problem(self) -> None:
+        for rev in (REV[:12], REV.upper()):
+            self.write_dep(f'git = "{GIT}", rev = "{rev}", version = "0.5.2"')
             rc, out = self.main(runner=self.git_runner())
             self.assertEqual(rc, 1, out)
-            self.assertIn("is not pinned to a 40-hex rev", out)
+            self.assertIn("not 40 lowercase hex digits", out)
+
+    def test_more_than_one_reference_is_a_problem(self) -> None:
+        self.write_dep(f'git = "{GIT}", rev = "{REV}", branch = "main", version = "0.5.2"')
+        rc, out = self.main(runner=self.git_runner())
+        self.assertEqual(rc, 1, out)
+        self.assertIn("names more than one of rev / branch / tag (branch, rev)", out)
+
+    def test_a_branch_or_default_branch_dep_without_a_lock_entry_is_a_problem(self) -> None:
+        for spec in (f'git = "{GIT}", branch = "main", version = "0.5.2"', f'git = "{GIT}", version = "0.5.2"'):
+            self.write_dep(spec)
+            rc, out = self.main(runner=self.git_runner())
+            self.assertEqual(rc, 1, out)
+            self.assertIn("there is no Cargo.lock to read the commit it resolved to", out)
+
+
+TESTED = "1" * 40
+MOVED = "2" * 40
+
+
+class GitBranch(GitBase):
+    """A dependency taken from git by branch / tag / the default branch while its version is not on
+    crates.io: patched with the same reference, checked at the commit this repository's Cargo.lock
+    resolved it to. oracle: the expected sources are written out here from the cargo source format
+    (`git+URL?branch=B#C`), not built by package_integrity"""
+
+    def use(self, ref: str) -> str:
+        """write the manifest and this repository's Cargo.lock for reference `ref` ("branch=main",
+        "tag=v1", or "" for the default branch); the source cargo writes for it at TESTED"""
+        spec = f'git = "{GIT}", version = "0.5.2"' + (
+            ", " + ref.replace("=", ' = "') + '"' if ref else "")
+        self.write_dep(spec)
+        source = f"git+{GIT}" + (f"?{ref}" if ref else "") + f"#{TESTED}"
+        (self.root / "Cargo.lock").write_text(self.lock(source))
+        return source
+
+    def test_a_branch_tag_or_default_branch_dep_is_patched_with_its_own_reference(self) -> None:
+        for ref, arg in (("branch=main", ("branch", "main")), ("tag=v1", ("tag", "v1")), ("", None)):
+            source = self.use(ref)
+            self.calls.clear()
+            rc, out = self.main(runner=self.git_runner(fresh=source, shipped=source))
+            self.assertEqual(rc, 0, f"{ref}: {out}")
+            self.assertIn("git pins: 1, compared 2 against the locks", out)
+            cargo = [c for c in self.calls if c[0] == "cargo"]
+            self.assertTrue(cargo)
+            for c in cargo:
+                self.assertIn(f'patch.crates-io.alice-det-math.git={json.dumps(GIT)}', c)
+                self.assertFalse(any("patch.crates-io.alice-det-math.rev" in a for a in c), c)
+                if arg:
+                    self.assertIn(f'patch.crates-io.alice-det-math.{arg[0]}={json.dumps(arg[1])}', c)
+                else:
+                    self.assertFalse(any(".branch=" in a or ".tag=" in a for a in c), c)
+
+    def test_a_branch_whose_tip_moved_since_the_tested_lock_fails(self) -> None:
+        source = self.use("branch=main")
+        moved = source.replace(TESTED, MOVED)
+        rc, out = self.main(runner=self.git_runner(fresh=moved, shipped=source))
+        self.assertEqual(rc, 1, out)
+        self.assertIn(f"the freshly resolved Cargo.lock takes alice-det-math from ['{moved}'], not {source}", out)
+
+    def test_a_second_source_of_the_package_fails(self) -> None:
+        """a transitive git dependency taking the same package by `?rev` next to this crate's
+        `?branch`: two copies linked"""
+        source = self.use("branch=main")
+        second = f"git+{GIT}?rev={TESTED}#{TESTED}"
+        two = self.lock(source) + f'\n[[package]]\nname = "alice-det-math"\nversion = "0.5.2"\nsource = "{second}"\n'
+        base = self.runner()
+
+        def run(cmd: list[str], cwd: Path) -> tuple[int, str, str]:
+            rc, o, e = base(cmd, cwd)
+            if cmd[1] == "check":
+                (cwd / "Cargo.lock").write_text(two)
+            return rc, o, e
+
+        rc, out = self.main(runner=run)
+        self.assertEqual(rc, 1, out)
+        self.assertIn(second, out)
+
+    def test_a_transitive_dependency_by_the_same_branch_passes(self) -> None:
+        """the crates reached through git name the package by the same `?branch=main#C`: one source"""
+        source = self.use("branch=main")
+        same = self.lock(source) + f'\n[[package]]\nname = "alice-zip"\nversion = "0.11.0"\nsource = "git+https://github.com/ext-sakamoro/ALICE-Zip?branch=main#{MOVED}"\ndependencies = ["alice-det-math"]\n'
+        base = self.runner()
+
+        def run(cmd: list[str], cwd: Path) -> tuple[int, str, str]:
+            rc, o, e = base(cmd, cwd)
+            if cmd[1] == "check":
+                (cwd / "Cargo.lock").write_text(same)
+            return rc, o, e
+
+        rc, out = self.main(runner=run)
+        self.assertEqual(rc, 0, out)
+        self.assertIn("compared 2 against the locks", out)
+
+    def test_the_branch_commit_is_reported(self) -> None:
+        source = self.use("branch=main")
+        rc, out = self.main(runner=self.git_runner(fresh=source, shipped=source))
+        self.assertEqual(rc, 0, out)
+        self.assertIn(f"taken from git {GIT} branch main at {TESTED[:12]}", out)
+
+
+class GitPinnedMore(GitBase):
+    """more rev cases"""
 
     def test_git_dep_without_a_version_is_a_problem_but_a_dev_dependency_is_left_out(self) -> None:
         (self.root / "Cargo.toml").write_text(
