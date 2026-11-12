@@ -664,8 +664,11 @@ fn golden_law() {
 ///
 /// Since the identifier of each alice-det-math function is folded, this is `ANALYTICS_SEMANTICS_ID`, which the
 /// law identifier is taken under.
+///
+/// Re-recorded for alice-zip's identifier `922b2865…` (`84753517…` → `67650b7f…`): only the
+/// alice-zip entry of the fold moved; every scenario hash above is unchanged.
 const GOLDEN_SEMANTICS_ID: &str =
-    "847535174fa305517aa11fe8b98f604d1b1ec48abaa23d2b1dce9ccc8aa8884f";
+    "67650b7f63ebe71670b7fd9b5781fe276f515dbcee4497169cdd74f1c19a08d4";
 
 #[test]
 fn golden_semantics_id() {
@@ -720,8 +723,17 @@ fn golden_semantics_id() {
 /// Re-recorded for `alice-det-math` 0.5.2 at 2d01c63f (`795d4520…` → `b2e9802d…`): the same law
 /// under the 39507d1b identifier (`a2e46794…`) still gives `795d4520…`
 /// (`law_id_under_the_det_math_39507d1b_identifier_is_unchanged` below).
+///
+/// Re-recorded for alice-zip's identifier `922b2865…` (the kind tag of its causal 2-D law folded
+/// as an entry), which moved `ANALYTICS_SEMANTICS_ID` `84753517…` → `67650b7f…` (`a8b76115…` →
+/// `dc657508…`): the same law under `84753517…` still gives `a8b76115…`
+/// (`law_id_under_the_analytics_84753517_identifier_is_unchanged` below).
 #[cfg(feature = "law")]
-const GOLDEN_LAW_ID: &str = "a8b76115965ed692b16be3ba4cb064d62198b9c55402efd6a9656baaa126556a";
+const GOLDEN_LAW_ID: &str = "dc6575086962d77c84a496a5e4998dd81972df123988f099a5f1652e52f0c8a2";
+/// `GOLDEN_LAW_ID` under `ANALYTICS_SEMANTICS_ID` `84753517…`, before alice-zip's causal-law kind tag
+#[cfg(feature = "law")]
+const GOLDEN_LAW_ID_ANALYTICS_84753517: &str =
+    "a8b76115965ed692b16be3ba4cb064d62198b9c55402efd6a9656baaa126556a";
 /// `GOLDEN_LAW_ID` under `ANALYTICS_SEMANTICS_ID` `54cbe6e9…`, before the `DDSketch` sum became exact
 #[cfg(feature = "law")]
 const GOLDEN_LAW_ID_ANALYTICS_54CBE6E9: &str =
@@ -816,6 +828,51 @@ fn law_id_under_the_previous_identifier_is_unchanged() {
         summary.law_id,
         law.law_id(&alice_analytics::ANALYTICS_SEMANTICS_ID)
     );
+}
+
+/// Every identifier of `PREVIOUS_ANALYTICS_SEMANTICS_IDS` still gives the law identifier recorded
+/// under it, so a law stamped with it reproduces; an identifier without a recorded value, or a
+/// list that lost one, fails here
+#[cfg(feature = "law")]
+#[test]
+fn every_previous_identifier_reproduces_its_recorded_law_id() {
+    let recorded = [(
+        "847535174fa305517aa11fe8b98f604d1b1ec48abaa23d2b1dce9ccc8aa8884f",
+        GOLDEN_LAW_ID_ANALYTICS_84753517,
+    )];
+    let law = law_fixture();
+    let mut compared = 0;
+    for previous in alice_analytics::PREVIOUS_ANALYTICS_SEMANTICS_IDS {
+        let mut id_hex = String::with_capacity(64);
+        for b in previous {
+            write!(id_hex, "{b:02x}").expect("writing to a String cannot fail");
+        }
+        let (_, expected) = recorded
+            .iter()
+            .find(|(id, _)| *id == id_hex)
+            .unwrap_or_else(|| panic!("no recorded law identifier under {id_hex}"));
+        let mut hex = String::with_capacity(64);
+        for b in law.law_id(previous) {
+            write!(hex, "{b:02x}").expect("writing to a String cannot fail");
+        }
+        assert_eq!(hex, *expected, "law identifier under {id_hex}");
+        compared += 1;
+    }
+    assert_eq!(compared, recorded.len(), "previous identifiers compared");
+}
+
+/// Re-recording `GOLDEN_LAW_ID` for alice-zip's `922b2865…` moved the identifier input only: the
+/// same law under `ANALYTICS_SEMANTICS_ID` `84753517…` gives the value recorded before
+#[cfg(feature = "law")]
+#[test]
+fn law_id_under_the_analytics_84753517_identifier_is_unchanged() {
+    let law = law_fixture();
+    let previous = unhex("847535174fa305517aa11fe8b98f604d1b1ec48abaa23d2b1dce9ccc8aa8884f");
+    let mut hex = String::with_capacity(64);
+    for b in law.law_id(&previous) {
+        write!(hex, "{b:02x}").expect("writing to a String cannot fail");
+    }
+    assert_eq!(hex, GOLDEN_LAW_ID_ANALYTICS_84753517);
 }
 
 /// Re-recording `GOLDEN_LAW_ID` for `alice-det-math` 0.5.2 at 39507d1b moved the identifier input

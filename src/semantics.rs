@@ -11,7 +11,7 @@
 //! # Hex form
 //!
 //! ```text
-//! 847535174fa305517aa11fe8b98f604d1b1ec48abaa23d2b1dce9ccc8aa8884f
+//! 67650b7f63ebe71670b7fd9b5781fe276f515dbcee4497169cdd74f1c19a08d4
 //! ```
 //!
 //! # Entries
@@ -43,7 +43,10 @@
 //! The identifier is a constant of this crate version: a dependency bump or
 //! a toolchain change that moved any pinned bits fails a golden, and moving
 //! the golden moves the identifier. Earlier identifiers whose pinned bits
-//! are still reproduced are listed in [`PREVIOUS_ANALYTICS_SEMANTICS_IDS`].
+//! are still reproduced are listed in [`PREVIOUS_ANALYTICS_SEMANTICS_IDS`]:
+//! when only an upstream identifier this crate folds moves (a pin-only move,
+//! every golden unchanged) the old identifier is listed; when a golden moved
+//! (the pinned bits are not reproduced) it is not.
 
 /// Decodes 64 hex digits into 32 bytes at compile time; anything else is a
 /// compile error.
@@ -98,7 +101,7 @@ pub const ANALYTICS_SEMANTICS_PINS: [(&str, [u8; 32]); 8] = [
     ),
     (
         "alice-zip",
-        hex32("65f48962c757ebb619d252f8784f830aca5f3698fbd22f34150f9887863f38dd"),
+        hex32("922b28656da64d8651eae0db86d0070078c4b5dc183c4a4d0219107f73ffca78"),
     ),
 ];
 
@@ -134,14 +137,20 @@ const _: () = alice_det_math::assert_function_pins(DET_MATH_PINS);
 /// The semantics identifier of this crate: the fold of
 /// [`ANALYTICS_SEMANTICS_PINS`] (see the module documentation).
 pub const ANALYTICS_SEMANTICS_ID: [u8; 32] =
-    hex32("847535174fa305517aa11fe8b98f604d1b1ec48abaa23d2b1dce9ccc8aa8884f");
+    hex32("67650b7f63ebe71670b7fd9b5781fe276f515dbcee4497169cdd74f1c19a08d4");
 
 /// Earlier values of [`ANALYTICS_SEMANTICS_ID`] whose pinned bits this
 /// release still reproduces, newest first
 ///
-/// Empty: `54cbe6e9…` and the generations before it (`38e4dba4…`, `2def9a11…`,
-/// `f8ded596…`) folded the `window` and `law` goldens of a `DDSketch` whose sum
-/// was a running float sum; the sum is now exact (see
+/// `84753517…` (alice-zip `65f48962…`): only the alice-zip entry moved (to
+/// `922b2865…`, the kind tag of its causal 2-D law), every golden is unchanged,
+/// so its pinned bits are reproduced and it is listed.
+///
+/// Not listed: `54cbe6e9…` and the generations before it (`38e4dba4…`,
+/// `2def9a11…`, `f8ded596…`) folded the `window` and `law` goldens of a
+/// `DDSketch` whose sum was a running float sum; the sum is now exact (see
 /// [`ExactSum`](crate::exact_sum::ExactSum)), so `mean` and `sum` of those
-/// scenarios have other bits and no earlier identifier's pinned bits are reproduced.
-pub const PREVIOUS_ANALYTICS_SEMANTICS_IDS: &[[u8; 32]] = &[];
+/// scenarios have other bits and their pinned bits are not reproduced.
+pub const PREVIOUS_ANALYTICS_SEMANTICS_IDS: &[[u8; 32]] = &[hex32(
+    "847535174fa305517aa11fe8b98f604d1b1ec48abaa23d2b1dce9ccc8aa8884f",
+)];
