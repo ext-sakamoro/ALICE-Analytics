@@ -86,6 +86,10 @@ step "ci.yml / docs-lint: Reader guard (G7 / G8, tests, then src/)"
 python3 scripts/test_reader_guard.py
 python3 scripts/reader_guard.py
 
+step "ci.yml / clippy: Upstream previous identifiers (test, then whole-list uses only)"
+python3 scripts/test_upstream_previous_ids_check.py
+python3 scripts/upstream_previous_ids_check.py
+
 step "ci.yml / clippy: Identifier moves (tests, then against the published release)"
 # CI sets CARGO_TERM_COLOR=always for the whole workflow: the probe reads rustc's coloured stderr there
 CARGO_TERM_COLOR=always python3 scripts/test_id_move_check.py
