@@ -15,12 +15,12 @@ dependencies = [
 [[package]]
 name = "alice-det-math"
 version = "0.6.1"
-source = "git+https://github.com/ext-sakamoro/ALICE-DetMath?branch=main#d80446ebce73c5c397f7df12435cf574460400bf"
+source = "git+https://github.com/ext-sakamoro/ALICE-DetMath?branch=main#6269efc2280a74301c91139117d5d01a5eca60df"
 
 [[package]]
 name = "alice-zip"
-version = "0.11.0"
-source = "git+https://github.com/ext-sakamoro/ALICE-Zip?branch=main#c498e1769a71532239aed179e918734dd6329d8a"
+version = "0.12.0"
+source = "git+https://github.com/ext-sakamoro/ALICE-Zip?branch=main#6c5fc8b08f9c5f7232e072f12fea88b9999df310"
 dependencies = [
  "alice-det-math",
  "libm",
