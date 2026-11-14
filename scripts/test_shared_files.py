@@ -66,9 +66,16 @@ def pinned_table() -> list[tuple[str, list[str]]]:
         if path is None or repos is None:
             raise RuntimeError(f"a table row without a path or a repos line: {block[:80]!r}")
         rows.append((path.group(1), re.findall(r'"([^"]+)"', repos.group(1))))
+        sha = re.search(r'^sha256 = "([0-9a-f]{64})"$', block, re.M)
+        if sha is not None:
+            UNIFORM[path.group(1)] = sha.group(1)
     if not rows:
         raise RuntimeError("the pinned table has no rows")
     return rows
+
+
+# path -> the bytes' SHA-256 of each uniform row of the pinned table (filled by pinned_table)
+UNIFORM: dict[str, str] = {}
 
 
 class SharedFiles(unittest.TestCase):
@@ -213,12 +220,44 @@ class SharedFiles(unittest.TestCase):
         code, out = self.run_script(str(self.tree))
         self.assertEqual(code, 2, out)
 
-    def test_a_pin_without_a_visibility_line_is_public(self):
-        # no line is the public mode: a name the table never lists then holds shared paths the table
-        # neither lists nor exempts for it, which fails (the private mode is never the default)
+    def converged_tree(self) -> tuple[Path, list[str]]:
+        """A tree holding only shared copies whose bytes are their uniform row's (taken from the committed
+        tree): converged by construction, whatever state the host repository's own copies are in."""
+        tree = Path(self.tmp.name) / "converged"
+        held = []
+        for rel in self.probes(self.tree):
+            data = (self.tree / rel).read_bytes()
+            if UNIFORM.get(rel) == hashlib.sha256(data).hexdigest():
+                (tree / rel).parent.mkdir(parents=True, exist_ok=True)
+                (tree / rel).write_bytes(data)
+                held.append(rel)
+        self.assertTrue(held, "the committed tree holds no copy with its uniform row's bytes")
+        return tree, held
+
+    def test_a_converged_copy_of_an_unlisted_name_is_adopting_in_the_public_mode(self):
+        # the table's bytes under a name it does not list yet are being adopted (the next table lists
+        # them): pending, not a finding
         self.write_pin(self.unlisted_name(), None)
-        code, out = self.run_script(str(self.private_tree()))
+        tree, held = self.converged_tree()
+        code, out = self.run_script(str(tree))
+        self.assertEqual(code, 0, out)
+        self.assertIn("adopting", out)
+        self.assertNotIn("private copy", out)
+
+    def test_a_pin_without_a_visibility_line_is_public(self):
+        # no line is the public mode: a name the table never lists then holds a shared path with other
+        # bytes than its row's, which fails, and the private mode's wording does not appear (the private
+        # mode is never the default). The other bytes are made here, on a converged tree, so the result
+        # does not depend on whether the host repository's copies are at their targets.
+        self.write_pin(self.unlisted_name(), None)
+        tree, held = self.converged_tree()
+        f = tree / held[0]
+        data = bytearray(f.read_bytes())
+        data[-1] ^= 1
+        f.write_bytes(bytes(data))
+        code, out = self.run_script(str(tree))
         self.assertEqual(code, 1, out)
+        self.assertIn(held[0], out)
         self.assertNotIn("private copy", out)
 
     def test_an_unknown_visibility_fails(self):
