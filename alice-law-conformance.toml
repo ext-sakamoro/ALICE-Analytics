@@ -144,7 +144,9 @@ note = "pass: (a) and (b) hold for every pass gate and are checked by machine (c
 
 [G12]
 status = "pass"
-evidence = [".github/workflows/public-text.yml", "scripts/public_text.sh", ".github/public-text-pin", "scripts/test_public_text.py"]
+evidence = [".github/workflows/public-text.yml", "scripts/public_text.sh", ".github/public-text-pin", "scripts/test_public_text.py",
+    "the public text check runs in CI: `.github/workflows/public-text.yml#- name: Public text (tree at HEAD, then the pushed commits)` (scripts/public_text.sh, ALICE-Law's checker at .github/public-text-pin) after its tests `.github/workflows/public-text.yml#- name: Tests of scripts/public_text.sh (no network)`",
+]
 mutant = "adding an internal word to a tracked document (a line in CONTRIBUTING.md) makes `scripts/public_text.sh` exit 1 naming the file and line; measured 2026-10-15, restored"
 since = "a3ceb09"
 note = "the CI job fetches ALICE-Law's own scripts/public_text_check.py at the revision named in .github/public-text-pin and refuses it unless its SHA-256 is the one in that file (so it is the file, not a copy that can drift); it checks the tree at HEAD and each pushed commit's message, added lines and paths, and exits 2 when it compared nothing or the pin or base is malformed (scripts/test_public_text.py covers the two exit-2 cases). Same step in scripts/preflight.sh."
@@ -172,6 +174,7 @@ evidence = [
     ".github/workflows/ci.yml docs-lint job (ubuntu, macOS, Windows): the static guard and both test files",
     ".github/workflows/release-profile.yml (ubuntu, macOS): tests/float_environment.rs in the release profile, and the dynamic check for the default, all-features and no-default feature sets",
     "tests/float_environment.rs round_to_nearest_even and subnormals_are_not_flushed (byte-identical to ALICE-DB's; ci.yml test job on the four OS, every-feature and default runs, through scripts/run_tests.sh as `float_environment=2`, so the step fails unless both tests pass: an #[ignore], a #[cfg] that drops one, or a rename is red)",
+    "where each half runs: the static guard `.github/workflows/ci.yml#python scripts/build_config_guard.py`, the dynamic check `.github/workflows/release-profile.yml#- name: Effective rustc flags (G14)`, and the float environment in the release profile `.github/workflows/release-profile.yml#- name: Test (release, determinism_golden + float_edge_golden)`",
 ]
 mutant = "measured 2026-10-16, each reverted: `RUSTFLAGS: \"-C target-cpu=native\"` added to release-profile.yml's env makes scripts/build_config_guard.py exit 1 with `target-cpu-native: target-cpu=native` on the added line; RUSTFLAGS=$'-C target-cpu=nat\\x69ve' makes scripts/build_flags_check.py exit 1 with `alice_analytics: target-cpu-native: target-cpu=native`; setting FPCR.RMode to round-toward-plus-infinity fails round_to_nearest_even and setting FPCR.FZ (flush-to-zero) fails subnormals_are_not_flushed (aarch64, macOS)"
 since = ""
