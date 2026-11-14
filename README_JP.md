@@ -225,16 +225,16 @@ scripts/preflight.sh --quick  # static checks, clippy, builds, docs, cargo test 
   残差統計、出典、oracle ケースを伴う fit 済みの law `law` feature はその残差分布を
   要約する
 
-<!-- law-integration:begin law=ffcc3d5a9395f4620aec29c5244fc2c528122fb0 -->
+<!-- law-integration:begin law=ab12888653b9ccfcb09275ff1dda3810bbf7c7a0 -->
 ## ALICE-Law との統合
 
-ALICE-Law の `scripts/gen-law-readme-block.py` が ALICE-Law `ffcc3d5a9395` とこの repository の `alice-law-conformance.toml` から生成する 手で編集しない
+ALICE-Law の `scripts/gen-law-readme-block.py` が ALICE-Law `ab12888653b9` とこの repository の `alice-law-conformance.toml` から生成する 手で編集しない
 
 | | |
 |---|---|
-| release train | alice-analytics 0.6.0 (published)、Law への依存: あり |
-| 算術 | main branch の alice-det-math 0.6.1、算術の識別子 `6fc214e924c53557f33775df51f1f8dfe2f246d67a9e493d6fb5837d999022f2` (release train の alice-det-math は 0.5.1 で、測った版と違う) この crate の要求は `alice-det-math = "0.6"` |
-| end to end 検査 | 対象 (`alice-analytics` 0.7、main branch から)、値の digest `66b99010e871b2bc099ad5a4dd0f7c34cc5d6731f1c2a0459c0dd58284b081d7`、aarch64 と x86_64 で同じ |
+| release train | alice-analytics 0.7.0 (main fd09b3e44710)、Law への依存: あり |
+| 算術 | main branch の alice-det-math 0.6.1、算術の識別子 `6fc214e924c53557f33775df51f1f8dfe2f246d67a9e493d6fb5837d999022f2` この crate の要求は `alice-det-math = "0.6"` |
+| end to end 検査 | 対象 (`alice-analytics` 0.7、main branch から)、値の digest `80aec05517ce040db16a29c4690e38ecfb1fbf127b4e8ee83a21d964d2d5f3bd`、aarch64 と x86_64 で同じ |
 
 ### 適合 (G1-G14)
 
@@ -250,7 +250,7 @@ ALICE-Law の `scripts/gen-law-readme-block.py` が ALICE-Law `ffcc3d5a9395` と
 | G8 persisted-semantics-id | 適合 | ruling (2026-11-09): the sketches' byte form is a durable format of this crate (a store keeps it and merges parts later), so G8 applies: the format carries the … |
 | G9 persisted-meaning-change-is-major | 適合 | [Unreleased] (Breaking): the DDSketch sum became exact (src/exact_sum.rs), which moved the window and law scenario goldens (both read DDSketch::mean), so … |
 | G10 no-run-varying-artifacts | 適合 | the clock-seeded constructors of the deprecated privacy module (XorShift64::from_entropy, impl Default for XorShift64, LaplaceNoise::new, Rappor::new, … |
-| G11 gate-self-tests | 適合 | pass: (a) and (b) hold for every pass gate and are checked by machine (conformance/g11.toml, scripts/g11_table.sh: 17 rows, 0 findings), and (c) every shared … |
+| G11 gate-self-tests | 適合 | pass: (a) and (b) hold for every pass gate and are checked by machine (conformance/g11.toml, scripts/g11_table.sh: 20 rows, 0 findings), and (c) every shared … |
 | G12 public-repo-text-rules | 適合 | the CI job fetches ALICE-Law's own scripts/public_text_check.py at the revision named in .github/public-text-pin and refuses it unless its SHA-256 is the one … |
 | G13 no-unspecified-order | 適合 | no parallel reduction over floats exists, so the ordered-reduction test with two thread counts has nothing to test; the lint keeps it that way. … |
 | G14 float-environment-invariants | 適合 | the static scan covers the files of this repository and the dynamic check covers the builds CI runs on ubuntu and macOS; a flag passed by a build outside this … |
