@@ -225,10 +225,10 @@ scripts/preflight.sh --quick  # static checks, clippy, builds, docs, cargo test 
   残差統計、出典、oracle ケースを伴う fit 済みの law `law` feature はその残差分布を
   要約する
 
-<!-- law-integration:begin law=ab12888653b9ccfcb09275ff1dda3810bbf7c7a0 -->
+<!-- law-integration:begin law=9311f9692f19c93ae5f8451c5c206053ca859aca -->
 ## ALICE-Law との統合
 
-ALICE-Law の `scripts/gen-law-readme-block.py` が ALICE-Law `ab12888653b9` とこの repository の `alice-law-conformance.toml` から生成する 手で編集しない
+ALICE-Law の `scripts/gen-law-readme-block.py` が ALICE-Law `9311f9692f19` とこの repository の `alice-law-conformance.toml` から生成する 手で編集しない
 
 | | |
 |---|---|
