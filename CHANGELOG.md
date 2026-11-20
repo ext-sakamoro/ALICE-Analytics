@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- CI (ALICE-Law G11 (c)): `.github/shared-files-pin` / `.github/g11-table-pin` / `.github/public-text-pin` を ALICE-Law 5e397e3 (`scripts/fneg_fma_ir_check.py` と試験の新しい bytes を計画した表) に上げた 共有の写しは 109 件で指摘 0、README の ALICE-Law の節はその版で生成し直した
 - CI: 他の crate の `PREVIOUS_*_SEMANTICS_IDS` は一覧全体としてだけ使える (`contains` / `len` / `is_empty`、全体を回す iterator や for、引数として丸ごと渡す) とし、添字・slice のパターン・`.first` / `next` / `take` などを拒む `scripts/upstream_previous_ids_check.py` と試験を足した (ALICE-Edge と同じ中身の共有 file) 上流は major で一覧を空にする 走査した .rs が 0 件なら失敗 (ci.yml と preflight)
 - CI (ALICE-Law G11 (c)): `.github/shared-files-pin` と `.github/g11-table-pin` を ALICE-Law 4e847f08 (package_integrity と id_move_check の新しい bytes を計画した表) に上げた 共有の写しは 107 件で指摘 0、README の ALICE-Law の節はその版で生成し直した
 - CI: 共有の `scripts/id_move_check.py` は、履歴で `.github/alice-siblings` を消した base (first-parent の履歴で最後にその file を触った commit が消している: path 依存と一緒に pin を外した repository) を兄弟の無い base として扱う 兄弟を path で引かなければ通し、まだ引いていれば `broken base` として止める (それまでは消した後の base をすべて broken としていた) 試験を 3 本足した

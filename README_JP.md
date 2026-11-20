@@ -225,16 +225,16 @@ scripts/preflight.sh --quick  # static checks, clippy, builds, docs, cargo test 
   残差統計、出典、oracle ケースを伴う fit 済みの law `law` feature はその残差分布を
   要約する
 
-<!-- law-integration:begin law=9311f9692f19c93ae5f8451c5c206053ca859aca -->
+<!-- law-integration:begin law=5e397e32dee4d3a172c60f3517579c8da77d2502 -->
 ## ALICE-Law との統合
 
-ALICE-Law の `scripts/gen-law-readme-block.py` が ALICE-Law `9311f9692f19` とこの repository の `alice-law-conformance.toml` から生成する 手で編集しない
+ALICE-Law の `scripts/gen-law-readme-block.py` が ALICE-Law `5e397e32dee4` とこの repository の `alice-law-conformance.toml` から生成する 手で編集しない
 
 | | |
 |---|---|
-| release train | alice-analytics 0.7.0 (main fd09b3e44710)、Law への依存: あり |
+| release train | alice-analytics 0.7.0 (main b7eaf317295e)、Law への依存: あり |
 | 算術 | main branch の alice-det-math 0.6.1、算術の識別子 `6fc214e924c53557f33775df51f1f8dfe2f246d67a9e493d6fb5837d999022f2` この crate の要求は `alice-det-math = "0.6"` |
-| end to end 検査 | 対象 (`alice-analytics` 0.7、main branch から)、値の digest `80aec05517ce040db16a29c4690e38ecfb1fbf127b4e8ee83a21d964d2d5f3bd`、aarch64 と x86_64 で同じ |
+| end to end 検査 | 対象 (`alice-analytics` 0.7、main branch から)、値の digest `d1a37d5f3bf2590657f8507277f1661ea9f7ea27bb0b492e7952add280f2a414`、aarch64 と x86_64 で同じ |
 
 ### 適合 (G1-G14)
 
