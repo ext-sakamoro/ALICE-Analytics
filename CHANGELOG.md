@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- CI: `scripts/workflow_tool_pins.py` (共有、試験 `scripts/test_workflow_tool_pins.py`) が、workflow が入れる道具はすべて版を固定していることを確かめる `cargo install` / `cargo binstall` は crate ごとに `X.Y.Z` の版、`cargo install` は加えて `cargo +X.Y.Z` の toolchain (repository の toolchain や `+stable` で build しない)、`--git` は `--rev` の 40 桁、taiki-e/install-action は commit の 40 桁・`tool:` の各項目が `name@X.Y.Z`・`fallback: none` (既定の cargo-binstall は版の照合をしない) 例外は Cargo.lock から版を読む形 (step が package を名前の完全一致で選び、空なら止まり、値を GITHUB_OUTPUT に書く) だけ 読んだ workflow 0 件も fail
 - CI (ALICE-Law G11 (c)): `.github/shared-files-pin` / `.github/g11-table-pin` / `.github/public-text-pin` を ALICE-Law 5e397e3 (`scripts/fneg_fma_ir_check.py` と試験の新しい bytes を計画した表) に上げた 共有の写しは 109 件で指摘 0、README の ALICE-Law の節はその版で生成し直した
 - CI: 他の crate の `PREVIOUS_*_SEMANTICS_IDS` は一覧全体としてだけ使える (`contains` / `len` / `is_empty`、全体を回す iterator や for、引数として丸ごと渡す) とし、添字・slice のパターン・`.first` / `next` / `take` などを拒む `scripts/upstream_previous_ids_check.py` と試験を足した (ALICE-Edge と同じ中身の共有 file) 上流は major で一覧を空にする 走査した .rs が 0 件なら失敗 (ci.yml と preflight)
 - CI (ALICE-Law G11 (c)): `.github/shared-files-pin` と `.github/g11-table-pin` を ALICE-Law 4e847f08 (package_integrity と id_move_check の新しい bytes を計画した表) に上げた 共有の写しは 107 件で指摘 0、README の ALICE-Law の節はその版で生成し直した
@@ -52,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `tests/float_environment.rs` (ALICE-DB と同一): round-to-nearest-even と subnormal が flush されないことを実行時に確かめる test test job (4 OS) と release profile で `scripts/run_tests.sh` を通して実行 `alice-law-conformance.toml` の G14 を fail-known から pass にした
 
 ### Changed
+- `scripts/workflow_concurrency.py` の式の評価: `true` / `false` / `null`、負の数・小数・16 進の数を読み、`==` / `!=` は型の違う値を数として比べる (`'1' == 1`、数にならない文字列はどれとも等しくない)、`format` は `{{` / `}}` を括弧 1 つとして書き、引数の無い `{N}` や対の無い括弧は評価の error (その workflow の指摘になり、検査全体は止まらない) とする
 - `scripts/workflow_concurrency.py` と試験: concurrency の group と cancel-in-progress を GitHub の式として評価し (`&&` / `||` は operand を返す、`==` は大文字小文字を区別しない、`format`、`inputs.*` は手動の run の値)、branch への push・main への push・手動の run (各 ref)・main の schedule の run のうち 異なる 2 つが同じ group を持ち、どちらかが cancel しうる形を指摘する 手動の run が同じ commit の push の run を cancel すると push の run の結果が失われる 評価できない文脈名も指摘にする この repository の workflow 6 本 (eol / fuzz / g3-ir / law-readme-block / public-text / security-audit) は手動の run に自分の run id の group を持たせる
 - CI (ALICE-Law G11 (c)): 共有の `scripts/test_shared_files.py` を新しい bytes へ (owner): ALICE-Law の表の own の行 (各 repository に固有の path) を別の種類として読んで数え、repos も own も無い行と共有の行が 0 の表を拒否する ALICE-Law は run ごとに 1 回だけ取得し (2 / 4 / 8 秒の再試行)、届かなければ取得の失敗 1 件で落ちる (試験ごとの失敗にしない、skip しない) 各試験の `scripts/shared_files.sh` は git の url の書き換えでその取得を読む
 - CI: 共有の `scripts/fneg_fma_ir_check.py` と試験を ALICE-Law の表の target へ (自分の build 先を片付ける版、owner) 共有の `.github/workflows/public-text.yml` / `scripts/public_text.sh` / `scripts/test_public_text.py` を表の target へ (owner ALICE-Audit: checkout の branch を読み、新しい commit を `--new-since` で読む)
