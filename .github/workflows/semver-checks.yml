@@ -83,6 +83,7 @@ jobs:
         uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2.87.27
         with:
           tool: cargo-semver-checks@0.50.0
+          fallback: none
 
       # recorded tool outputs, and the real tool on two small crates (fails when the
       # tool is missing, so the recorded lines cannot drift from the tool unseen)

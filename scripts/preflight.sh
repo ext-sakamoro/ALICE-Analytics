@@ -51,6 +51,10 @@ python3 scripts/workflow_timeouts.py
 step "ci.yml / actionlint: workflow-concurrency (branch runs cancel, main never)"
 python3 scripts/test_workflow_concurrency.py
 python3 scripts/workflow_concurrency.py
+
+step "ci.yml / actionlint: workflow-tool-pins (every installed tool pinned)"
+python3 scripts/test_workflow_tool_pins.py
+python3 scripts/workflow_tool_pins.py
 python3 scripts/test_workflow_pipefail.py
 python3 scripts/workflow_pipefail.py
 python3 scripts/test_check_pipe_grep_q.py

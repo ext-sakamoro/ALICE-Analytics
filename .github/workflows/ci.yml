@@ -105,9 +105,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Install cargo-hack
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2.90.8
         with:
-          tool: cargo-hack
+          tool: cargo-hack@0.6.46
+          fallback: none
       - name: cargo hack check (lib, feature powerset, depth 2)
         run: cargo hack check --lib --feature-powerset --depth 2
 
@@ -381,6 +382,12 @@ jobs:
         run: |
           python3 scripts/test_workflow_concurrency.py
           python3 scripts/workflow_concurrency.py
+      # every tool a workflow installs is pinned to an exact version and built without the
+      # repository's toolchain; the checker's own tests run first
+      - name: workflow-tool-pins
+        run: |
+          python3 scripts/test_workflow_tool_pins.py
+          python3 scripts/workflow_tool_pins.py
       # every step that pipes runs with pipefail; the checker's own tests run first
       - name: workflow-pipefail
         run: |

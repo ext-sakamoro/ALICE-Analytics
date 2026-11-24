@@ -97,7 +97,9 @@ jobs:
       - name: Install cargo-fuzz
         # built from source: the prebuilt cargo-fuzz binary targets musl by
         # default, which the sanitizer build cannot use
-        run: cargo install cargo-fuzz --locked
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal
+          cargo +1.95.0 install --locked --version 0.13.2 cargo-fuzz
 
       # the build blocks: a target that does not compile must not pass
       - name: Build fuzz target
