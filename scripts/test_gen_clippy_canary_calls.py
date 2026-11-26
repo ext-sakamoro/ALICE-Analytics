@@ -212,9 +212,31 @@ class Main(unittest.TestCase):
         toml = 'disallowed-methods = [{ path = "nowhere::f", reason = "r" }]\n'
         for args in ([], ["--check"]):
             with tempfile.TemporaryDirectory() as d:
-                rc, _, err = run(["--root", str(repo(d, toml=toml, lock=None)), *args])
+                rc, _, err = run(["--root", str(repo(d, toml=toml)), *args])
             self.assertEqual(rc, 1)
             self.assertIn("compared nothing", err)
+
+    def test_an_external_entry_without_a_cargo_lock_fails(self):
+        # without Cargo.lock no external crate can be decided: every one would read "not in Cargo.lock"
+        # and the table would look valid with the planted rows gone (an untracked lock, a fresh checkout)
+        for args in ([], ["--check"]):
+            with tempfile.TemporaryDirectory() as d:
+                root = repo(d, lock=None)
+                rc, _, err = run(["--root", str(root), *args])
+                written = (root / "scripts" / "clippy_canary_calls.tsv").exists()
+            self.assertEqual(rc, 1, args)
+            self.assertIn("no Cargo.lock: cannot decide which entries are plantable", err)
+            self.assertIn("dep_a::clock::now", err)
+            self.assertFalse(written, args)
+
+    def test_builtin_and_own_entries_need_no_cargo_lock(self):
+        toml = ('disallowed-methods = [{ path = "f64::sin", reason = "r" }, '
+                '{ path = "my_crate::inner::f", reason = "r" }]\n')
+        with tempfile.TemporaryDirectory() as d:
+            root = repo(d, toml=toml, lock=None)
+            rc, out, err = run(["--root", str(root)])
+        self.assertEqual(rc, 0, err)
+        self.assertIn("(1 planted, 1 skipped)", out)
 
     def test_no_entries_compares_nothing(self):
         with tempfile.TemporaryDirectory() as d:
