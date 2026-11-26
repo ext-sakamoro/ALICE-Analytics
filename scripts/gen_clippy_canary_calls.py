@@ -10,7 +10,8 @@ resolves it (a registry or git source, or a path the root Cargo.toml declares;
 '-' and '_' are equivalent). Every other entry becomes a skip row with the reason
 it cannot be planted. Without a Cargo.lock no external crate can be decided, so
 an entry outside std, core, alloc, the primitive types and the repository's own
-crate fails the run (exit 1, nothing written) instead of becoming a skip row: a
+crate fails the run (exit 1, nothing written) instead of becoming a skip row; so
+does a Cargo.lock that lists no package, and an unreadable one always fails: a
 table made without the lock (an untracked lock, a fresh checkout) would look
 valid with every external plant gone.
 
@@ -145,14 +146,23 @@ def main(argv: list[str] | None = None) -> int:
     entries = cc.clippy_toml_entries((args.root / "clippy.toml").read_text(encoding="utf-8"))
     lock_file = args.root / "Cargo.lock"
     own = own_crates(args.root)
-    if not lock_file.exists():
+    lock: dict = {}
+    if lock_file.exists():
+        try:
+            lock = cc.lock_packages(lock_file.read_text(encoding="utf-8"))
+        except (tomllib.TOMLDecodeError, KeyError, TypeError, AttributeError, UnicodeDecodeError) as e:
+            print(f"gen_clippy_canary_calls: Cargo.lock is not readable ({type(e).__name__}: {e}): "
+                  "cannot decide which entries are plantable; regenerate it (cargo generate-lockfile)",
+                  file=sys.stderr)
+            return 1
+    if not lock:
         need = undecidable_without_lock(entries, own)
         if need:
-            print(f"gen_clippy_canary_calls: no Cargo.lock: cannot decide which entries are plantable "
+            what = "no Cargo.lock" if not lock_file.exists() else "Cargo.lock lists no package"
+            print(f"gen_clippy_canary_calls: {what}: cannot decide which entries are plantable "
                   f"({len(need)} outside std / core / alloc / primitives / own crate, first {need[0]}); "
                   "generate the lock (cargo generate-lockfile) or track it", file=sys.stderr)
             return 1
-    lock = cc.lock_packages(lock_file.read_text(encoding="utf-8")) if lock_file.exists() else {}
     text, planted, skipped = render(entries, lock, own, cc.path_dependencies(args.root))
     if planted == 0:
         print(f"gen_clippy_canary_calls: compared nothing: no plantable entry among {skipped} "

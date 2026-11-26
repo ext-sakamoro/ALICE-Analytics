@@ -229,6 +229,29 @@ class Main(unittest.TestCase):
             self.assertIn("dep_a::clock::now", err)
             self.assertFalse(written, args)
 
+    def test_an_external_entry_with_a_cargo_lock_listing_no_package_fails(self):
+        # a lock that parses but lists no package (an empty file, a stub) decides nothing either
+        for lock in ("", "version = 4\n"):
+            with tempfile.TemporaryDirectory() as d:
+                root = repo(d, lock=lock)
+                rc, _, err = run(["--root", str(root)])
+                written = (root / "scripts" / "clippy_canary_calls.tsv").exists()
+            self.assertEqual(rc, 1, repr(lock))
+            self.assertIn("Cargo.lock lists no package: cannot decide which entries are plantable", err)
+            self.assertFalse(written, repr(lock))
+
+    def test_an_unreadable_cargo_lock_is_one_refusal_line(self):
+        for lock in ("[[package]\nname = ", '[[package]]\nversion = "1"\n'):
+            with tempfile.TemporaryDirectory() as d:
+                root = repo(d, lock=lock)
+                rc, _, err = run(["--root", str(root)])
+                written = (root / "scripts" / "clippy_canary_calls.tsv").exists()
+            self.assertEqual(rc, 1, repr(lock))
+            self.assertIn("Cargo.lock is not readable", err)
+            self.assertNotIn("Traceback", err)
+            self.assertEqual(len(err.strip().splitlines()), 1, err)
+            self.assertFalse(written, repr(lock))
+
     def test_builtin_and_own_entries_need_no_cargo_lock(self):
         toml = ('disallowed-methods = [{ path = "f64::sin", reason = "r" }, '
                 '{ path = "my_crate::inner::f", reason = "r" }]\n')
